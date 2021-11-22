@@ -1,0 +1,4 @@
+jax
+jaxlib
+dm-haiku
+optax
