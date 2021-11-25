@@ -18,6 +18,7 @@
 """
 
 from typing import Callable, Tuple
+from functools import partial
 
 import jax
 import optax
@@ -188,9 +189,10 @@ def get_ddpm_loss_fn(
     return loss_fn
 
 
-def get_step_fn(
+def get_pmap_step_fn(
     sde: SDE,
     model: ParametrisedScoreFunction,
+    optimizer,
     train: bool,
     reduce_mean=False,
     continuous=True,
@@ -258,28 +260,130 @@ def get_step_fn(
                 step_rng, params, model_state, batch
             )
             grad = jax.lax.pmean(grad, axis_name="batch")
-            updates, new_opt_state = train_state.optimizer.update(
-                grad, train_state.opt_state
-            )
+            updates, new_opt_state = optimizer.update(grad, train_state.opt_state)
             new_parmas = optax.apply_updates(params, updates)
 
             new_params_ema = jax.tree_multimap(
-                lambda p_ema, p: p_ema * state.ema_rate + p * (1.0 - state.ema_rate),
-                state.params_ema,
+                lambda p_ema, p: p_ema * train_state.ema_rate
+                + p * (1.0 - train_state.ema_rate),
+                train_state.params_ema,
                 new_parmas,
             )
-            step = state.step + 1
-            new_train_state = state.replace(
+            step = train_state.step + 1
+            new_train_state = train_state._replace(
                 step=step,
                 opt_state=new_opt_state,
                 model_state=new_model_state,
                 params_ema=new_params_ema,
+                params=new_parmas,
             )
         else:
-            loss, _ = loss_fn(step_rng, state.params_ema, state.model_state, batch)
-            new_train_state = state
+            loss, _ = loss_fn(
+                step_rng, train_state.params_ema, train_state.model_state, batch
+            )
+            new_train_state = train_state
 
         loss = jax.lax.pmean(loss, axis_name="batch")
+        new_carry_state = (rng, new_train_state)
+        return new_carry_state, loss
+
+    return step_fn
+
+
+def get_step_fn(
+    sde: SDE,
+    model: ParametrisedScoreFunction,
+    optimizer,
+    train: bool,
+    reduce_mean=False,
+    continuous=True,
+    likelihood_weighting=False,
+):
+    """Create a one-step training/evaluation function.
+
+    Args:
+      sde: An `sde_lib.SDE` object that represents the forward SDE.
+      model: A `flax.linen.Module` object that represents the architecture of the score-based model.
+      train: `True` for training and `False` for evaluation.
+      optimize_fn: An optimization function.
+      reduce_mean: If `True`, average the loss across data dimensions. Otherwise sum the loss across data dimensions.
+      continuous: `True` indicates that the model is defined to take continuous time steps.
+      likelihood_weighting: If `True`, weight the mixture of score matching losses according to
+        https://arxiv.org/abs/2101.09258; otherwise use the weighting recommended by our paper.
+
+    Returns:
+      A one-step function for training or evaluation.
+    """
+    if continuous:
+        loss_fn = get_sde_loss_fn(
+            sde,
+            model,
+            train,
+            reduce_mean=reduce_mean,
+            continuous=True,
+            likelihood_weighting=likelihood_weighting,
+        )
+    else:
+        assert (
+            not likelihood_weighting
+        ), "Likelihood weighting is not supported for original SMLD/DDPM training."
+        if isinstance(sde, VESDE):
+            loss_fn = get_smld_loss_fn(sde, model, train, reduce_mean=reduce_mean)
+        elif isinstance(sde, VPSDE):
+            loss_fn = get_ddpm_loss_fn(sde, model, train, reduce_mean=reduce_mean)
+        else:
+            raise ValueError(
+                f"Discrete training for {sde.__class__.__name__} is not recommended."
+            )
+
+    # @partial(jax.jit)
+    def step_fn(carry_state: Tuple[jax.random.KeyArray, TrainState], batch: dict):
+        """Running one step of training or evaluation.
+
+        This function will undergo `jax.lax.scan` so that multiple steps can be pmapped and jit-compiled together
+        for faster execution.
+
+        Args:
+          carry_state: A tuple (JAX random state, NamedTuple containing the training state).
+          batch: A mini-batch of training/evaluation data.
+
+        Returns:
+          new_carry_state: The updated tuple of `carry_state`.
+          loss: The average loss value of this state.
+        """
+
+        (rng, train_state) = carry_state
+        rng, step_rng = jax.random.split(rng)
+        grad_fn = jax.value_and_grad(loss_fn, argnums=1, has_aux=True)
+        if train:
+            params = train_state.params
+            model_state = train_state.model_state
+            (loss, new_model_state), grad = grad_fn(
+                step_rng, params, model_state, batch
+            )
+            updates, new_opt_state = optimizer.update(grad, train_state.opt_state)
+            new_parmas = optax.apply_updates(params, updates)
+
+            new_params_ema = jax.tree_multimap(
+                lambda p_ema, p: p_ema * train_state.ema_rate
+                + p * (1.0 - train_state.ema_rate),
+                train_state.params_ema,
+                new_parmas,
+            )
+            step = train_state.step + 1
+            new_train_state = train_state._replace(
+                step=step,
+                opt_state=new_opt_state,
+                model_state=new_model_state,
+                params=new_parmas,
+                params_ema=new_params_ema,
+            )
+        else:
+            loss, _ = loss_fn(
+                step_rng, train_state.params_ema, train_state.model_state, batch
+            )
+            new_train_state = train_state
+
         new_carry_state = (rng, new_train_state)
         return new_carry_state, loss
 

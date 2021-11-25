@@ -24,8 +24,18 @@ import jax.numpy as jnp
 from scipy import integrate
 
 from score_sde.sde import SDE
-from score_sde.utils import ParametrisedScoreFunction, TrainState
-from score_sde.utils import get_score_fn, to_flattened_numpy, from_flattened_numpy
+from score_sde.utils import (
+    ParametrisedScoreFunction,
+    TrainState,
+    get_div_fn,
+    get_estimate_div_fn,
+)
+from score_sde.utils import (
+    get_score_fn,
+    to_flattened_numpy,
+    from_flattened_numpy,
+    unreplicate,
+)
 
 
 def get_likelihood_fn(
@@ -37,6 +47,7 @@ def get_likelihood_fn(
     atol: str = 1e-5,
     method: str = "RK45",
     eps: str = 1e-5,
+    bits_per_dimension=True,
 ):
     """Create a function to compute the unbiased log-likelihood estimate of a given data point.
 
@@ -44,7 +55,7 @@ def get_likelihood_fn(
       sde: A `sde_lib.SDE` object that represents the forward SDE.
       model: A `flax.linen.Module` object that represents the architecture of the score-based model.
       inverse_scaler: The inverse data normalizer.
-      hutchinson_type: "Rademacher" or "Gaussian". The type of noise for Hutchinson-Skilling trace estimator.
+      hutchinson_type: "Rademacher", "Gaussian" or "None". The type of noise for Hutchinson-Skilling trace estimator.
       rtol: A `float` number. The relative tolerance level of the black-box ODE solver.
       atol: A `float` number. The absolute tolerance level of the black-box ODE solver.
       method: A `str`. The algorithm for the black-box ODE solver.
@@ -76,8 +87,12 @@ def get_likelihood_fn(
         train_state: TrainState, x: jnp.ndarray, t: float, eps: jnp.ndarray
     ) -> jnp.ndarray:
         """Pmapped divergence of the drift function."""
-        div_fn = get_div_fn(lambda x, t: drift_fn(train_state, x, t))
-        return div_fn(x, t, eps)
+        if hutchinson_type == "None":
+            return get_div_fn(lambda x, t: drift_fn(train_state, x, t))(x, t)
+        else:
+            return get_estimate_div_fn(lambda x, t: drift_fn(train_state, x, t))(
+                x, t, eps
+            )
 
     p_drift_fn = jax.pmap(drift_fn)  # Pmapped drift function of the reverse-time SDE
     p_prior_logp_fn = jax.pmap(
@@ -100,7 +115,7 @@ def get_likelihood_fn(
             probability flow ODE.
           nfe: An integer. The number of function evaluations used for running the black-box ODE solver.
         """
-        rng, step_rng = jax.random.split(flax.jax_utils.unreplicate(prng))
+        rng, step_rng = jax.random.split(unreplicate(prng))
         shape = data.shape
         if hutchinson_type == "Gaussian":
             epsilon = jax.random.normal(step_rng, shape)
@@ -112,6 +127,8 @@ def get_likelihood_fn(
                 * 2
                 - 1
             )
+        elif hutchinson_type == "None":
+            epsilon = None
         else:
             raise NotImplementedError(f"Hutchinson type {hutchinson_type} unknown.")
 
@@ -125,23 +142,24 @@ def get_likelihood_fn(
             return np.concatenate([drift, logp_grad], axis=0)
 
         init = jnp.concatenate(
-            [mutils.to_flattened_numpy(data), np.zeros((shape[0] * shape[1],))], axis=0
+            [to_flattened_numpy(data), np.zeros((shape[0] * shape[1],))], axis=0
         )
         solution = integrate.solve_ivp(
             ode_func, (eps, sde.T), init, rtol=rtol, atol=atol, method=method
         )
         nfe = solution.nfev
         zp = jnp.asarray(solution.y[:, -1])
-        z = mutils.from_flattened_numpy(zp[: -shape[0] * shape[1]], shape)
+        z = from_flattened_numpy(zp[: -shape[0] * shape[1]], shape)
         delta_logp = zp[-shape[0] * shape[1] :].reshape((shape[0], shape[1]))
         prior_logp = p_prior_logp_fn(z)
-        bpd = -(prior_logp + delta_logp) / np.log(2)
+        posterior_logp = prior_logp + delta_logp
+        bpd = -posterior_logp / np.log(2)
         N = np.prod(shape[2:])
         bpd = bpd / N
         # A hack to convert log-likelihoods to bits/dim
         # based on the gradient of the inverse data normalizer.
         offset = jnp.log2(jax.grad(inverse_scaler)(0.0)) + 8.0
         bpd += offset
-        return bpd, z, nfe
+        return bpd if bits_per_dimension else posterior_logp, z, nfe
 
     return likelihood_fn

@@ -17,6 +17,7 @@
 """All functions and modules related to model definition.
 """
 import functools
+from dataclasses import dataclass
 from typing import Any, NamedTuple, Callable
 
 import jax
@@ -30,8 +31,6 @@ from .registry import register_category
 from .typing import ParametrisedScoreFunction
 
 from score_sde.sde import SDE, VESDE, VPSDE, subVPSDE
-
-get_model, register_model = register_category("model")
 
 
 def get_sigmas(sigma_min, sigma_max, num_scales):
@@ -49,7 +48,7 @@ def get_sigmas(sigma_min, sigma_max, num_scales):
 
 def get_score_fn(
     sde: SDE,
-    model_fn: ParametrisedScoreFunction,
+    model: ParametrisedScoreFunction,
     params,
     state,
     train=False,
@@ -81,17 +80,17 @@ def get_score_fn(
                 # The maximum value of time embedding is assumed to 999 for
                 # continuously-trained models.
                 labels = t * 999
-                model_out, state = model_fn(params, state, x, labels, rng)
+                model_out, new_state = model.apply(params, state, rng, x=x, t=labels)
                 std = sde.marginal_prob(jnp.zeros_like(x), t)[1]
             else:
                 # For VP-trained models, t=0 corresponds to the lowest noise level
                 labels = t * (sde.N - 1)
-                model_out, state = model_fn(x, labels, rng)
+                model_out, new_state = model.apply(params, state, rng, x=x, t=labels)
                 std = sde.sqrt_1m_alphas_cumprod[labels.astype(jnp.int32)]
 
             score = batch_mul(-model_out, 1.0 / std)
             if return_state:
-                return score, state
+                return score, new_state
             else:
                 return score
 
@@ -106,7 +105,7 @@ def get_score_fn(
                 labels *= sde.N - 1
                 labels = jnp.round(labels).astype(jnp.int32)
 
-            score, state = model_fn(x, labels, rng)
+            score, state = model(x, labels, rng)
             if return_state:
                 return score, state
             else:
@@ -132,6 +131,7 @@ def get_model_fn(model, params, state, train=False):
     Returns:
       A model function.
     """
+
     def model_fn(x, labels, rng=None):
         """Compute the output of the score-based model.
 
@@ -144,6 +144,23 @@ def get_model_fn(model, params, state, train=False):
         Returns:
           A tuple of (model output, new mutable states)
         """
-        return model.apply(parmas, state, rng if rng is not None else hk.next_rng_key(), x, lables)
+        return model.apply(
+            parmas, state, rng if rng is not None else hk.next_rng_key(), x, lables
+        )
 
     return model_fn
+
+
+@dataclass
+class ScoreFunctionWrapper:
+    model: object()
+
+    def __call__(self, x, t):
+        t = jnp.array(t)
+        if len(t.shape) == 0:
+            t = t * jnp.ones(x.shape[:-1])
+
+        if len(t.shape) == len(x.shape) - 1:
+            t = jnp.expand_dims(t, axis=-1)
+
+        return self.model(jnp.concatenate([x, t], axis=-1))

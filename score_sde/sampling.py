@@ -105,7 +105,7 @@ class Predictor(abc.ABC):
         sde: SDE,
         score_fn: ParametrisedScoreFunction,
         probability_flow=False,
-    ) -> Predictor:
+    ):
         super().__init__()
         self.sde = sde
         # Compute the reverse SDE/ODE
@@ -135,7 +135,7 @@ class Corrector(abc.ABC):
 
     def __init__(
         self, sde: SDE, score_fn: ParametrisedScoreFunction, snr: float, n_steps: int
-    ) -> Corrector:
+    ):
         super().__init__()
         self.sde = sde
         self.score_fn = score_fn
@@ -160,9 +160,9 @@ class Corrector(abc.ABC):
         raise NotImplementedError()
 
 
-@register_predictor(name="euler_maruyama")
+@register_predictor
 class EulerMaruyamaPredictor(Predictor):
-    def __init__(self, sde, score_fn, probability_flow=False) -> EulerMaruyamaPredictor:
+    def __init__(self, sde, score_fn, probability_flow=False):
         super().__init__(sde, score_fn, probability_flow)
 
     def update_fn(
@@ -176,11 +176,9 @@ class EulerMaruyamaPredictor(Predictor):
         return x, x_mean
 
 
-@register_predictor(name="reverse_diffusion")
+@register_predictor
 class ReverseDiffusionPredictor(Predictor):
-    def __init__(
-        self, sde, score_fn, probability_flow=False
-    ) -> ReverseDiffusionPredictor:
+    def __init__(self, sde, score_fn, probability_flow=False):
         super().__init__(sde, score_fn, probability_flow)
 
     def update_fn(
@@ -193,15 +191,13 @@ class ReverseDiffusionPredictor(Predictor):
         return x, x_mean
 
 
-@register_predictor(name="ancestral_sampling")
+@register_predictor
 class AncestralSamplingPredictor(Predictor):
     """The ancestral sampling predictor. Currently only supports VE/VP SDEs."""
 
-    def __init__(
-        self, sde, score_fn, probability_flow=False
-    ) -> AncestralSamplingPredictor:
+    def __init__(self, sde, score_fn, probability_flow=False):
         super().__init__(sde, score_fn, probability_flow)
-        if not isinstance(sde, sde_lib.VPSDE) and not isinstance(sde, sde_lib.VESDE):
+        if not isinstance(sde, VPSDE) and not isinstance(sde, VESDE):
             raise NotImplementedError(
                 f"SDE class {sde.__class__.__name__} not yet supported."
             )
@@ -210,7 +206,7 @@ class AncestralSamplingPredictor(Predictor):
         ), "Probability flow not supported by ancestral sampling"
 
     def vesde_update_fn(
-        self, rng: jnp.random.KeyArray, x: jnp.ndarray, t: float
+        self, rng: jax.random.KeyArray, x: jnp.ndarray, t: float
     ) -> Tuple[jnp.ndarray, jnp.ndarray]:
         sde = self.sde
         timestep = (t * (sde.N - 1) / sde.T).astype(jnp.int32)
@@ -228,7 +224,7 @@ class AncestralSamplingPredictor(Predictor):
         return x, x_mean
 
     def vpsde_update_fn(
-        self, rng: jnp.random.KeyArray, x: jnp.ndarray, t: float
+        self, rng: jax.random.KeyArray, x: jnp.ndarray, t: float
     ) -> Tuple[jnp.ndarray, jnp.ndarray]:
         sde = self.sde
         timestep = (t * (sde.N - 1) / sde.T).astype(jnp.int32)
@@ -248,11 +244,11 @@ class AncestralSamplingPredictor(Predictor):
             return self.vpsde_update_fn(rng, x, t)
 
 
-@register_predictor(name="none")
+@register_predictor
 class NonePredictor(Predictor):
     """An empty predictor that does nothing."""
 
-    def __init__(self, sde, score_fn, probability_flow=False) -> NonePredictor:
+    def __init__(self, sde, score_fn, probability_flow=False):
         pass
 
     def update_fn(
@@ -261,16 +257,16 @@ class NonePredictor(Predictor):
         return x, x
 
 
-@register_corrector(name="langevin")
+@register_corrector
 class LangevinCorrector(Corrector):
     def __init__(
         self, sde: SDE, score_fn: ParametrisedScoreFunction, snr: float, n_steps: int
-    ) -> LangevinCorrector:
+    ):
         super().__init__(sde, score_fn, snr, n_steps)
         if (
-            not isinstance(sde, sde_lib.VPSDE)
-            and not isinstance(sde, sde_lib.VESDE)
-            and not isinstance(sde, sde_lib.subVPSDE)
+            not isinstance(sde, VPSDE)
+            and not isinstance(sde, VESDE)
+            and not isinstance(sde, subVPSDE)
         ):
             raise NotImplementedError(
                 f"SDE class {sde.__class__.__name__} not yet supported."
@@ -311,7 +307,7 @@ class LangevinCorrector(Corrector):
         return x, x_mean
 
 
-@register_corrector(name="ald")
+@register_corrector
 class AnnealedLangevinDynamics(Corrector):
     """The original annealed Langevin dynamics predictor in NCSN/NCSNv2.
 
@@ -320,12 +316,12 @@ class AnnealedLangevinDynamics(Corrector):
 
     def __init__(
         self, sde: SDE, score_fn: ParametrisedScoreFunction, snr: float, n_steps: int
-    ) -> AnnealedLangevinDynamics:
+    ):
         super().__init__(sde, score_fn, snr, n_steps)
         if (
-            not isinstance(sde, sde_lib.VPSDE)
-            and not isinstance(sde, sde_lib.VESDE)
-            and not isinstance(sde, sde_lib.subVPSDE)
+            not isinstance(sde, VPSDE)
+            and not isinstance(sde, VESDE)
+            and not isinstance(sde, subVPSDE)
         ):
             raise NotImplementedError(
                 f"SDE class {sde.__class__.__name__} not yet supported."
@@ -338,7 +334,7 @@ class AnnealedLangevinDynamics(Corrector):
         score_fn = self.score_fn
         n_steps = self.n_steps
         target_snr = self.snr
-        if isinstance(sde, sde_lib.VPSDE) or isinstance(sde, sde_lib.subVPSDE):
+        if isinstance(sde, VPSDE) or isinstance(sde, subVPSDE):
             timestep = (t * (sde.N - 1) / sde.T).astype(jnp.int32)
             alpha = sde.alphas[timestep]
         else:
@@ -360,13 +356,13 @@ class AnnealedLangevinDynamics(Corrector):
         return x, x_mean
 
 
-@register_corrector(name="none")
+@register_corrector
 class NoneCorrector(Corrector):
     """An empty corrector that does nothing."""
 
     def __init__(
         self, sde: SDE, score_fn: ParametrisedScoreFunction, snr: float, n_steps: int
-    ) -> NoneCorrector:
+    ):
         pass
 
     def update_fn(
@@ -381,7 +377,7 @@ def shared_predictor_update_fn(
     x: jnp.ndarray,
     t: jnp.ndarray,
     sde: SDE,
-    model_fn: ParametrisedScoreFunction,
+    model: ParametrisedScoreFunction,
     predictor: Predictor,
     probability_flow: bool,
     continuous: bool,
@@ -389,7 +385,7 @@ def shared_predictor_update_fn(
     """A wrapper that configures and returns the update function of predictors."""
     score_fn = get_score_fn(
         sde,
-        model_fn,
+        model,
         train_state.params_ema,
         train_state.model_state,
         train=False,
@@ -409,16 +405,16 @@ def shared_corrector_update_fn(
     x: jnp.ndarray,
     t: jnp.ndarray,
     sde: SDE,
-    model_fn: ParametrisedScoreFunction,
+    model: ParametrisedScoreFunction,
     corrector: Corrector,
     continuous: bool,
     snr: float,
     n_steps: int,
 ) -> SDEUpdateFunction:
     """A wrapper tha configures and returns the update function of correctors."""
-    score_fn = mutils.get_score_fn(
+    score_fn = get_score_fn(
         sde,
-        model_fn,
+        model,
         train_state.params_ema,
         train_state.model_state,
         train=False,
@@ -434,7 +430,7 @@ def shared_corrector_update_fn(
 
 def get_pc_sampler(
     sde: SDE,
-    model_fn: ParametrisedScoreFunction,
+    model: ParametrisedScoreFunction,
     shape,
     predictor: Predictor,
     corrector: Corrector,
@@ -470,7 +466,7 @@ def get_pc_sampler(
     predictor_update_fn = functools.partial(
         shared_predictor_update_fn,
         sde=sde,
-        model=model_fn,
+        model=model,
         predictor=predictor,
         probability_flow=probability_flow,
         continuous=continuous,
@@ -478,7 +474,7 @@ def get_pc_sampler(
     corrector_update_fn = functools.partial(
         shared_corrector_update_fn,
         sde=sde,
-        model=model_fn,
+        model=model,
         corrector=corrector,
         continuous=continuous,
         snr=snr,

@@ -42,3 +42,7 @@ def register_category(category: str) -> None:
         return register_item(category, obj, name)
 
     return get_func, register_func
+
+
+get_model, register_model = register_category("model")
+get_dataset, register_dataset = register_category("dataset")
