@@ -1,0 +1,3 @@
+[submodule "geomstats"]
+	path = geomstats
+	url = git@github.com:oxcsml/geomstats.git
