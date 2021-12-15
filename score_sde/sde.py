@@ -9,7 +9,9 @@ import jax
 import numpy as np
 import jax.numpy as jnp
 
-from .utils import batch_mul
+# from .utils import batch_mul
+def batch_mul(a, b):
+    return jax.vmap(lambda a, b: a * b)(a, b)
 
 
 class SDE(abc.ABC):
@@ -292,3 +294,37 @@ class VESDE(SDE):
         f = jnp.zeros_like(x)
         G = jnp.sqrt(sigma ** 2 - adjacent_sigma ** 2)
         return f, G
+
+
+class Brownian(SDE):
+    def __init__(self, manifold, T=1, beta=1, N=1000):
+        """Construct a Brownian motion on a compact manifold.
+
+        Args:
+          N: number of discretization steps
+        """
+        super().__init__(N)
+        self.manifold = manifold
+        self.beta = beta
+        self._T = T
+        self.N = N
+
+    @property
+    def T(self):
+        return self._T
+
+    def sde(self, x, t):
+        beta_t = jnp.ones_like(x) * self.beta
+        drift = jnp.zeros_like(x)
+        diffusion = jnp.sqrt(beta_t)
+        return drift, diffusion
+
+    def marginal_prob(self, x, t):
+        # TODO: This is wrong. Should not rely on closed-form marginal probability
+        return jnp.zeros_like(x), jnp.ones_like(x)
+
+    def prior_sampling(self, rng, shape):
+        return self.manifold.random_uniform(state=rng, n_samples=shape[0])
+
+    def prior_logp(self, z):
+        return - jnp.ones_like(z) * self.manifold.metric.log_volume

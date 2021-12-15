@@ -168,7 +168,7 @@ class EulerMaruyamaPredictor(Predictor):
     def update_fn(
         self, rng: jax.random.KeyArray, x: jnp.ndarray, t: float
     ) -> Tuple[jnp.ndarray, jnp.ndarray]:
-        dt = -1.0 / self.rsde.N
+        dt = -1.0 / self.rsde.N * self.rsde.T
         z = random.normal(rng, x.shape)
         drift, diffusion = self.rsde.sde(x, t)
         x_mean = x + drift * dt

@@ -30,7 +30,7 @@ from .jax import batch_mul
 from .registry import register_category
 from .typing import ParametrisedScoreFunction
 
-from score_sde.sde import SDE, VESDE, VPSDE, subVPSDE
+from score_sde.sde import SDE, VESDE, VPSDE, subVPSDE, Brownian
 
 
 def get_sigmas(sigma_min, sigma_max, num_scales):
@@ -71,7 +71,7 @@ def get_score_fn(
     """
     # model_fn = get_model_fn(model, params, states, train=train)
 
-    if isinstance(sde, VPSDE) or isinstance(sde, subVPSDE):
+    if isinstance(sde, (VPSDE, subVPSDE, Brownian)):
 
         def score_fn(x, t, rng=None):
             # Scale neural network output by standard deviation and flip sign
