@@ -12,7 +12,7 @@ import geomstats.visualization as visualization
 from geomstats.geometry.hypersphere import Hypersphere
 from geomstats.geometry.spd_matrices import SPDMatrices
 
-from score_sde.sampling import Predictor, register_predictor, get_pc_sampler
+from score_sde.sampling import EulerMaruyamaManifoldPredictor, get_pc_sampler
 from score_sde.sde import SDE, batch_mul, Brownian
 from score_sde.utils import TrainState, ScoreFunctionWrapper, replicate
 from score_sde.models import MLP
@@ -103,25 +103,6 @@ def main():
     plot_and_save_video(traj, pdf=functools.partial(vMF_pdf, mu=mu, kappa=kappa), out="forward.mp4")
 
 
-@register_predictor
-class EulerMaruyamaPredictor(Predictor):
-    def __init__(self, sde, score_fn, probability_flow=False):
-        super().__init__(sde, score_fn, probability_flow)
-
-
-    def update_fn(
-        self, rng: jax.random.KeyArray, x: jnp.ndarray, t: float
-    ) -> Tuple[jnp.ndarray, jnp.ndarray]:
-        dt = -1.0 / self.rsde.N
-        rng, z = self.sde.manifold.random_normal_tangent(state=rng, base_point=x, n_samples=x.shape[0])
-        drift, diffusion = self.rsde.sde(x, t)
-        drift = drift * dt
-        x_mean = self.sde.manifold.metric.exp(tangent_vec=drift, base_point=x)  # NOTE: do we really need this in practice? only if denoise=True
-        tangent_vector = drift + batch_mul(diffusion, jnp.sqrt(-dt) * z)
-        x = self.sde.manifold.metric.exp(tangent_vec=tangent_vector, base_point=x)
-        return x, x_mean
-
-
 def score_sde():
     manifold = Hypersphere(dim=2)
     N = 1000
@@ -131,7 +112,7 @@ def score_sde():
     sde = Brownian(manifold, T=100, N=N)
     x = sde.prior_sampling(jax.random.PRNGKey(0), (n_samples,))
     # timesteps = jnp.linspace(sde.T, 1e-3, sde.N)
-    # predictor = EulerMaruyamaPredictor(sde, score_fn=None)
+    # predictor = EulerMaruyamaManifoldPredictor(sde, score_fn=None)
 
     # @jax.jit
     # def loop_body(i, val):
@@ -164,7 +145,7 @@ def score_sde():
     )
     p_train_state = replicate(train_state)
     
-    sampler = get_pc_sampler(sde, model, (n_samples,), predictor=EulerMaruyamaPredictor, corrector=None, inverse_scaler=lambda x: x, snr=0.2, continuous=True)
+    sampler = get_pc_sampler(sde, model, (n_samples,), predictor=EulerMaruyamaManifoldPredictor, corrector=None, inverse_scaler=lambda x: x, snr=0.2, continuous=True)
     samples, _ = sampler(replicate(jax.random.PRNGKey(0)), p_train_state)
     print(samples.shape)
     prior_likelihood = lambda x: jnp.exp(sde.prior_logp(x))
