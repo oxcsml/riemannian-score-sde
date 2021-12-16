@@ -71,7 +71,16 @@ def get_score_fn(
     """
     # model_fn = get_model_fn(model, params, states, train=train)
 
-    if isinstance(sde, (VPSDE, subVPSDE, Brownian)):
+    if isinstance(sde, Brownian):
+        def score_fn(x, t, rng=None):
+            model_out, new_state = model.apply(params, state, rng, x=x, t=t)
+            score = model_out
+            if return_state:
+                return score, new_state
+            else:
+                return score
+
+    elif isinstance(sde, (VPSDE, subVPSDE)):
 
         def score_fn(x, t, rng=None):
             # Scale neural network output by standard deviation and flip sign

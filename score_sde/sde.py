@@ -323,6 +323,10 @@ class Brownian(SDE):
         # TODO: This is wrong. Should not rely on closed-form marginal probability
         return jnp.zeros_like(x), jnp.ones_like(x)
 
+    def marginal_log_prob(self, x0, x, t):
+        raise NotImplementedError()
+        # return self.manifold.heat_kernel(x0, x, t)
+
     def prior_sampling(self, rng, shape):
         return self.manifold.random_uniform(state=rng, n_samples=shape[0])
 

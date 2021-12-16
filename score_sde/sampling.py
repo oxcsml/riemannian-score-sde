@@ -104,12 +104,14 @@ class Predictor(abc.ABC):
         self,
         sde: SDE,
         score_fn: ParametrisedScoreFunction,
+        forward: bool,
         probability_flow=False,
     ):
         super().__init__()
         self.sde = sde
+        self.forward = forward
         # Compute the reverse SDE/ODE
-        self.rsde = sde.reverse(score_fn, probability_flow)
+        self.rsde = sde if forward else sde.reverse(score_fn, probability_flow)
         self.score_fn = score_fn
 
     @abc.abstractmethod
@@ -134,10 +136,11 @@ class Corrector(abc.ABC):
     """The abstract class for a corrector algorithm."""
 
     def __init__(
-        self, sde: SDE, score_fn: ParametrisedScoreFunction, snr: float, n_steps: int
+        self, sde: SDE, score_fn: ParametrisedScoreFunction, forward: bool, snr: float, n_steps: int
     ):
         super().__init__()
         self.sde = sde
+        self.forward = forward
         self.score_fn = score_fn
         self.snr = snr
         self.n_steps = n_steps
@@ -162,24 +165,45 @@ class Corrector(abc.ABC):
 
 @register_predictor
 class EulerMaruyamaPredictor(Predictor):
-    def __init__(self, sde, score_fn, probability_flow=False):
-        super().__init__(sde, score_fn, probability_flow)
+    def __init__(self, sde, score_fn, forward, probability_flow=False):
+        super().__init__(sde, score_fn, forward, probability_flow)
 
     def update_fn(
         self, rng: jax.random.KeyArray, x: jnp.ndarray, t: float
     ) -> Tuple[jnp.ndarray, jnp.ndarray]:
-        dt = -1.0 / self.rsde.N * self.rsde.T
+        dt = self.rsde.T / self.rsde.N
+        sign = 1 if self.forward else -1
         z = random.normal(rng, x.shape)
         drift, diffusion = self.rsde.sde(x, t)
-        x_mean = x + drift * dt
-        x = x_mean + batch_mul(diffusion, jnp.sqrt(-dt) * z)
+        x_mean = x + sign * drift * dt
+        x = x_mean + batch_mul(diffusion, jnp.sqrt(dt) * z)
+        return x, x_mean
+
+
+@register_predictor
+class EulerMaruyamaManifoldPredictor(Predictor):
+    def __init__(self, sde, score_fn, forward, probability_flow=False):
+        super().__init__(sde, score_fn, forward, probability_flow)
+        self.forward = forward
+
+    def update_fn(
+        self, rng: jax.random.KeyArray, x: jnp.ndarray, t: float
+    ) -> Tuple[jnp.ndarray, jnp.ndarray]:
+        dt = self.rsde.T / self.rsde.N
+        sign = 1 if self.forward else -1
+        rng, z = self.sde.manifold.random_normal_tangent(state=rng, base_point=x, n_samples=x.shape[0])
+        drift, diffusion = self.rsde.sde(x, t)
+        drift = sign * drift * dt
+        x_mean = self.sde.manifold.metric.exp(tangent_vec=drift, base_point=x)  # NOTE: do we really need this in practice? only if denoise=True
+        tangent_vector = drift + batch_mul(diffusion, jnp.sqrt(dt) * z)
+        x = self.sde.manifold.metric.exp(tangent_vec=tangent_vector, base_point=x)
         return x, x_mean
 
 
 @register_predictor
 class ReverseDiffusionPredictor(Predictor):
-    def __init__(self, sde, score_fn, probability_flow=False):
-        super().__init__(sde, score_fn, probability_flow)
+    def __init__(self, sde, score_fn, forward, probability_flow=False):
+        super().__init__(sde, score_fn, forward, probability_flow)
 
     def update_fn(
         self, rng: jax.random.KeyArray, x: jnp.ndarray, t: float
@@ -195,8 +219,8 @@ class ReverseDiffusionPredictor(Predictor):
 class AncestralSamplingPredictor(Predictor):
     """The ancestral sampling predictor. Currently only supports VE/VP SDEs."""
 
-    def __init__(self, sde, score_fn, probability_flow=False):
-        super().__init__(sde, score_fn, probability_flow)
+    def __init__(self, sde, score_fn, forward, probability_flow=False):
+        super().__init__(sde, score_fn, forward, probability_flow)
         if not isinstance(sde, VPSDE) and not isinstance(sde, VESDE):
             raise NotImplementedError(
                 f"SDE class {sde.__class__.__name__} not yet supported."
@@ -248,7 +272,7 @@ class AncestralSamplingPredictor(Predictor):
 class NonePredictor(Predictor):
     """An empty predictor that does nothing."""
 
-    def __init__(self, sde, score_fn, probability_flow=False):
+    def __init__(self, sde, score_fn, forward, probability_flow=False):
         pass
 
     def update_fn(
@@ -260,9 +284,9 @@ class NonePredictor(Predictor):
 @register_corrector
 class LangevinCorrector(Corrector):
     def __init__(
-        self, sde: SDE, score_fn: ParametrisedScoreFunction, snr: float, n_steps: int
+        self, sde: SDE, score_fn: ParametrisedScoreFunction, forward: bool, snr: float, n_steps: int
     ):
-        super().__init__(sde, score_fn, snr, n_steps)
+        super().__init__(sde, score_fn, forward, snr, n_steps)
         if (
             not isinstance(sde, VPSDE)
             and not isinstance(sde, VESDE)
@@ -315,9 +339,9 @@ class AnnealedLangevinDynamics(Corrector):
     """
 
     def __init__(
-        self, sde: SDE, score_fn: ParametrisedScoreFunction, snr: float, n_steps: int
+        self, sde: SDE, score_fn: ParametrisedScoreFunction, forward: bool, snr: float, n_steps: int
     ):
-        super().__init__(sde, score_fn, snr, n_steps)
+        super().__init__(sde, score_fn, forward, snr, n_steps)
         if (
             not isinstance(sde, VPSDE)
             and not isinstance(sde, VESDE)
@@ -361,7 +385,7 @@ class NoneCorrector(Corrector):
     """An empty corrector that does nothing."""
 
     def __init__(
-        self, sde: SDE, score_fn: ParametrisedScoreFunction, snr: float, n_steps: int
+        self, sde: SDE, score_fn: ParametrisedScoreFunction, forward: bool, snr: float, n_steps: int
     ):
         pass
 
@@ -379,6 +403,7 @@ def shared_predictor_update_fn(
     sde: SDE,
     model: ParametrisedScoreFunction,
     predictor: Predictor,
+    forward: bool,
     probability_flow: bool,
     continuous: bool,
 ) -> SDEUpdateFunction:
@@ -393,9 +418,9 @@ def shared_predictor_update_fn(
     )
     if predictor is None:
         # Corrector-only sampler
-        predictor_obj = NonePredictor(sde, score_fn, probability_flow)
+        predictor_obj = NonePredictor(sde, score_fn, forward, probability_flow)
     else:
-        predictor_obj = predictor(sde, score_fn, probability_flow)
+        predictor_obj = predictor(sde, score_fn, forward, probability_flow)
     return predictor_obj.update_fn(rng, x, t)
 
 
@@ -407,6 +432,7 @@ def shared_corrector_update_fn(
     sde: SDE,
     model: ParametrisedScoreFunction,
     corrector: Corrector,
+    forward: bool,
     continuous: bool,
     snr: float,
     n_steps: int,
@@ -422,9 +448,9 @@ def shared_corrector_update_fn(
     )
     if corrector is None:
         # Predictor-only sampler
-        corrector_obj = NoneCorrector(sde, score_fn, snr, n_steps)
+        corrector_obj = NoneCorrector(sde, score_fn, forward, snr, n_steps)
     else:
-        corrector_obj = corrector(sde, score_fn, snr, n_steps)
+        corrector_obj = corrector(sde, score_fn, forward, snr, n_steps)
     return corrector_obj.update_fn(rng, x, t)
 
 
@@ -434,8 +460,9 @@ def get_pc_sampler(
     shape,
     predictor: Predictor,
     corrector: Corrector,
-    inverse_scaler,  # TODO: Figure type
-    snr: float,
+    forward: bool = False,
+    inverse_scaler=lambda x: x,  # TODO: Figure type
+    snr: float = 0.2,
     n_steps: int = 1,
     probability_flow: bool = False,
     continuous: bool = False,
@@ -468,6 +495,7 @@ def get_pc_sampler(
         sde=sde,
         model=model,
         predictor=predictor,
+        forward=forward,
         probability_flow=probability_flow,
         continuous=continuous,
     )
@@ -476,12 +504,13 @@ def get_pc_sampler(
         sde=sde,
         model=model,
         corrector=corrector,
+        forward=forward,
         continuous=continuous,
         snr=snr,
         n_steps=n_steps,
     )
 
-    def pc_sampler(rng, state):
+    def pc_sampler(rng, state, x = None, T = None):
         """The PC sampler funciton.
 
         Args:
@@ -492,8 +521,14 @@ def get_pc_sampler(
         """
         # Initial sample
         rng, step_rng = random.split(rng)
-        x = sde.prior_sampling(step_rng, shape)
-        timesteps = jnp.linspace(sde.T, eps, sde.N)
+        if forward:
+            assert (x is not None) and (T is not None)
+        else:
+            x = sde.prior_sampling(step_rng, shape)
+            T = sde.T
+        N = round(T / sde.T) * sde.N
+        timesteps = jnp.linspace(T, eps, N)
+        timesteps = jnp.flip(timesteps) if forward else timesteps
 
         def loop_body(i, val):
             rng, x, x_mean = val
@@ -505,9 +540,9 @@ def get_pc_sampler(
             x, x_mean = predictor_update_fn(step_rng, state, x, vec_t)
             return rng, x, x_mean
 
-        _, x, x_mean = jax.lax.fori_loop(0, sde.N, loop_body, (rng, x, x))
+        _, x, x_mean = jax.lax.fori_loop(0, N, loop_body, (rng, x, x))
         # Denoising is equivalent to running one predictor step without adding noise.
-        return inverse_scaler(x_mean if denoise else x), sde.N * (n_steps + 1)
+        return inverse_scaler(x_mean if denoise else x), N * (n_steps + 1)
 
     return jax.pmap(pc_sampler, axis_name="batch")
 
