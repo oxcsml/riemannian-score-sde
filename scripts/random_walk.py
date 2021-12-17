@@ -109,7 +109,7 @@ def score_sde():
     n_samples = 10 ** 3
     # x = manifold.random_von_mises_fisher(kappa=15, n_samples=n_samples)
 
-    sde = Brownian(manifold, T=100, N=N)
+    sde = Brownian(manifold, T=10, N=N)
     x = sde.prior_sampling(jax.random.PRNGKey(0), (n_samples,))
     # timesteps = jnp.linspace(sde.T, 1e-3, sde.N)
     # predictor = EulerMaruyamaManifoldPredictor(sde, score_fn=None)
@@ -145,13 +145,56 @@ def score_sde():
     )
     p_train_state = replicate(train_state)
     
-    sampler = get_pc_sampler(sde, model, (n_samples,), predictor=EulerMaruyamaManifoldPredictor, corrector=None, inverse_scaler=lambda x: x, snr=0.2, continuous=True)
-    samples, _ = sampler(replicate(jax.random.PRNGKey(0)), p_train_state)
-    print(samples.shape)
-    prior_likelihood = lambda x: jnp.exp(sde.prior_logp(x))
-    traj = jnp.concatenate([jnp.expand_dims(x, 0), samples], axis=0)
-    plot_and_save(traj)
+    # sampler = get_pc_sampler(sde, model, (n_samples,), predictor=EulerMaruyamaManifoldPredictor, corrector=None, inverse_scaler=lambda x: x, snr=0.2, continuous=True)
+    # samples, _ = sampler(replicate(jax.random.PRNGKey(0)), p_train_state)
+    # print(samples.shape)
+    # prior_likelihood = lambda x: jnp.exp(sde.prior_logp(x))
+    # traj = jnp.concatenate([jnp.expand_dims(x, 0), samples], axis=0)
+    # plot_and_save(traj)
+
+    K = 100
+    rng = jax.random.PRNGKey(0)
+    rng, step_rng = jax.random.split(rng)
+    x0 = sde.prior_sampling(step_rng, (K,))
+    rng, step_rng = jax.random.split(rng)
+    print("x0", x0.shape)
+    rng, step_rng = jax.random.split(rng)
+    # t = jax.random.uniform(step_rng, (K,), minval=1e-3, maxval=sde.T)
+    t = 1.
+    print("t", t)
+    rng, step_rng = jax.random.split(rng)
+    x = sde.marginal_sample(step_rng, x0, t, train_state)
+    # print(manifold.metric.dist_broadcast(x0, x).mean())
+    # x = sde.marginal_sample(replicate(step_rng), replicate(x0), replicate(t), p_train_state)
+    print("x", x.shape)
+    # x = x.squeeze(0)
+    # x = sde.marginal_sample(step_rng, x0, 5, train_state)
+
+def test_spherical_heat_kernel():
+    manifold = Hypersphere(dim=2)
+    x0 = jnp.expand_dims(jnp.array([1., 0., 0.]), 0)
+    K = 200
+    eps = 1e-3
+    theta = jnp.linspace(eps, jnp.pi - eps, K)
+    phi = jnp.linspace(eps, 2 * jnp.pi - eps, K)
+    theta, phi = jnp.meshgrid(theta, phi)
+    theta = theta.reshape(-1, 1)
+    phi = phi.reshape(-1, 1)
+    x = jnp.concatenate([
+        jnp.sin(theta) * jnp.cos(phi),
+        jnp.sin(theta) * jnp.sin(phi), 
+        jnp.cos(theta)
+    ], axis=-1)
+    volume = jnp.pi * jnp.pi
+    lambda_x = jnp.sin(theta)
+    t = 5.
+    log_heat_kernel = manifold.log_heat_kernel(x0, x, t, n_max=10)
+    pdf = jnp.exp(log_heat_kernel)
+    volume = (2 * np.pi) * np.pi
+    Z = jnp.mean(batch_mul(pdf, lambda_x) * volume)
+    print(Z)
 
 
 if __name__ == "__main__":
     score_sde()
+    # test_spherical_heat_kernel()
