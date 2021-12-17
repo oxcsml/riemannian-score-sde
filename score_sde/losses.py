@@ -29,7 +29,6 @@ from score_sde.sde import VESDE, VPSDE, SDE, Brownian
 from score_sde.utils import batch_mul, get_score_fn, get_model_fn
 from score_sde.utils import ParametrisedScoreFunction, TrainState
 from score_sde.likelihood import p_div_fn, div_noise
-from score_sde.sampling import EulerMaruyamaManifoldPredictor, get_pc_sampler
 
 
 def get_sde_loss_fn(
@@ -97,8 +96,7 @@ def get_sde_loss_fn(
         rng, step_rng = random.split(rng)
 
         if isinstance(sde, Brownian):
-            sampler = get_pc_sampler(sde, None, data.shape, predictor=EulerMaruyamaManifoldPredictor, corrector=None, continuous=True, forward=True)
-            perturbed_data, _ = sampler(step_rng, states, data, t)  # NOTE: need to replicate rnf and states?
+            perturbed_data = sde.marginal_sample(step_rng, data, t, states)
             score, new_model_state = score_fn(perturbed_data, t, rng=step_rng)
 
             if not ism_loss:

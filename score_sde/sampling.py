@@ -526,7 +526,8 @@ def get_pc_sampler(
         else:
             x = sde.prior_sampling(step_rng, shape)
             T = sde.T
-        N = round(T / sde.T) * sde.N
+
+        N = int(jnp.round(T / sde.T * sde.N))
         timesteps = jnp.linspace(T, eps, N)
         timesteps = jnp.flip(timesteps) if forward else timesteps
 
@@ -544,7 +545,8 @@ def get_pc_sampler(
         # Denoising is equivalent to running one predictor step without adding noise.
         return inverse_scaler(x_mean if denoise else x), N * (n_steps + 1)
 
-    return jax.pmap(pc_sampler, axis_name="batch")
+    return pc_sampler
+    # return jax.pmap(pc_sampler, axis_name="batch")
 
 
 def get_ode_sampler(

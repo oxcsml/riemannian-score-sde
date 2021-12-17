@@ -297,6 +297,7 @@ class VESDE(SDE):
 
 
 class Brownian(SDE):
+
     def __init__(self, manifold, T=1, beta=1, N=1000):
         """Construct a Brownian motion on a compact manifold.
 
@@ -323,9 +324,19 @@ class Brownian(SDE):
         # TODO: This is wrong. Should not rely on closed-form marginal probability
         return jnp.zeros_like(x), jnp.ones_like(x)
 
+    def marginal_sample(self, rng, x, t, state):
+        from score_sde.sampling import EulerMaruyamaManifoldPredictor, get_pc_sampler
+
+        perturbed_x = self.manifold.random_walk(rng, x, t)
+        if perturbed_x is None:
+            sampler = get_pc_sampler(self, None, x.shape, predictor=EulerMaruyamaManifoldPredictor, corrector=None, continuous=True, forward=True)
+            # TODO: problem if t is different for each batch value
+            perturbed_x, _ = sampler(rng, state, x, t)  # NOTE: need to replicate rnf and states?
+        return perturbed_x
+
     def marginal_log_prob(self, x0, x, t):
         raise NotImplementedError()
-        # return self.manifold.heat_kernel(x0, x, t)
+        # return self.manifold.log_heat_kernel(x0, x, t)
 
     def prior_sampling(self, rng, shape):
         return self.manifold.random_uniform(state=rng, n_samples=shape[0])
