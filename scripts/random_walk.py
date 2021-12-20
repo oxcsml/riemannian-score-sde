@@ -1,5 +1,5 @@
 from timeit import timeit
-import functools
+from functools import partial
 from typing import Tuple
 
 import matplotlib
@@ -16,6 +16,7 @@ from score_sde.sampling import EulerMaruyamaManifoldPredictor, get_pc_sampler
 from score_sde.sde import SDE, batch_mul, Brownian
 from score_sde.utils import TrainState, ScoreFunctionWrapper, replicate
 from score_sde.models import MLP
+from score_sde.losses import get_pmap_step_fn, get_step_fn
 import jax
 from jax import numpy as jnp
 import haiku as hk
@@ -23,6 +24,32 @@ import optax
 import numpy as np
 
 
+class vMFDataset:
+    def __init__(
+        self, batch_dims, rng, manifold, mu=None, kappa=1.
+    ):
+        self.manifold = manifold
+        self.mu = mu
+        self.kappa = kappa
+        self.batch_dims = batch_dims
+        self.rng = rng
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        # rng = jax.random.split(self.rng)
+
+        samples = self.manifold.random_von_mises_fisher(
+            mu=self.mu,
+            kappa=self.kappa,
+            n_samples=np.prod(self.batch_dims)
+        )
+        samples = samples.reshape([*self.batch_dims, samples.shape[-1]])
+
+        return samples
+        # return jnp.expand_dims(samples, axis=-1)
+    
 def plot_and_save_video(
     trajectories, pdf=None, size=20, fps=10, dpi=100, out="out.mp4", color="red"
 ):
@@ -33,7 +60,7 @@ def plot_and_save_video(
     ax = fig.add_subplot(111, projection="3d")
     sphere = visualization.Sphere()
     if pdf:
-        sphere.plot_heatmap(ax, pdf)
+        scatter = sphere.plot_heatmap(ax, pdf)
     points = gs.to_ndarray(trajectories[0], to_ndim=2)
     sphere.draw(ax, color=color, marker=".")
     scatter = sphere.draw_points(ax, points=points, color=color, marker=".")
@@ -44,6 +71,52 @@ def plot_and_save_video(
             scatter = sphere.draw_points(ax, points=points, color=color, marker=".")
             writer.grab_frame()
 
+def plot_and_save_video2(
+    heatmaps, size=20, fps=10, dpi=100, out="out.mp4", color="red"
+):
+    """Render a set of geodesics and save it to an mpeg 4 file."""
+    FFMpegWriter = animation.writers["ffmpeg"]
+    writer = FFMpegWriter(fps=fps)
+    fig = plt.figure(figsize=(size, size))
+    ax = fig.add_subplot(111, projection="3d")
+    ax.view_init(elev=30, azim=45)
+    cmap = sns.cubehelix_palette(light=1, dark=0.0, start=0.5, rot=-0.75, reverse=False, as_cmap=True)
+    sphere = visualization.Sphere()
+    sphere.draw(ax, color=color, marker=".")
+    N = 100
+    eps = 1e-3
+    theta = jnp.linspace(eps, jnp.pi - eps, N // 2)
+    phi = jnp.linspace(eps, 2 * jnp.pi - eps, N)
+    theta, phi = jnp.meshgrid(theta, phi)
+    theta = theta.reshape(-1, 1)
+    phi = phi.reshape(-1, 1)
+    xs = jnp.concatenate([
+        jnp.sin(theta) * jnp.cos(phi),
+        jnp.sin(theta) * jnp.sin(phi), 
+        jnp.cos(theta)
+    ], axis=-1)
+    
+    with writer.saving(fig, out, dpi=dpi):
+        for i, heatmap in enumerate(heatmaps):
+            print(i, len(heatmaps))
+            fs = heatmap(xs)
+            xs_reshaped = xs.reshape(N // 2, N, 3)
+            fs = fs.reshape(N // 2, N)
+            surf = ax.plot_surface(
+                    xs_reshaped[:, :, 0],
+                    xs_reshaped[:, :, 1],
+                    xs_reshaped[:, :, 2],
+                    rstride=1,
+                    cstride=1,
+                    cmap=cmap,
+                    linewidth=0,
+                    antialiased=False,
+                    rasterized=True,
+                    facecolors=cmap(fs),
+                )
+            writer.grab_frame()
+            surf.remove()
+
 
 def plot_and_save(
     trajectories, pdf=None, size=20, dpi=300, out="out.jpg", color="red"
@@ -53,12 +126,56 @@ def plot_and_save(
     # colours = sns.cubehelix_palette(n_colors=trajectories.shape[0], light=1.0, dark=0.0, start=0.5, rot=-0.75, reverse=False)
     colours = ["green", "blue"]
     sphere = visualization.Sphere()
+    cmap = sns.cubehelix_palette(light=1, dark=0.0, start=0.5, rot=-0.75, reverse=False, as_cmap=True)
     if pdf:
-        sphere.plot_heatmap(ax, pdf)
+        sphere.plot_heatmap(ax, pdf, n_points=16000, alpha=0.2, cmap=cmap)
     sphere.draw(ax, color=color, marker=".")
     for i, points in enumerate(trajectories):
         points = gs.to_ndarray(points, to_ndim=2)
         sphere.draw_points(ax, points=points, color=colours[i], marker=".")
+    plt.savefig(out, dpi=dpi, bbox_inches="tight", transparent=True)
+    plt.close(fig)
+
+def plot_and_save2(
+    trajectories, pdf=None, size=20, dpi=300, out="out.jpg", color="red"
+):
+    fig = plt.figure(figsize=(size, size))
+    ax = fig.add_subplot(111, projection="3d")
+    ax.view_init(elev=30, azim=45)
+    # colours = sns.cubehelix_palette(n_colors=trajectories.shape[0], light=1.0, dark=0.0, start=0.5, rot=-0.75, reverse=False)
+    colours = ["green", "blue"]
+    sphere = visualization.Sphere()
+    cmap = sns.cubehelix_palette(light=1, dark=0.0, start=0.5, rot=-0.75, reverse=False, as_cmap=True)
+    # if pdf:
+    #     sphere.plot_heatmap(ax, pdf, n_points=16000, alpha=0.2, cmap=cmap)
+    N = 200
+    eps = 1e-3
+    theta = jnp.linspace(eps, jnp.pi - eps, N // 2)
+    phi = jnp.linspace(eps, 2 * jnp.pi - eps, N)
+    theta, phi = jnp.meshgrid(theta, phi)
+    theta = theta.reshape(-1, 1)
+    phi = phi.reshape(-1, 1)
+    xs = jnp.concatenate([
+        jnp.sin(theta) * jnp.cos(phi),
+        jnp.sin(theta) * jnp.sin(phi), 
+        jnp.cos(theta)
+    ], axis=-1)
+    fs = pdf(xs)
+    xs = xs.reshape(N // 2, N, 3)
+    fs = fs.reshape(N // 2, N)
+    ax.plot_surface(
+            xs[:, :, 0],
+            xs[:, :, 1],
+            xs[:, :, 2],
+            rstride=1,
+            cstride=1,
+            cmap=cmap,
+            linewidth=0,
+            antialiased=False,
+            rasterized=True,
+            facecolors=cmap(fs),
+        )
+    sphere.draw(ax, color=color, marker=".")
     plt.savefig(out, dpi=dpi, bbox_inches="tight", transparent=True)
     plt.close(fig)
 
@@ -100,80 +217,105 @@ def main():
     traj = jnp.zeros((N + 1, previous_x.shape[0], S2.dim + 1))
 
     x, traj = brownian_motion(previous_x, traj, delta, N)
-    plot_and_save_video(traj, pdf=functools.partial(vMF_pdf, mu=mu, kappa=kappa), out="forward.mp4")
+    plot_and_save_video(traj, pdf=partial(vMF_pdf, mu=mu, kappa=kappa), out="forward.mp4")
 
 
 def score_sde():
     manifold = Hypersphere(dim=2)
     N = 1000
     n_samples = 10 ** 3
+    batch_size = 256
+
+    dataset = vMFDataset([batch_size], jax.random.PRNGKey(0), manifold, kappa=15)
+    x = next(dataset)
     # x = manifold.random_von_mises_fisher(kappa=15, n_samples=n_samples)
 
-    sde = Brownian(manifold, T=10, N=N)
-    x = sde.prior_sampling(jax.random.PRNGKey(0), (n_samples,))
+    sde = Brownian(manifold, T=5, N=N)
+    # x = sde.prior_sampling(jax.random.PRNGKey(0), (n_samples,))
     # timesteps = jnp.linspace(sde.T, 1e-3, sde.N)
     # predictor = EulerMaruyamaManifoldPredictor(sde, score_fn=None)
 
-    # @jax.jit
-    # def loop_body(i, val):
-    #     rng, x, x_mean = val
-    #     t = timesteps[i]
-    #     vec_t = jnp.ones(x.shape[0]) * t
-    #     rng, step_rng = random.split(rng)
-    #     x, x_mean = predictor.update_fn(step_rng, x, vec_t)
-    #     return rng, x, x_mean
-
-    # _, x, x_mean = jax.lax.fori_loop(0, sde.N, loop_body, (rng, x, x))
-
     # Score networks
     # score_model = lambda x, t: gs.concatenate([-x[..., [1]], x[..., [0]], gs.zeros((*x.shape[:-1], 1))], axis=-1)  # one of the divergence free vector field, i.e. generate an isometry
-    score_model = lambda x, t: manifold.to_tangent(gs.concatenate([gs.zeros((*x.shape[:-1], 1)), 10 * gs.ones((*x.shape[:-1], 1)), gs.zeros((*x.shape[:-1], 1))], axis=-1), x)
-    score_model = lambda x, t: manifold.to_tangent(ScoreFunctionWrapper(MLP(hidden_shapes=1*[64], output_shape=3, act='sin'))(x, t), x)
+    # score_model = lambda x, t: manifold.to_tangent(gs.concatenate([gs.zeros((*x.shape[:-1], 1)), 10 * gs.ones((*x.shape[:-1], 1)), gs.zeros((*x.shape[:-1], 1))], axis=-1), x)
     def score_model(x, t):
-        invariant_basis = manifold.invariant_basis(x)
-        weights = ScoreFunctionWrapper(MLP(hidden_shapes=1*[64], output_shape=3, act='sin'))(x, t)  # output_shape = dim(Isom(manifold))
-        return (gs.expand_dims(weights, -2) * invariant_basis).sum(-1)
+        # t = gs.expand_dims(t, axis=(-1, -2))
+        # print(t.shape)
+        return manifold.to_tangent(ScoreFunctionWrapper(MLP(hidden_shapes=1*[64], output_shape=3, act='sin'))(x, t), x)
+    # def score_model(x, t):
+    #     invariant_basis = manifold.invariant_basis(x)
+    #     weights = ScoreFunctionWrapper(MLP(hidden_shapes=1*[64], output_shape=3, act='sin'))(x, t)  # output_shape = dim(Isom(manifold))
+    #     return (gs.expand_dims(weights, -2) * invariant_basis).sum(-1)
 
-    model = hk.transform_with_state(score_model)
-    params, state = model.init(rng=jax.random.PRNGKey(0), x=x, t=0)
-    # print(model.apply(params, state, jax.random.PRNGKey(0), x=x, t=0)[0].shape)
+    score_model = hk.transform_with_state(score_model)
+    params, state = score_model.init(rng=jax.random.PRNGKey(0), x=x, t=0)
+    # print(score_model.apply(params, state, jax.random.PRNGKey(0), x=x, t=0)[0].shape)
+
 
     optimiser = optax.adam(1e-3)
     opt_state = optimiser.init(params)
+
     train_state = TrainState(
         opt_state=opt_state, model_state=state, step=0, params=params, ema_rate=0.999, params_ema=params, rng=jax.random.PRNGKey(0)
     )
+    # train_step_fn = get_pmap_step_fn(sde, score_model, optimiser, True, reduce_mean=False, continuous=True, likelihood_weighting=False)
+    train_step_fn = get_step_fn(sde, score_model, optimiser, True, reduce_mean=False, continuous=True, likelihood_weighting=False)
+    p_train_step = jax.pmap(partial(jax.lax.scan, train_step_fn), axis_name='batch', donate_argnums=1)
     p_train_state = replicate(train_state)
+
+
+    # dataset = vMFDataset([1,1,batch_size], jax.random.PRNGKey(0), manifold, kappa=15)
+    dataset = vMFDataset([batch_size], jax.random.PRNGKey(0), manifold, kappa=15)
+    steps = 1000
+
+    for i in range(steps):
+        batch = {
+            'data': next(dataset),
+            'label': None
+        }
+        # rng = p_train_state.rng[0]
+        rng = train_state.rng
+
+        # next_rng = jax.random.split(rng, num=jax.local_device_count() + 1)
+        # rng = next_rng[0]
+        # next_rng = next_rng[1:]
+        rng, next_rng = jax.random.split(rng)
+        # (_, p_train_state), loss = p_train_step((next_rng, p_train_state), batch)
+        (_, train_state), loss = train_step_fn((next_rng, train_state), batch)
+        # if i%100 == 0:
+        print(i, ': ', loss)
     
-    # sampler = get_pc_sampler(sde, model, (n_samples,), predictor=EulerMaruyamaManifoldPredictor, corrector=None, inverse_scaler=lambda x: x, snr=0.2, continuous=True)
+    
+    # sampler = get_pc_sampler(sde, score_model, (n_samples,), predictor=EulerMaruyamaManifoldPredictor, corrector=None, inverse_scaler=lambda x: x, snr=0.2, continuous=True)
     # samples, _ = sampler(replicate(jax.random.PRNGKey(0)), p_train_state)
     # print(samples.shape)
     # prior_likelihood = lambda x: jnp.exp(sde.prior_logp(x))
     # traj = jnp.concatenate([jnp.expand_dims(x, 0), samples], axis=0)
     # plot_and_save(traj)
 
-    K = 100
-    rng = jax.random.PRNGKey(0)
-    rng, step_rng = jax.random.split(rng)
-    x0 = sde.prior_sampling(step_rng, (K,))
-    rng, step_rng = jax.random.split(rng)
-    print("x0", x0.shape)
-    rng, step_rng = jax.random.split(rng)
-    # t = jax.random.uniform(step_rng, (K,), minval=1e-3, maxval=sde.T)
-    t = 1.
-    print("t", t)
-    rng, step_rng = jax.random.split(rng)
-    x = sde.marginal_sample(step_rng, x0, t, train_state)
-    # print(manifold.metric.dist_broadcast(x0, x).mean())
-    # x = sde.marginal_sample(replicate(step_rng), replicate(x0), replicate(t), p_train_state)
-    print("x", x.shape)
-    # x = x.squeeze(0)
-    # x = sde.marginal_sample(step_rng, x0, 5, train_state)
+    # K = 100
+    # rng = jax.random.PRNGKey(0)
+    # rng, step_rng = jax.random.split(rng)
+    # x0 = sde.prior_sampling(step_rng, (K,))
+    # rng, step_rng = jax.random.split(rng)
+    # print("x0", x0.shape)
+    # rng, step_rng = jax.random.split(rng)
+    # # t = jax.random.uniform(step_rng, (K,), minval=1e-3, maxval=sde.T)
+    # t = 1.
+    # print("t", t)
+    # rng, step_rng = jax.random.split(rng)
+    # x = sde.marginal_sample(step_rng, x0, t, train_state)
+    # # print(manifold.metric.dist_broadcast(x0, x).mean())
+    # # x = sde.marginal_sample(replicate(step_rng), replicate(x0), replicate(t), p_train_state)
+    # print("x", x.shape)
+    # # x = x.squeeze(0)
+    # # x = sde.marginal_sample(step_rng, x0, 5, train_state)
+
 
 def test_spherical_heat_kernel():
     manifold = Hypersphere(dim=2)
     x0 = jnp.expand_dims(jnp.array([1., 0., 0.]), 0)
-    K = 200
+    K = 600
     eps = 1e-3
     theta = jnp.linspace(eps, jnp.pi - eps, K)
     phi = jnp.linspace(eps, 2 * jnp.pi - eps, K)
@@ -187,12 +329,32 @@ def test_spherical_heat_kernel():
     ], axis=-1)
     volume = jnp.pi * jnp.pi
     lambda_x = jnp.sin(theta)
-    t = 5.
-    log_heat_kernel = manifold.log_heat_kernel(x0, x, t, n_max=10)
-    pdf = jnp.exp(log_heat_kernel)
+
+    @jax.jit
+    def heat_kernel(y, s):
+        return jnp.exp(manifold.log_heat_kernel(x0, y, s, tol=0.05, n_max=20))
+
+    # ts = jnp.linspace(0, 1, 20+1)
+    ts = jnp.linspace(0, 0.02, 10+1)[1:]
+    # ts = [0.1, 0.4, 0.5]
+    # pdf = heat_kernel(x, t)
     volume = (2 * np.pi) * np.pi
-    Z = jnp.mean(batch_mul(pdf, lambda_x) * volume)
-    print(Z)
+    # Z = jnp.mean(batch_mul(pdf, lambda_x) * volume)
+    # print(Z)
+    # ts = [0.1]
+    # x = jnp.array([[0., 0., 1.],[-1., 0., 0.]])
+    # pdf = heat_kernel(x, ts[0])
+
+    # for t in ts:
+    #     pdf = heat_kernel(x, t)
+    #     Z = jnp.mean(batch_mul(pdf, lambda_x) * volume)
+    #     print(f"t={t:.3f} | Z={Z:.2f} | mean={pdf.mean():.2f} | std={pdf.std():.2f}")
+        # print(f"t={t:.3f} | pdfN={pdf[0]:.2f} | pdfW={pdf[1]:.2f}")
+
+    ts = jnp.linspace(0, 1., 100+1)[1:]
+    heatmaps = [partial(heat_kernel, s=t) for t in ts]
+    plot_and_save_video2(heatmaps, fps=10, out="forward.mp4")
+    
 
 
 if __name__ == "__main__":
