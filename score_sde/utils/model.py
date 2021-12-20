@@ -74,6 +74,8 @@ def get_score_fn(
     if isinstance(sde, Brownian):
         def score_fn(x, t, rng=None):
             model_out, new_state = model.apply(params, state, rng, x=x, t=t)
+            # NOTE: scaling the output with 1.0 / std helps cf 'Improved Techniques for Training Score-Based Generative Model'
+            # Could approximate std as interpolate bewteen 0 and std of unif
             score = model_out
             if return_state:
                 return score, new_state

@@ -321,7 +321,7 @@ class Brownian(SDE):
         return drift, diffusion
 
     def marginal_prob(self, x, t):
-        # TODO: This is wrong. Should not rely on closed-form marginal probability
+        # TODO: Should not rely on closed-form marginal probability
         return jnp.zeros_like(x), jnp.ones_like(x)
 
     def marginal_sample(self, rng, x, t):
