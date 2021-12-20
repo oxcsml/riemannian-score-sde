@@ -194,6 +194,7 @@ class EulerMaruyamaManifoldPredictor(Predictor):
         rng, z = self.sde.manifold.random_normal_tangent(state=rng, base_point=x, n_samples=x.shape[0])
         drift, diffusion = self.rsde.sde(x, t)
         drift = sign * drift * dt
+        #NOTE: should we use retraction?
         x_mean = self.sde.manifold.metric.exp(tangent_vec=drift, base_point=x)  # NOTE: do we really need this in practice? only if denoise=True
         tangent_vector = drift + batch_mul(diffusion, jnp.sqrt(dt) * z)
         x = self.sde.manifold.metric.exp(tangent_vec=tangent_vector, base_point=x)
@@ -408,14 +409,17 @@ def shared_predictor_update_fn(
     continuous: bool,
 ) -> SDEUpdateFunction:
     """A wrapper that configures and returns the update function of predictors."""
-    score_fn = get_score_fn(
-        sde,
-        model,
-        train_state.params_ema,
-        train_state.model_state,
-        train=False,
-        continuous=continuous,
-    )
+    if forward:
+        score_fn = None
+    else:
+        score_fn = get_score_fn(
+            sde,
+            model,
+            train_state.params_ema,
+            train_state.model_state,
+            train=False,
+            continuous=continuous,
+        )
     if predictor is None:
         # Corrector-only sampler
         predictor_obj = NonePredictor(sde, score_fn, forward, probability_flow)
@@ -438,14 +442,17 @@ def shared_corrector_update_fn(
     n_steps: int,
 ) -> SDEUpdateFunction:
     """A wrapper tha configures and returns the update function of correctors."""
-    score_fn = get_score_fn(
-        sde,
-        model,
-        train_state.params_ema,
-        train_state.model_state,
-        train=False,
-        continuous=continuous,
-    )
+    if forward:
+        score_fn = None
+    else:
+        score_fn = get_score_fn(
+            sde,
+            model,
+            train_state.params_ema,
+            train_state.model_state,
+            train=False,
+            continuous=continuous,
+        )
     if corrector is None:
         # Predictor-only sampler
         corrector_obj = NoneCorrector(sde, score_fn, forward, snr, n_steps)
@@ -510,7 +517,7 @@ def get_pc_sampler(
         n_steps=n_steps,
     )
 
-    def pc_sampler(rng, state, x = None, T = None):
+    def pc_sampler(rng, state=None, x=None, T=None):
         """The PC sampler funciton.
 
         Args:
