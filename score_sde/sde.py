@@ -324,19 +324,20 @@ class Brownian(SDE):
         # TODO: This is wrong. Should not rely on closed-form marginal probability
         return jnp.zeros_like(x), jnp.ones_like(x)
 
-    def marginal_sample(self, rng, x, t, state):
+    def marginal_sample(self, rng, x, t):
         from score_sde.sampling import EulerMaruyamaManifoldPredictor, get_pc_sampler
 
         perturbed_x = self.manifold.random_walk(rng, x, t)
         if perturbed_x is None:
+            # TODO: should pmap the pc_sampler?
             sampler = get_pc_sampler(self, None, x.shape, predictor=EulerMaruyamaManifoldPredictor, corrector=None, continuous=True, forward=True)
-            # TODO: problem if t is different for each batch value
-            perturbed_x, _ = sampler(rng, state, x, t)  # NOTE: need to replicate rnf and states?
+            perturbed_x, _ = sampler(rng, None, x, t)
         return perturbed_x
 
     def marginal_log_prob(self, x0, x, t):
-        raise NotImplementedError()
-        # return self.manifold.log_heat_kernel(x0, x, t)
+        # TODO: Should indeed vmap?
+        # NOTE: reshape: https://github.com/google/jax/issues/2303
+        return np.reshape(self.manifold.log_heat_kernel(x0, x, t), ())
 
     def prior_sampling(self, rng, shape):
         return self.manifold.random_uniform(state=rng, n_samples=shape[0])
