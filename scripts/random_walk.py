@@ -241,7 +241,7 @@ def score_sde():
     def score_model(x, t):
         # t = gs.expand_dims(t, axis=(-1, -2))
         # print(t.shape)
-        return manifold.to_tangent(ScoreFunctionWrapper(MLP(hidden_shapes=1*[64], output_shape=3, act='sin'))(x, t), x)
+        return manifold.to_tangent(ScoreFunctionWrapper(MLP(hidden_shapes=3*[128], output_shape=3, act='sin'))(x, t), x)
     # def score_model(x, t):
     #     invariant_basis = manifold.invariant_basis(x)
     #     weights = ScoreFunctionWrapper(MLP(hidden_shapes=1*[64], output_shape=3, act='sin'))(x, t)  # output_shape = dim(Isom(manifold))
@@ -251,8 +251,24 @@ def score_sde():
     params, state = score_model.init(rng=jax.random.PRNGKey(0), x=x, t=0)
     # print(score_model.apply(params, state, jax.random.PRNGKey(0), x=x, t=0)[0].shape)
 
+    # steps = 100000 // 100
+    # warmup_steps = 2000 // 100
+    steps = 100000 // 1000
+    warmup_steps = 2000 // 1000
 
-    optimiser = optax.adam(1e-3)
+    schedule_fn = optax.join_schedules([
+        optax.linear_schedule(init_value=0.0, end_value=1.0, transition_steps=warmup_steps),
+        optax.cosine_decay_schedule(init_value=1.0, decay_steps = steps - warmup_steps, alpha=0.0),
+    ], [warmup_steps])
+
+    lr=2e-4
+    grad_clip=jnp.inf
+
+    optimiser = optax.chain(
+        optax.clip_by_global_norm(grad_clip),
+        optax.adam(lr, b1=.9, b2=0.999,eps=1e-8),
+        optax.scale_by_schedule(schedule_fn)
+    )
     opt_state = optimiser.init(params)
 
     train_state = TrainState(
@@ -266,7 +282,6 @@ def score_sde():
 
     # dataset = vMFDataset([1,1,batch_size], jax.random.PRNGKey(0), manifold, kappa=15)
     dataset = vMFDataset([batch_size], jax.random.PRNGKey(0), manifold, kappa=15)
-    steps = 1000
 
     for i in range(steps):
         batch = {
@@ -285,13 +300,16 @@ def score_sde():
         # if i%100 == 0:
         print(i, ': ', loss)
     
-    
-    # sampler = get_pc_sampler(sde, score_model, (n_samples,), predictor=EulerMaruyamaManifoldPredictor, corrector=None, inverse_scaler=lambda x: x, snr=0.2, continuous=True)
+
+    sampler = get_pc_sampler(sde, score_model, (n_samples,), predictor=EulerMaruyamaManifoldPredictor, corrector=None, inverse_scaler=lambda x: x, snr=0.2, continuous=True)
+    # p_train_state = replicate(train_state)
     # samples, _ = sampler(replicate(jax.random.PRNGKey(0)), p_train_state)
-    # print(samples.shape)
+    samples, _ = sampler(jax.random.PRNGKey(0), train_state)
     # prior_likelihood = lambda x: jnp.exp(sde.prior_logp(x))
-    # traj = jnp.concatenate([jnp.expand_dims(x, 0), samples], axis=0)
-    # plot_and_save(traj)
+    x = next(vMFDataset([n_samples], jax.random.PRNGKey(0), manifold, kappa=15))
+    # traj = jnp.concatenate([x, samples], axis=0)
+    traj = [x, samples]
+    plot_and_save(traj, out=f"sphere_{steps}.jpg")
 
     # K = 100
     # rng = jax.random.PRNGKey(0)
