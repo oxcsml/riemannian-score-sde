@@ -325,7 +325,7 @@ class Brownian(SDE):
         return jnp.zeros_like(x), jnp.ones_like(x)
 
     def marginal_sample(self, rng, x, t):
-        from score_sde.sampling import EulerMaruyamaManifoldPredictor, get_pc_sampler
+        from score_sde.sampling import EulerMaruyamaManifoldPredictor, get_pc_sampler  # TODO: remove from class
 
         perturbed_x = self.manifold.random_walk(rng, x, t)
         if perturbed_x is None:

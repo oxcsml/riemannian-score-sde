@@ -103,7 +103,7 @@ def get_sde_loss_fn(
             t = jnp.ones(data.shape[0]) * t
             score, new_model_state = score_fn(perturbed_data, t, rng=step_rng)
 
-            if not ism_loss:
+            if not ism_loss:  # DSM loss
                 logp_grad_fn = jax.value_and_grad(sde.marginal_log_prob, argnums=1, has_aux=False)
                 logp, logp_grad = jax.vmap(logp_grad_fn)(data, perturbed_data, t)
             else:  # TODO: NOT tested!
@@ -113,8 +113,8 @@ def get_sde_loss_fn(
 
             losses = jnp.square(score - logp_grad)
             losses = reduce_op(losses.reshape((losses.shape[0], -1)), axis=-1)
-            if likelihood_weighting:  # TODO: g(t) is 1?
-                pass
+            if likelihood_weighting:
+                raise NotImplementedError()
         else:
             t = random.uniform(step_rng, (data.shape[0],), minval=eps, maxval=sde.T)
             rng, step_rng = random.split(rng)
