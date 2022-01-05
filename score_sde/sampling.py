@@ -512,6 +512,99 @@ def get_pc_sampler(
     return jax.pmap(pc_sampler, axis_name="batch")
 
 
+def get_pc_sampler_debug(
+    sde: SDE,
+    model: ParametrisedScoreFunction,
+    shape,
+    predictor: Predictor,
+    corrector: Corrector,
+    inverse_scaler,  # TODO: Figure type
+    snr: float,
+    n_steps: int = 1,
+    probability_flow: bool = False,
+    continuous: bool = False,
+    denoise: bool = True,
+    eps: float = 1e-3,
+):
+    """Create a Predictor-Corrector (PC) sampler.
+
+    Args:
+      sde: An `sde_lib.SDE` object representing the forward SDE.
+      model: A `flax.linen.Module` object that represents the architecture of a time-dependent score-based model.
+      shape: A sequence of integers. The expected shape of a single sample.
+      predictor: A subclass of `sampling.Predictor` representing the predictor algorithm.
+      corrector: A subclass of `sampling.Corrector` representing the corrector algorithm.
+      inverse_scaler: The inverse data normalizer.
+      snr: A `float` number. The signal-to-noise ratio for configuring correctors.
+      n_steps: An integer. The number of corrector steps per predictor update.
+      probability_flow: If `True`, solve the reverse-time probability flow ODE when running the predictor.
+      continuous: `True` indicates that the score model was continuously trained.
+      denoise: If `True`, add one-step denoising to the final samples.
+      eps: A `float` number. The reverse-time SDE and ODE are integrated to `epsilon` to avoid numerical issues.
+
+    Returns:
+      A sampling function that takes random states, and a replcated training state and returns samples as well as
+      the number of function evaluations during sampling.
+    """
+    # Create predictor & corrector update functions
+    predictor_update_fn = functools.partial(
+        shared_predictor_update_fn,
+        sde=sde,
+        model=model,
+        predictor=predictor,
+        probability_flow=probability_flow,
+        continuous=continuous,
+    )
+    corrector_update_fn = functools.partial(
+        shared_corrector_update_fn,
+        sde=sde,
+        model=model,
+        corrector=corrector,
+        continuous=continuous,
+        snr=snr,
+        n_steps=n_steps,
+    )
+
+    def pc_sampler(rng, state):
+        """The PC sampler funciton.
+
+        Args:
+          rng: A JAX random state
+          state: A `flax.struct.dataclass` object that represents the training state of a score-based model.
+        Returns:
+          Samples, number of function evaluations
+        """
+        # Initial sample
+        rng, step_rng = random.split(rng)
+        x = sde.prior_sampling(step_rng, shape)
+        timesteps = jnp.linspace(sde.T, eps, sde.N)
+
+        # def loop_body(i, val):
+        #     rng, x, x_mean = val
+        #     t = timesteps[i]
+        #     vec_t = jnp.ones(shape[0]) * t
+        #     rng, step_rng = random.split(rng)
+        #     x, x_mean = corrector_update_fn(step_rng, state, x, vec_t)
+        #     rng, step_rng = random.split(rng)
+        #     x, x_mean = predictor_update_fn(step_rng, state, x, vec_t)
+        #     return rng, x, x_mean
+
+        # _, x, x_mean = jax.lax.fori_loop(0, sde.N, loop_body, (rng, x, x))
+
+        for i in range(sde.N):
+            t = timesteps[i]
+            vec_t = jnp.ones(shape[0]) * t
+            rng, step_rng = random.split(rng)
+            x, x_mean = corrector_update_fn(step_rng, state, x, vec_t)
+            rng, step_rng = random.split(rng)
+            x, x_mean = predictor_update_fn(step_rng, state, x, vec_t)
+
+        # Denoising is equivalent to running one predictor step without adding noise.
+        return inverse_scaler(x_mean if denoise else x), sde.N * (n_steps + 1)
+
+    return pc_sampler
+
+
 def get_ode_sampler(
     sde: SDE,
     model_fn: ParametrisedScoreFunction,
