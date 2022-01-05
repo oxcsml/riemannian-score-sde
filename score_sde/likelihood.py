@@ -17,7 +17,7 @@
 # pylint: skip-file
 # pytype: skip-file
 """Various sampling methods."""
-
+from typing import Sequence
 import jax
 import numpy as np
 import jax.numpy as jnp
@@ -36,6 +36,61 @@ from score_sde.utils import (
     from_flattened_numpy,
     unreplicate,
 )
+
+
+@jax.pmap
+def p_div_fn(
+    train_state: TrainState, hutchinson_type: str, x: jnp.ndarray, t: float, eps: jnp.ndarray
+) -> jnp.ndarray:
+    """Pmapped divergence of the drift function."""
+    if hutchinson_type == "None":
+        return get_div_fn(lambda x, t: drift_fn(train_state, x, t))(x, t)
+    else:
+        return get_estimate_div_fn(lambda x, t: drift_fn(train_state, x, t))(
+            x, t, eps
+        )
+
+
+def drift_fn(
+    sde: SDE,
+    model: ParametrisedScoreFunction,
+    train_state: TrainState,
+    x: jnp.ndarray,
+    t: float) -> jnp.ndarray:
+    """The drift function of the reverse-time SDE."""
+    score_fn = get_score_fn(
+        sde,
+        model,
+        train_state.params_ema,
+        train_state.model_state,
+        train=False,
+        continuous=True,
+    )
+    # Probability flow ODE is a special case of Reverse SDE
+    rsde = sde.reverse(score_fn, probability_flow=True)
+    return rsde.sde(x, t)[0]
+
+
+p_drift_fn = jax.pmap(drift_fn)  # Pmapped drift function of the reverse-time SDE
+
+
+def div_noise(rng: jax.random.KeyArray, shape: Sequence[int], hutchinson_type: str) -> jnp.ndarray:
+    """Sample noise for the hutchinson estimator."""
+    if hutchinson_type == "Gaussian":
+        epsilon = jax.random.normal(rng, shape)
+    elif hutchinson_type == "Rademacher":
+        epsilon = (
+            jax.random.randint(rng, shape, minval=0, maxval=2).astype(
+                jnp.float32
+            )
+            * 2
+            - 1
+        )
+    elif hutchinson_type == "None":
+        epsilon = None
+    else:
+        raise NotImplementedError(f"Hutchinson type {hutchinson_type} unknown.")
+    return epsilon
 
 
 def get_likelihood_fn(
@@ -67,34 +122,6 @@ def get_likelihood_fn(
         and returns the log-likelihoods in bits/dim, the latent code, and the number of function
         evaluations cost by computation.
     """
-
-    def drift_fn(train_state: TrainState, x: jnp.ndarray, t: float) -> jnp.ndarray:
-        """The drift function of the reverse-time SDE."""
-        score_fn = get_score_fn(
-            sde,
-            model,
-            train_state.params_ema,
-            train_state.model_state,
-            train=False,
-            continuous=True,
-        )
-        # Probability flow ODE is a special case of Reverse SDE
-        rsde = sde.reverse(score_fn, probability_flow=True)
-        return rsde.sde(x, t)[0]
-
-    @jax.pmap
-    def p_div_fn(
-        train_state: TrainState, x: jnp.ndarray, t: float, eps: jnp.ndarray
-    ) -> jnp.ndarray:
-        """Pmapped divergence of the drift function."""
-        if hutchinson_type == "None":
-            return get_div_fn(lambda x, t: drift_fn(train_state, x, t))(x, t)
-        else:
-            return get_estimate_div_fn(lambda x, t: drift_fn(train_state, x, t))(
-                x, t, eps
-            )
-
-    p_drift_fn = jax.pmap(drift_fn)  # Pmapped drift function of the reverse-time SDE
     p_prior_logp_fn = jax.pmap(
         sde.prior_logp
     )  # Pmapped log-PDF of the SDE's prior distribution
@@ -117,27 +144,14 @@ def get_likelihood_fn(
         """
         rng, step_rng = jax.random.split(unreplicate(prng))
         shape = data.shape
-        if hutchinson_type == "Gaussian":
-            epsilon = jax.random.normal(step_rng, shape)
-        elif hutchinson_type == "Rademacher":
-            epsilon = (
-                jax.random.randint(step_rng, shape, minval=0, maxval=2).astype(
-                    jnp.float32
-                )
-                * 2
-                - 1
-            )
-        elif hutchinson_type == "None":
-            epsilon = None
-        else:
-            raise NotImplementedError(f"Hutchinson type {hutchinson_type} unknown.")
+        epsilon = div_noise(step_rng, shape, hutchinson_type)
 
         def ode_func(t: float, x: jnp.ndarray) -> np.array:
             sample = from_flattened_numpy(x[: -shape[0] * shape[1]], shape)
             vec_t = jnp.ones((sample.shape[0], sample.shape[1])) * t
-            drift = to_flattened_numpy(p_drift_fn(ptrain_state, sample, vec_t))
+            drift = to_flattened_numpy(p_drift_fn(sde, model, ptrain_state, sample, vec_t))
             logp_grad = to_flattened_numpy(
-                p_div_fn(ptrain_state, sample, vec_t, epsilon)
+                p_div_fn(ptrain_state, hutchinson_type, sample, vec_t, epsilon)
             )
             return np.concatenate([drift, logp_grad], axis=0)
 

@@ -25,9 +25,10 @@ import optax
 import jax.numpy as jnp
 import jax.random as random
 
-from score_sde.sde import VESDE, VPSDE, SDE
+from score_sde.sde import VESDE, VPSDE, SDE, Brownian
 from score_sde.utils import batch_mul, get_score_fn, get_model_fn
 from score_sde.utils import ParametrisedScoreFunction, TrainState
+from score_sde.likelihood import p_div_fn, div_noise
 
 
 def get_sde_loss_fn(
@@ -38,6 +39,8 @@ def get_sde_loss_fn(
     continuous: bool = True,
     likelihood_weighting: bool = True,
     eps: float = 1e-5,
+    ism_loss: bool = False,
+    hutchinson_type: str = "Rademacher",
 ) -> Callable[[jax.random.KeyArray, dict, dict, dict], Tuple[float, dict]]:
     """Create a loss function for training with arbirary SDEs.
 
@@ -91,19 +94,43 @@ def get_sde_loss_fn(
         rng, step_rng = random.split(rng)
         t = random.uniform(step_rng, (data.shape[0],), minval=eps, maxval=sde.T)
         rng, step_rng = random.split(rng)
-        z = random.normal(step_rng, data.shape)
-        mean, std = sde.marginal_prob(data, t)
-        perturbed_data = mean + batch_mul(std, z)
-        rng, step_rng = random.split(rng)
-        score, new_model_state = score_fn(perturbed_data, t, rng=step_rng)
 
-        if not likelihood_weighting:
-            losses = jnp.square(batch_mul(score, std) + z)
+        if isinstance(sde, Brownian):
+            # TODO: problem if t is different for each batch value
+            t = random.uniform(step_rng, (1,), minval=eps, maxval=sde.T)
+            rng, step_rng = random.split(rng)
+            perturbed_data = sde.marginal_sample(step_rng, data, t)
+            t = jnp.ones(data.shape[0]) * t
+            score, new_model_state = score_fn(perturbed_data, t, rng=step_rng)
+
+            if not ism_loss:
+                logp_grad_fn = jax.value_and_grad(sde.marginal_log_prob, argnums=1, has_aux=False)
+                logp, logp_grad = jax.vmap(logp_grad_fn)(data, perturbed_data, t)
+            else:  # TODO: NOT tested!
+                rng, step_rng = random.split(rng)
+                epsilon = div_noise(step_rng, data.shape, hutchinson_type)
+                logp_grad = p_div_fn(new_model_state, hutchinson_type, data, t, epsilon)
+
+            losses = jnp.square(score - logp_grad)
             losses = reduce_op(losses.reshape((losses.shape[0], -1)), axis=-1)
+            if likelihood_weighting:  # TODO: g(t) is 1?
+                pass
         else:
-            g2 = sde.sde(jnp.zeros_like(data), t)[1] ** 2
-            losses = jnp.square(score + batch_mul(z, 1.0 / std))
-            losses = reduce_op(losses.reshape((losses.shape[0], -1)), axis=-1) * g2
+            t = random.uniform(step_rng, (data.shape[0],), minval=eps, maxval=sde.T)
+            rng, step_rng = random.split(rng)
+            z = random.normal(step_rng, data.shape)
+            mean, std = sde.marginal_prob(data, t)
+            perturbed_data = mean + batch_mul(std, z)
+            rng, step_rng = random.split(rng)
+            score, new_model_state = score_fn(perturbed_data, t, rng=step_rng)
+
+            if not likelihood_weighting:
+                losses = jnp.square(batch_mul(score, std) + z)
+                losses = reduce_op(losses.reshape((losses.shape[0], -1)), axis=-1)
+            else:
+                g2 = sde.sde(jnp.zeros_like(data), t)[1] ** 2
+                losses = jnp.square(score + batch_mul(z, 1.0 / std))
+                losses = reduce_op(losses.reshape((losses.shape[0], -1)), axis=-1) * g2
 
         loss = jnp.mean(losses)
         return loss, new_model_state
