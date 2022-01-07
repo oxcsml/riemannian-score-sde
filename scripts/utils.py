@@ -1,3 +1,6 @@
+import os
+import pickle
+
 import matplotlib.animation as animation
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -25,11 +28,13 @@ def plot_and_save_video(
     sphere.draw(ax, color=color, marker=".")
     scatter = sphere.draw_points(ax, points=points, color=color, marker=".")
     with writer.saving(fig, out, dpi=dpi):
-        for points in trajectories[1:]:
+        for i, points in enumerate(trajectories[1:]):
+            print(i, len(trajectories))
             points = gs.to_ndarray(points, to_ndim=2)
             scatter.remove()
             scatter = sphere.draw_points(ax, points=points, color=color, marker=".")
             writer.grab_frame()
+
 
 def plot_and_save_video2(
     heatmaps, size=20, fps=10, dpi=100, out="out.mp4", color="red"
@@ -83,6 +88,7 @@ def plot_and_save(
 ):
     fig = plt.figure(figsize=(size, size))
     ax = fig.add_subplot(111, projection="3d")
+    ax.view_init(elev=30, azim=45)
     # colours = sns.cubehelix_palette(n_colors=trajectories.shape[0], light=1.0, dark=0.0, start=0.5, rot=-0.75, reverse=False)
     colours = ["green", "blue"]
     sphere = visualization.Sphere()
@@ -153,3 +159,24 @@ def vMF_pdf(x, mu, kappa):
     x = jnp.broadcast_to(x, shape)
     mu = jnp.broadcast_to(mu, shape)
     return constant * jnp.exp(kappa * (batch_mul(mu, x).sum(-1) - 1.))
+
+
+def save(ckpt_dir: str, name: str, state) -> None:
+    with open(os.path.join(ckpt_dir, f"{name}_arrays.npy"), "wb") as f:
+        for x in jax.tree_leaves(state):
+            np.save(f, x, allow_pickle=False)
+
+    tree_struct = jax.tree_map(lambda t: 0, state)
+    with open(os.path.join(ckpt_dir, f"{name}_tree.pkl"), "wb") as f:
+        pickle.dump(tree_struct, f)
+
+
+def restore(ckpt_dir, name: str):
+    with open(os.path.join(ckpt_dir, f"{name}_tree.pkl"), "rb") as f:
+        tree_struct = pickle.load(f)
+ 
+    leaves, treedef = jax.tree_flatten(tree_struct)
+    with open(os.path.join(ckpt_dir, f"{name}_arrays.npy"), "rb") as f:
+        flat_state = [np.load(f) for _ in leaves]
+
+    return jax.tree_unflatten(treedef, flat_state)
