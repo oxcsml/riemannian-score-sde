@@ -298,7 +298,7 @@ class VESDE(SDE):
 
 class Brownian(SDE):
 
-    def __init__(self, manifold, T=1, beta=1, N=1000):
+    def __init__(self, manifold, T=1, beta_min=0.1, beta_max=1, N=1000):
         """Construct a Brownian motion on a compact manifold.
 
         Args:
@@ -306,7 +306,8 @@ class Brownian(SDE):
         """
         super().__init__(N)
         self.manifold = manifold
-        self.beta = beta
+        self.beta_0 = beta_min
+        self.beta_1 = beta_max
         self._T = T
         self.N = N
 
@@ -315,14 +316,21 @@ class Brownian(SDE):
         return self._T
 
     def sde(self, x, t):
-        beta_t = jnp.ones_like(x) * self.beta
+        beta_t = self.beta_0 + t * (self.beta_1 - self.beta_0)
+        # beta_t = jnp.ones_like(x)
         drift = jnp.zeros_like(x)
         diffusion = jnp.sqrt(beta_t)
         return drift, diffusion
 
     def marginal_prob(self, x, t):
-        # TODO: Should not rely on closed-form marginal probability
-        return jnp.zeros_like(x), jnp.ones_like(x)
+        """ Should not rely on closed-form marginal probability """
+        log_mean_coeff = (
+            -0.25 * t ** 2 * (self.beta_1 - self.beta_0) - 0.5 * t * self.beta_0
+        )
+        # mean = batch_mul(jnp.exp(log_mean_coeff), x)
+        std = jnp.sqrt(1 - jnp.exp(2.0 * log_mean_coeff))
+        # return mean, std
+        return jnp.zeros_like(x), std
 
     def marginal_sample(self, rng, x, t):
         from score_sde.sampling import EulerMaruyamaManifoldPredictor, get_pc_sampler  # TODO: remove from class
@@ -337,7 +345,7 @@ class Brownian(SDE):
     def marginal_log_prob(self, x0, x, t):
         # TODO: Should indeed vmap?
         # NOTE: reshape: https://github.com/google/jax/issues/2303
-        return np.reshape(self.manifold.log_heat_kernel(x0, x, t), ())
+        return jnp.reshape(self.manifold.log_heat_kernel(x0, x, t), ())
 
     def prior_sampling(self, rng, shape):
         return self.manifold.random_uniform(state=rng, n_samples=shape[0])
