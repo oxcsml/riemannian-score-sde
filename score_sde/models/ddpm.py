@@ -39,7 +39,7 @@ from .layers.layers import (
 )
 
 from score_sde.utils import register_model
-from score_sde.utils import get_sigmas
+from .model import get_sigmas
 
 
 @register_model

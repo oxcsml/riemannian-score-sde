@@ -13,10 +13,11 @@ class MLP:
     hidden_shapes: list
     output_shape: list
     act: str
+    bias: bool = True
 
     def __call__(self, x):
         for hs in self.hidden_shapes:
-            x = hk.Linear(output_size=hs)(x)
+            x = hk.Linear(output_size=hs, with_bias=self.bias)(x)
             x = get_activation(self.act)(x)
 
         x = hk.Linear(output_size=self.output_shape)(x)

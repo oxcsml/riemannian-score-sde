@@ -26,7 +26,8 @@ import jax.numpy as jnp
 import jax.random as random
 
 from score_sde.sde import VESDE, VPSDE, SDE, Brownian
-from score_sde.utils import batch_mul, get_score_fn, get_model_fn
+from score_sde.utils import batch_mul
+from score_sde.models import get_score_fn, get_model_fn
 from score_sde.utils import ParametrisedScoreFunction, TrainState
 from score_sde.likelihood import p_div_fn, div_noise
 

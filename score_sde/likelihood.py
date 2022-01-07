@@ -24,6 +24,7 @@ import jax.numpy as jnp
 from scipy import integrate
 
 from score_sde.sde import SDE
+from score_sde.models import get_score_fn
 from score_sde.utils import (
     ParametrisedScoreFunction,
     TrainState,
@@ -31,7 +32,6 @@ from score_sde.utils import (
     get_estimate_div_fn,
 )
 from score_sde.utils import (
-    get_score_fn,
     to_flattened_numpy,
     from_flattened_numpy,
     unreplicate,

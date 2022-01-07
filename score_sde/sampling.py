@@ -28,7 +28,8 @@ import jax.numpy as jnp
 import jax.random as random
 
 from score_sde.sde import SDE, VPSDE, subVPSDE, VESDE
-from score_sde.utils import from_flattened_numpy, to_flattened_numpy, get_score_fn
+from score_sde.models import get_score_fn
+from score_sde.utils import from_flattened_numpy, to_flattened_numpy
 from score_sde.utils import batch_mul, batch_add
 from score_sde.utils import register_category
 from score_sde.utils import ParametrisedScoreFunction, ScoreFunction, SDEUpdateFunction
