@@ -10,6 +10,7 @@ import jax
 from jax import numpy as jnp
 import numpy as np
 from scipy.stats import gaussian_kde
+from score_sde.sde import SDE, batch_mul, Brownian
 from scipy.interpolate import splev, splrep
 
 from scripts.utils import plot_and_save2, plot_and_save_video, plot_and_save_video2, vMF_pdf
@@ -39,9 +40,15 @@ def batch_mul(a, b):
     return jax.vmap(lambda a, b: a * b)(a, b)
 
 
+# @partial(jax.jit, static_argnums=(3,4,5))
+# def heat_kernel(y, s, x, tol, n_max, manifold):
+#     return jnp.exp(manifold.log_heat_kernel(x, y, s, tol=tol, n_max=n_max))
+
 @partial(jax.jit, static_argnums=(3,4,5))
-def heat_kernel(y, s, x, tol, n_max, manifold):
-    return jnp.exp(manifold.log_heat_kernel(x, y, s, tol=tol, n_max=n_max))
+def heat_kernel(y, s, x, tol, n_max, sde):
+    s = jnp.ones((x.shape[0], 1)) * s
+    marginal_log_prob = partial(sde.marginal_log_prob, tol=tol, n_max=n_max)
+    return jnp.exp(jax.vmap(marginal_log_prob)(x, y, s))
 
 
 @partial(jax.jit, static_argnums=(4))
@@ -62,19 +69,20 @@ def brownian_motion_traj(previous_x, traj, dt, N, manifold):
 
 
 @partial(jax.jit, static_argnums=(3))
-def brownian_motion(previous_x, dt, N, manifold):
+def brownian_motion(previous_x, dt, timesteps, sde):
     rng = jax.random.PRNGKey(0)
 
     def body(step, val):
         rng, x = val
-        rng, z = manifold.random_normal_tangent(state=rng, base_point=x, n_samples=x.shape[0])
-        tangent_vector = jnp.sqrt(dt) * z
-        x = manifold.metric.exp(tangent_vec=tangent_vector, base_point=x)
+        t = jnp.broadcast_to(timesteps[step], (x.shape[0], 1))
+        rng, z = sde.manifold.random_normal_tangent(state=rng, base_point=x, n_samples=x.shape[0])
+        drift, diffusion = sde.sde(x, t)
+        tangent_vector = drift * dt + batch_mul(diffusion, jnp.sqrt(dt) * z)
+        x = sde.manifold.metric.exp(tangent_vec=tangent_vector, base_point=x)
         return rng, x
 
-    _, x = jax.lax.fori_loop(0, N, body, (rng, previous_x))
+    _, x = jax.lax.fori_loop(0, sde.N, body, (rng, previous_x))
     return x
-
 
 ### S2
 
@@ -128,143 +136,53 @@ def test_s2_normalisation():
     
 
 def test_s2():
+    M = 500
     S2 = Hypersphere(dim=2)
     x0 = jnp.expand_dims(jnp.array([1., 0., 0.]), 0)
-    kernel = partial(heat_kernel, manifold=S2)
-    S2_brownian_motion = partial(brownian_motion, manifold=S2)
+    x0b = jnp.repeat(x0, 2*500, 0)
+    # sde = Brownian(S2, T=3, N=100, beta_min=0.1, beta_max=1)
+    sde = Brownian(S2, T=1, N=100, beta_min=0.1, beta_max=10)
+    # sde = Brownian(S2, T=3, N=100, beta_min=1., beta_max=1)
+    kernel = partial(heat_kernel, sde=sde)
+    S2_brownian_motion = partial(brownian_motion, sde=sde)
 
     # ts = jnp.linspace(0, 1., 4+1)[1:]
     # ts = [0.002, 0.005, 0.01, 0.02, 0.05]
-    ts = [0.1, 0.2, 0.5, 1., 2., 5.]
-    # ts = [0.1, 1., 5.]
+    # ts = [0.1, 0.2, 0.5, 1., 2., 5.]
+    ts = [0.02, 0.05, 0.1, 0.2, 0.5, 1.]
     # ts = [0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 5.]
-    N = 500
     eps = jnp.pi * 3 / 4
-    r = jnp.linspace(0., jnp.pi - eps, N)
+    r = jnp.linspace(0., jnp.pi - eps, M)
     r = jnp.concatenate([-jnp.flip(r), r]).reshape(-1, 1)
-    N = 2 * N
+    M = 2 * M
     v0 = jnp.array([[0., 0., 1.]]) * r
     # r = S2.metric.norm(v0)
     x = S2.metric.exp(v0, x0)
 
-    probs_trunc_5 = jnp.array([kernel(x=x0, y=x, s=t, tol=0., n_max=5) for t in ts])
-    probs_trunc_10 = jnp.array([kernel(x=x0, y=x, s=t, tol=0., n_max=10) for t in ts])
-    # probs_trunc_20 = jnp.array([kernel(x=x0, y=x, s=t, tol=0., n_max=20) for t in ts])
-    probs_trunc_50 = jnp.array([kernel(x=x0, y=x, s=t, tol=0., n_max=50) for t in ts])
-    probs_dev = jnp.array([kernel(x=x0, y=x, s=t, tol=jnp.inf, n_max=1) for t in ts])
+    probs_trunc_5 = jnp.array([kernel(x=x0b, y=x, s=t, tol=0., n_max=5) for t in ts])
+    probs_trunc_10 = jnp.array([kernel(x=x0b, y=x, s=t, tol=0., n_max=10) for t in ts])
+    # probs_trunc_20 = jnp.array([kernel(x=x0b, y=x, s=t, tol=0., n_max=20) for t in ts])
+    probs_trunc_50 = jnp.array([kernel(x=x0b, y=x, s=t, tol=0., n_max=50) for t in ts])
+    probs_dev = jnp.array([kernel(x=x0b, y=x, s=t, tol=jnp.inf, n_max=1) for t in ts])
 
     ### Sample heat kernel + density estimation
     K = 1000000
     previous_x = jnp.repeat(x0, K, axis=0)
-    probs_samples = jnp.zeros((len(ts), N))
+    probs_samples = jnp.zeros((len(ts), M))
     
     for i, t in enumerate(ts):
         print(t)
-        N, T = 100, t
-        dt = T / N * 2
-        previous_x = jnp.repeat(x0, K, axis=0)
-        y = S2_brownian_motion(previous_x, dt, N)
+        eps = 1e-3
+        dt = (t - eps) / sde.N
+        timesteps = jnp.linspace(eps, t, sde.N)
+        y = S2_brownian_motion(previous_x, dt, timesteps)
         kde = vmf_kde(y, kappa=50/t)
         prob = kde(x)
         probs_samples = probs_samples.at[i].set(prob)
     
     probs = jnp.concatenate(list(map(lambda x: jnp.expand_dims(x, 1),[probs_trunc_5, probs_trunc_10, probs_trunc_50, probs_samples, probs_dev])), axis=1)
     dim_1_names = ['truncated(5)', 'truncated(10)', 'truncated(50)', 'samples', 'developement']
-    plot(r, probs, ts, dim_1_names, out="images/s2_heat_kernel")
-
-
-# def test_s2_sample():
-#     S2 = Hypersphere(dim=2)
-#     kernel = partial(heat_kernel, manifold=S2)
-#     S2_brownian_motion = partial(brownian_motion_traj, manifold=S2)
-
-#     x0 = jnp.expand_dims(jnp.array([1., 0., 0.]), 0)
-#     N = 100
-#     T = 0.01
-#     K = 100000
-#     dt = T / N * 2
-#     timesteps = jnp.linspace(0, T, N + 1)
-#     previous_x = jnp.repeat(x0, K, axis=0)
-#     traj = jnp.zeros((N + 1, previous_x.shape[0], S2.dim + 1))
-
-#     _, traj = S2_brownian_motion(previous_x, traj, dt, N)
-#     y = traj[-1]
-#     # y = traj[list(timesteps).index(0.01)]
-#     kde = vmf_kde(y, kappa=1000)
-   
-#     # K = 1000
-#     # theta = jnp.linspace(0., jnp.pi, K)
-#     # phi = jnp.linspace(0., 2 * jnp.pi, K)
-#     # theta, phi = jnp.meshgrid(theta, phi)
-#     # theta = theta.reshape(-1, 1)
-#     # phi = phi.reshape(-1, 1)
-#     # x = spherical_to_cartesian(theta, phi)
-
-#     ts = [T]
-#     K = 500
-#     # eps = 0.
-#     eps = jnp.pi * 3 / 4
-#     r = jnp.linspace(0., jnp.pi - eps, K)
-#     r = jnp.concatenate([-jnp.flip(r), r]).reshape(-1, 1)
-#     v0 = jnp.array([[0., 0., 1.]]) * r
-#     x = S2.metric.exp(v0, x0)
-#     probs_sample = jnp.array([kde(x)])
-
-#     probs_trunc_50 = jnp.array([kernel(x=x0, y=x, s=t, tol=0., n_max=50) for t in ts])
-#     probs_dev = jnp.array([kernel(x=x0, y=x, s=t, tol=jnp.inf, n_max=1) for t in ts])
-    
-#     probs = jnp.concatenate(list(map(lambda x: jnp.expand_dims(x, 1),[probs_trunc_50, probs_sample, probs_dev])), axis=1)
-#     dim_1_names = ['truncated(50)', 'sample', 'developement']
-#     plot(r, probs, ts, dim_1_names, out="images/s2_heat_kernel_3")
-    
-#     # plot_and_save2([], pdf=kde, out=f"images/s2_pdf/bm_{T:.3f}.jpg")
-
-
-
-# def test_s2_sample_radius():
-#     S2 = Hypersphere(dim=2)
-#     S2_brownian_motion = partial(brownian_motion_traj, manifold=S2)
-#     x0 = jnp.expand_dims(jnp.array([1., 0., 0.]), 0)
-#     N = 100
-#     T = 5.
-#     K = 100000
-#     dt = T / N
-#     # dt = 1.
-#     # timesteps = jnp.linspace(0, T, N + 1)
-#     previous_x = jnp.repeat(x0, K, axis=0)
-#     traj = jnp.zeros((N + 1, previous_x.shape[0], S2.dim + 1))
-#     x, traj = S2_brownian_motion(previous_x, traj, dt, N)
-#     # plot_and_save_video(traj, out="forward_samples.mp4")
-#     y = traj[-1]
-#     v0 = S2.metric.log(y, x0)
-
-#     # radius = jnp.pi * jnp.sqrt(jax.random.uniform(jax.random.PRNGKey(0), shape=(K, 1)))
-#     # theta = jax.random.uniform(jax.random.PRNGKey(0), shape=(K, 1), maxval=2*jnp.pi)
-#     # v0 = jnp.concatenate([radius*jnp.cos(theta), radius*jnp.sin(theta)], axis=-1)
-    
-#     r = S2.metric.norm(v0)
-#     # dist = S2.metric.dist(x0, x)
-#     density, bins = jnp.histogram(r, bins=20, density=True) # range=[0, jnp.pi]
-
-#     x = (bins[:-1] + bins[1:]) / 2
-#     y = density * (x / jnp.sin(x))
-
-#     # Interpolation
-#     x2 = np.linspace(0, 3., 200)
-#     # y_true = x2 * 2 / (jnp.pi ** 2)
-#     y_true = x2 / 2
-#     kernel = gaussian_kde(r, bw_method=0.2)
-#     y2 = kernel(x2) * (x2 / jnp.sin(x2))
-
-#     # Plotting
-#     fig, ax = plt.subplots()
-#     # ax.hist2d(v0[..., 1], v0[..., 2], bins=20, density=True)
-#     ax.bar(x, y, width=np.pi/len(y), alpha=0.5)
-#     # ax.hist(r, bins=20, density=True)
-#     ax.plot(x, y, 'o')
-#     ax.plot(x2, y2, 'r-')
-#     ax.plot(x2, y_true, 'g-')
-#     plt.savefig("{}.png".format('images/s2_samples'), dpi=300, bbox_inches="tight")
+    plot(r, probs, ts, dim_1_names, out=f"images/s2_heat_kernel_beta_{sde.T}_{sde.beta_0:.1f}_{sde.beta_1:.1f}")
 
 
 ### S1
