@@ -96,7 +96,7 @@ def div_noise(rng: jax.random.KeyArray, shape: Sequence[int], hutchinson_type: s
 def get_likelihood_fn(
     sde: SDE,
     model: ParametrisedScoreFunction,
-    inverse_scaler,
+    inverse_scaler: lambda x: x,
     hutchinson_type: str = "Rademacher",
     rtol: str = 1e-5,
     atol: str = 1e-5,

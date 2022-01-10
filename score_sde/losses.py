@@ -102,9 +102,7 @@ def get_sde_loss_fn(
             score, new_model_state = score_fn(perturbed_data, t, rng=step_rng)
 
             if not ism_loss:  # DSM loss
-                logp_grad_fn = jax.value_and_grad(sde.marginal_log_prob, argnums=1, has_aux=False)
-                logp, logp_grad = jax.vmap(logp_grad_fn)(data, perturbed_data, t)
-                logp_grad = sde.manifold.to_tangent(logp_grad, perturbed_data)
+                logp_grad = sde.grad_marginal_log_prob(data, perturbed_data, t)[1]
                 losses = jnp.square(score - logp_grad)
                 # losses = batch_mul(losses, 1 / std)
                 losses = reduce_op(losses.reshape((losses.shape[0], -1)), axis=-1)
