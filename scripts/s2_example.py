@@ -2,6 +2,7 @@ from functools import partial
 
 import matplotlib.animation as animation
 import matplotlib.pyplot as plt
+from scipy.integrate._ivp.radau import E
 import seaborn as sns
 import geomstats.visualization as visualization
 from geomstats.geometry.hypersphere import Hypersphere
@@ -12,7 +13,7 @@ from score_sde.sde import SDE, batch_mul, Brownian
 from score_sde.utils import TrainState, replicate
 from score_sde.models import MLP, ScoreFunctionWrapper, ScoreNetwork, get_score_fn
 from score_sde.losses import get_pmap_step_fn, get_step_fn
-from score_sde.likelihood import get_likelihood_fn
+from score_sde.likelihood import get_likelihood_fn, get_pmap_likelihood_fn
 import jax
 from jax import device_put
 from jax import numpy as jnp
@@ -130,8 +131,8 @@ def forward_or_backward_process(forward=False):
     n_samples = 512
     S2 = Hypersphere(dim=2)
     # sde = Brownian(S2, T=1, N=N, beta_min=0.1, beta_max=20)
-    sde = Brownian(S2, T=3, N=N, beta_min=0.1, beta_max=1)
-    # sde = Brownian(S2, T=3, N=N, beta_min=1, beta_max=1)
+    # sde = Brownian(S2, T=3, N=N, beta_min=0.1, beta_max=1)
+    sde = Brownian(S2, T=3, N=N, beta_min=1, beta_max=1)
     x0 = gs.array([[1., 0., 0.]])
     x0b = jnp.repeat(x0, n_samples, 0)
     eps = 1e-3
@@ -145,8 +146,8 @@ def forward_or_backward_process(forward=False):
     else:
         params = restore('experiments', 'params')
         state = restore('experiments', 'state')
-        # score_model = hk.transform_with_state(partial(score_inv, sde=sde))
-        score_model = hk.transform_with_state(partial(score_true, sde=sde, x0=x0b))
+        score_model = hk.transform_with_state(partial(score_inv, sde=sde))
+        # score_model = hk.transform_with_state(partial(score_true, sde=sde, x0=x0b))
         score_fn = get_score_fn(sde, score_model, params, state)
         # score_fn = lambda x, t: value_and_grad_log_marginal_prob(x0b, x, t, sde)[1]
         rsde = sde.reverse(score_fn)
@@ -190,12 +191,12 @@ def score_inv(x, t, sde):
     invariant_basis = sde.manifold.invariant_basis(x)
     layer = MLP(hidden_shapes=3*[512], output_shape=3, act='sin')
     weights = ScoreFunctionWrapper(layer)(x, t)
-    # weights = ScoreNetwork(output_shape=3)(x, t)
+    # weights = ScoreNetwork(output_shape=3, encoder_layers=[512], pos_dim=16, decoder_layers=3*[512])(x, t)
     # weights = ConcatSquash(output_shape=3, layer=layer)(x, t)  # output_shape = dim(Isom(manifold))
     return (gs.expand_dims(weights, -2) * invariant_basis).sum(-1)
 
 
-def main():
+def main(train=False):
     rng = jax.random.PRNGKey(0)
     manifold = Hypersphere(dim=2)
     # sde = Brownian(manifold, T=1, N=100, beta_min=0.1, beta_max=10)
@@ -205,21 +206,26 @@ def main():
 
     x0 = jnp.array([[1., 0., 0.]])
     x0b = jnp.repeat(jnp.expand_dims(x0, 0), batch_size, 0)
-    # dataset_init = vMFDataset([batch_size], jax.random.PRNGKey(0), manifold, mu=x0, kappa=15)
-    dataset_init = DiracDataset([batch_size], mu=x0)
+    kappa = 15
+    dataset_init = vMFDataset([batch_size], jax.random.PRNGKey(0), manifold, mu=x0.reshape(3), kappa=kappa)
+    # dataset_init = DiracDataset([batch_size], mu=x0)
     x = next(dataset_init)
 
-    score_model = partial(score_true, sde=sde, x0=x0b)
+    # score_model = partial(score_true, sde=sde, x0=x0b)
     # score_model = partial(score_ambiant, sde=sde)
     score_model = partial(score_inv, sde=sde)
     score_model = hk.transform_with_state(score_model)
-    rng, next_rng = jax.random.split(rng)
-    params, state = score_model.init(rng=next_rng, x=x, t=0)
+    if train:
+        rng, next_rng = jax.random.split(rng)
+        params, state = score_model.init(rng=next_rng, x=x, t=0)
+    else:
+        params = restore('experiments', 'params')
+        state = restore('experiments', 'state')
 
     ### Optimiser ###
 
-    warmup_steps, steps = 10, 1000
-    # warmup_steps, steps = 0, 10
+    warmup_steps, steps = 10, 500
+    # warmup_steps, steps = 0, 20
     # warmup_steps, steps = 0, 1
     # steps = 1
 
@@ -242,32 +248,34 @@ def main():
     train_state = TrainState(
         opt_state=opt_state, model_state=state, step=0, params=params, ema_rate=0.999, params_ema=params, rng=next_rng
     )
-    # train_step_fn = get_pmap_step_fn(sde, score_model, optimiser, True, reduce_mean=False, continuous=True, likelihood_weighting=False, eps=1e-3)
-    train_step_fn = get_step_fn(sde, score_model, optimiser, True, reduce_mean=False, continuous=True, likelihood_weighting=False, eps=1e-3)
-    # p_train_step = jax.pmap(partial(jax.lax.scan, train_step_fn), axis_name='batch', donate_argnums=1)
-    # p_train_state = replicate(train_state)
 
     ### Training ###
+    if train:
 
-    # dataset = vMFDataset([1,1,batch_size], jax.random.PRNGKey(0), manifold, kappa=15)
-    dataset = dataset_init
-    for i in range(steps):
-        batch = {
-            'data': next(dataset),
-            'label': None
-        }
+        # train_step_fn = get_pmap_step_fn(sde, score_model, optimiser, True, reduce_mean=False, continuous=True, likelihood_weighting=False, eps=1e-3)
+        train_step_fn = get_step_fn(sde, score_model, optimiser, True, reduce_mean=False, continuous=True, likelihood_weighting=False, eps=1e-3)
+        # p_train_step = jax.pmap(partial(jax.lax.scan, train_step_fn), axis_name='batch', donate_argnums=1)
+        # p_train_state = replicate(train_state)
 
-        # rng = p_train_state.rng[0]
-        # rng = train_state.rng  # TODO: train_state.rng is not updated!
+        # dataset = vMFDataset([1,1,batch_size], jax.random.PRNGKey(0), manifold, kappa=15)
+        dataset = dataset_init
+        for i in range(steps):
+            batch = {
+                'data': next(dataset),
+                'label': None
+            }
 
-        # next_rng = jax.random.split(rng, num=jax.local_device_count() + 1)
-        # rng = next_rng[0]
-        # next_rng = next_rng[1:]
-        # (rng, p_train_state), loss = p_train_step((next_rng, p_train_state), batch)
-        rng, next_rng = jax.random.split(rng)
-        (rng, train_state), loss = train_step_fn((next_rng, train_state), batch)
-        # if i%100 == 0:
-        print(i, ': ', loss)
+            # rng = p_train_state.rng[0]
+            # rng = train_state.rng  # TODO: train_state.rng is not updated!
+
+            # next_rng = jax.random.split(rng, num=jax.local_device_count() + 1)
+            # rng = next_rng[0]
+            # next_rng = next_rng[1:]
+            # (rng, p_train_state), loss = p_train_step((next_rng, p_train_state), batch)
+            rng, next_rng = jax.random.split(rng)
+            (rng, train_state), loss = train_step_fn((next_rng, train_state), batch)
+            # if i%100 == 0:
+            print(i, ': ', loss)
 
     ### Analysis ###
 
@@ -304,21 +312,28 @@ def main():
     score = score_fn(x, jnp.ones(x.shape[0]) * t)
     prob = jax.vmap(sde.marginal_log_prob)(x0, x, jnp.ones(x.shape[0]) * t)
     plot_and_save3(x0, x, jnp.exp(prob), score, out=f"images/s2_xt_backw_{name}.jpg")
-    # plot_and_save([x0, x], out=f"s2_train_{steps}.jpg")
 
-    ## likelihood
-    # likelihood_fn = get_likelihood_fn(sde, score_model)
-    # next_rng = jax.random.split(rng, num=jax.local_device_count())
-    # p_train_state = replicate(train_state)
-    # prob = likelihood_fn(next_rng, train_state, x)
+    ## p_0 (backward)
+    t = 1e-3
+    rng, next_rng = jax.random.split(rng)
+    x, _ = sampler(next_rng, train_state, t=t)
+    # prob = jax.vmap(sde.marginal_log_prob)(x0, x, jnp.ones(x.shape[0]) * t)
+    likelihood_fn = get_likelihood_fn(sde, score_model, bits_per_dimension=False, eps=1e-3)
+    logp, z, nfe = likelihood_fn(rng, train_state, x)
+    print(logp.shape)
+    # logp = jnp.log(jax.vmap(partial(vMF_pdf, kappa=15))(x=x.reshape(-1, 1, 3), mu=x0.reshape(-1, 1, 3))).reshape(-1)
+    constant = kappa / ((2 * jnp.pi) * (1. - jnp.exp(-2. * kappa)))
+    prob = constant * jnp.exp(kappa * (batch_mul(x0, x).sum(-1) - 1.))
+    print(prob.shape)
+    plot_and_save3(x0, x, prob, None, out=f"images/s2_x0_backw_{name}.jpg")
 
-    # score, _ = score_model.apply(train_state.params, train_state.model_state, None, x=jnp.array([[0.,1.,0.],[0.,0.,1.]]), t=t)
-    # print(jnp.linalg.norm(score))
+    # # score, _ = score_model.apply(train_state.params, train_state.model_state, None, x=jnp.array([[0.,1.,0.],[0.,0.,1.]]), t=t)
+    # # print(jnp.linalg.norm(score))
     save('experiments', 'params', train_state.params)
     save('experiments', 'state', train_state.model_state)
-    # params = restore('experiments', 'params')
-    # state = restore('experiments', 'state')
-    # score, _ = score_model.apply(params, state, None, x=x, t=t)
+    # # params = restore('experiments', 'params')
+    # # state = restore('experiments', 'state')
+    # # score, _ = score_model.apply(params, state, None, x=x, t=t)
 
 
 if __name__ == "__main__":
