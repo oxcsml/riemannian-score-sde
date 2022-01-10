@@ -358,4 +358,4 @@ class Brownian(SDE):
         return self.manifold.random_uniform(state=rng, n_samples=shape[0])
 
     def prior_logp(self, z):
-        return - jnp.ones_like(z) * self.manifold.metric.log_volume
+        return - jnp.ones([*z.shape[:-1]]) * self.manifold.metric.log_volume
