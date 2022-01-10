@@ -29,7 +29,7 @@ from score_sde.sde import VESDE, VPSDE, SDE, Brownian
 from score_sde.utils import batch_mul
 from score_sde.models import get_score_fn, get_model_fn
 from score_sde.utils import ParametrisedScoreFunction, TrainState
-from score_sde.likelihood import p_div_fn, div_noise
+from score_sde.likelihood import div_noise, get_drift_fn, get_div_fn
 
 
 def get_sde_loss_fn(
@@ -94,6 +94,7 @@ def get_sde_loss_fn(
 
         rng, step_rng = random.split(rng)
         t = random.uniform(step_rng, (data.shape[0],), minval=eps, maxval=sde.T)
+        # t = eps + random.beta(step_rng, a=1., b=3., shape=(data.shape[0],)) * sde.T
 
         if isinstance(sde, Brownian):
             # t = jnp.ones(data.shape[0]) * t[0]
@@ -109,7 +110,10 @@ def get_sde_loss_fn(
             else:  # ISM loss  # TODO: NOT tested!
                 rng, step_rng = random.split(rng)
                 epsilon = div_noise(step_rng, data.shape, hutchinson_type)
-                div_score = p_div_fn(new_model_state, hutchinson_type, data, t, epsilon)
+                drift_fn = get_drift_fn(sde, model, params, states)
+                div_fn = get_div_fn(drift_fn, hutchinson_type)
+                div_score = div_fn(data, t, epsilon)
+                # div_score = p_div_fn(new_model_state, hutchinson_type, data, t, epsilon)
                 score_sq_norm = jnp.sum(jnp.square(score), -1)
                 losses = score_sq_norm - div_score
             if likelihood_weighting:
