@@ -552,7 +552,7 @@ def get_pc_sampler(
             # N = int(jnp.round((sde.T - t0) / sde.T * sde.N))
             timesteps = jnp.linspace(sde.T, t0, N)
             dt = (sde.T - t0) / N
-        dt = jnp.expand_dims(dt, -1) * 2  # TODO: Is this correct?
+        dt = jnp.expand_dims(dt, -1)
 
         def loop_body(i, val):
             rng, x, x_mean = val

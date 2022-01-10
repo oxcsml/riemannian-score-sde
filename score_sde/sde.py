@@ -298,7 +298,7 @@ class VESDE(SDE):
 
 class Brownian(SDE):
 
-    def __init__(self, manifold, T=1, beta_min=0.1, beta_max=1, N=1000):
+    def __init__(self, manifold, T=1, beta_min=0.1, beta_max=10, N=1000):
         """Construct a Brownian motion on a compact manifold.
 
         Args:
@@ -342,10 +342,17 @@ class Brownian(SDE):
             perturbed_x, _ = sampler(rng, None, x, t)
         return perturbed_x
 
-    def marginal_log_prob(self, x0, x, t):
+    def marginal_log_prob(self, x0, x, t, **kwargs):
         # TODO: Should indeed vmap?
         # NOTE: reshape: https://github.com/google/jax/issues/2303
-        return jnp.reshape(self.manifold.log_heat_kernel(x0, x, t), ())
+        s = 2 * (0.25 * t ** 2 * (self.beta_1 - self.beta_0) + 0.5 * t * self.beta_0)
+        return jnp.reshape(self.manifold.log_heat_kernel(x0, x, s, **kwargs), ())
+
+    def grad_marginal_log_prob(self, x0, x, t):
+        logp_grad_fn = jax.value_and_grad(self.marginal_log_prob, argnums=1, has_aux=False)
+        logp, logp_grad = jax.vmap(logp_grad_fn)(x0, x, t)
+        logp_grad = self.manifold.to_tangent(logp_grad, x)
+        return logp, logp_grad
 
     def prior_sampling(self, rng, shape):
         return self.manifold.random_uniform(state=rng, n_samples=shape[0])

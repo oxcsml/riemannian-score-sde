@@ -77,7 +77,6 @@ def get_score_fn(
         def score_fn(x, t, rng=None):
             model_out, new_state = model.apply(params, state, rng, x=x, t=t)
             # NOTE: scaling the output with 1.0 / std helps cf 'Improved Techniques for Training Score-Based Generative Model'
-            # Could approximate std as interpolate bewteen 0 and std of unif
             score = model_out 
             std = sde.marginal_prob(jnp.zeros_like(x), t)[1]
             score = batch_mul(model_out, 1.0 / std)
