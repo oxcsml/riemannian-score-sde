@@ -28,7 +28,8 @@ import jax.numpy as jnp
 import jax.random as random
 
 from score_sde.sde import SDE, VPSDE, subVPSDE, VESDE
-from score_sde.utils import from_flattened_numpy, to_flattened_numpy, get_score_fn
+from score_sde.models import get_score_fn
+from score_sde.utils import from_flattened_numpy, to_flattened_numpy
 from score_sde.utils import batch_mul, batch_add
 from score_sde.utils import register_category
 from score_sde.utils import ParametrisedScoreFunction, ScoreFunction, SDEUpdateFunction
@@ -116,7 +117,7 @@ class Predictor(abc.ABC):
 
     @abc.abstractmethod
     def update_fn(
-        self, rng: jax.random.KeyArray, x: jnp.ndarray, t: float
+        self, rng: jax.random.KeyArray, x: jnp.ndarray, t: float, dt: float
     ) -> Tuple[jnp.ndarray, jnp.ndarray]:
         """One update of the predictor.
 
@@ -147,7 +148,7 @@ class Corrector(abc.ABC):
 
     @abc.abstractmethod
     def update_fn(
-        self, rng: jax.random.KeyArray, x: jnp.ndarray, t: float
+        self, rng: jax.random.KeyArray, x: jnp.ndarray, t: float, dt: float
     ) -> Tuple[jnp.ndarray, jnp.ndarray]:
         """One update of the corrector.
 
@@ -187,18 +188,19 @@ class EulerMaruyamaManifoldPredictor(Predictor):
         self.forward = forward
 
     def update_fn(
-        self, rng: jax.random.KeyArray, x: jnp.ndarray, t: float
+        self, rng: jax.random.KeyArray, x: jnp.ndarray, t: float, dt: float
     ) -> Tuple[jnp.ndarray, jnp.ndarray]:
-        dt = self.rsde.T / self.rsde.N
+        # dt = self.rsde.T / self.rsde.N
         sign = 1 if self.forward else -1
         rng, z = self.sde.manifold.random_normal_tangent(state=rng, base_point=x, n_samples=x.shape[0])
         drift, diffusion = self.rsde.sde(x, t)
         drift = sign * drift * dt
-        #NOTE: should we use retraction?
-        x_mean = self.sde.manifold.metric.exp(tangent_vec=drift, base_point=x)  # NOTE: do we really need this in practice? only if denoise=True
+        #NOTE: should we use retraction? can we not compute x_mean?
+        # x_mean = self.sde.manifold.metric.exp(tangent_vec=drift, base_point=x)  # NOTE: do we really need this in practice? only if denoise=True
         tangent_vector = drift + batch_mul(diffusion, jnp.sqrt(dt) * z)
         x = self.sde.manifold.metric.exp(tangent_vec=tangent_vector, base_point=x)
-        return x, x_mean
+        # x = self.sde.manifold.projection(x + self.sde.manifold.metric.metric_matrix @ tangent_vector)
+        return x, x#x_mean
 
 
 @register_predictor
@@ -391,7 +393,7 @@ class NoneCorrector(Corrector):
         pass
 
     def update_fn(
-        self, rng: jax.random.KeyArray, x: jnp.ndarray, t: float
+        self, rng: jax.random.KeyArray, x: jnp.ndarray, t: float, dt: float
     ) -> Tuple[jnp.ndarray, jnp.ndarray]:
         return x, x
 
@@ -401,6 +403,7 @@ def shared_predictor_update_fn(
     train_state: TrainState,
     x: jnp.ndarray,
     t: jnp.ndarray,
+    dt: jnp.ndarray,
     sde: SDE,
     model: ParametrisedScoreFunction,
     predictor: Predictor,
@@ -425,7 +428,7 @@ def shared_predictor_update_fn(
         predictor_obj = NonePredictor(sde, score_fn, forward, probability_flow)
     else:
         predictor_obj = predictor(sde, score_fn, forward, probability_flow)
-    return predictor_obj.update_fn(rng, x, t)
+    return predictor_obj.update_fn(rng, x, t, dt)
 
 
 def shared_corrector_update_fn(
@@ -433,6 +436,7 @@ def shared_corrector_update_fn(
     train_state: TrainState,
     x: jnp.ndarray,
     t: jnp.ndarray,
+    dt: jnp.ndarray,
     sde: SDE,
     model: ParametrisedScoreFunction,
     corrector: Corrector,
@@ -458,7 +462,7 @@ def shared_corrector_update_fn(
         corrector_obj = NoneCorrector(sde, score_fn, forward, snr, n_steps)
     else:
         corrector_obj = corrector(sde, score_fn, forward, snr, n_steps)
-    return corrector_obj.update_fn(rng, x, t)
+    return corrector_obj.update_fn(rng, x, t, dt)
 
 
 def get_pc_sampler(
@@ -517,7 +521,7 @@ def get_pc_sampler(
         n_steps=n_steps,
     )
 
-    def pc_sampler(rng, state=None, x=None, T=None):
+    def pc_sampler(rng, state=None, x=None, t=None):
         """The PC sampler funciton.
 
         Args:
@@ -529,23 +533,35 @@ def get_pc_sampler(
         # Initial sample
         rng, step_rng = random.split(rng)
         if forward:
-            assert (x is not None) and (T is not None)
+            assert (x is not None) and (t is not None)
         else:
             x = sde.prior_sampling(step_rng, shape)
-            T = sde.T
 
-        N = int(jnp.round(T / sde.T * sde.N))
-        timesteps = jnp.linspace(T, eps, N)
-        timesteps = jnp.flip(timesteps) if forward else timesteps
+        # N = int(jnp.round(T / sde.T * sde.N))
+        # timesteps = jnp.linspace(T, eps, N)
+        # timesteps = jnp.flip(timesteps) if forward else timesteps
+
+        N = sde.N
+        if forward:
+            # N = int(jnp.round(t / sde.T * sde.N))
+            timesteps = jnp.linspace(eps, t, N)
+            dt = (t - eps) / N
+        else:
+            t0 = eps if t is None else  t
+            t0 = jnp.ones(shape[0]) * t0
+            # N = int(jnp.round((sde.T - t0) / sde.T * sde.N))
+            timesteps = jnp.linspace(sde.T, t0, N)
+            dt = (sde.T - t0) / N
+        dt = jnp.expand_dims(dt, -1)
 
         def loop_body(i, val):
             rng, x, x_mean = val
-            t = timesteps[i]
-            vec_t = jnp.ones(shape[0]) * t
+            vec_t = timesteps[i]
+            # vec_t = jnp.ones(shape[0]) * t
             rng, step_rng = random.split(rng)
-            x, x_mean = corrector_update_fn(step_rng, state, x, vec_t)
+            x, x_mean = corrector_update_fn(step_rng, state, x, vec_t, dt)
             rng, step_rng = random.split(rng)
-            x, x_mean = predictor_update_fn(step_rng, state, x, vec_t)
+            x, x_mean = predictor_update_fn(step_rng, state, x, vec_t, dt)
             return rng, x, x_mean
 
         _, x, x_mean = jax.lax.fori_loop(0, N, loop_body, (rng, x, x))

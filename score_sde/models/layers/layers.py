@@ -34,7 +34,7 @@ get_activation, register_activation = register_category("activation")
 
 register_activation(jnn.elu, name="elu")
 register_activation(jnn.relu, name="relu")
-register_activation(functools.partial(jnn.leaky_relu, negative_slope=0.2), name="lrelu")
+register_activation(functools.partial(jnn.leaky_relu, negative_slope=0.01), name="lrelu")
 register_activation(jnn.swish, name="swish")
 register_activation(jnp.sin, name='sin')
 

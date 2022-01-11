@@ -28,7 +28,7 @@ def get_estimate_div_fn(fn: ScoreFunction):
     return div_fn
 
 
-def get_div_fn(fn):
+def get_exact_div_fn(fn):
     "flatten all but the last axis and compute the true divergence"
 
     def div_fn(
@@ -42,12 +42,8 @@ def get_div_fn(fn):
         x_shape = x.shape
         t_shape = t.shape
 
-        print(t.shape)
-        print(x.shape)
         x = x.reshape((-1, x_shape[-1]))
         t = t.reshape((-1, t_shape[-1]))
-        print(t.shape)
-        print(x.shape)
         jac = jax.vmap(jax.jacrev(fn, argnums=0))(x, t)
         return jnp.trace(jac, axis1=-1, axis2=-2).reshape(x_shape[:-1])
 
