@@ -31,7 +31,8 @@ from score_sde.utils.jax import batch_mul
 from score_sde.utils import register_category
 from score_sde.utils.typing import ParametrisedScoreFunction
 
-from score_sde.sde import SDE, VESDE, VPSDE, subVPSDE, Brownian
+from score_sde.sde import SDE, VESDE, VPSDE, subVPSDE
+from riemannian_score_sde.sde import Brownian
 from .mlp import MLP
 
 
@@ -74,10 +75,11 @@ def get_score_fn(
     # model_fn = get_model_fn(model, params, states, train=train)
 
     if isinstance(sde, Brownian):
+
         def score_fn(x, t, rng=None):
             model_out, new_state = model.apply(params, state, rng, x=x, t=t)
             # NOTE: scaling the output with 1.0 / std helps cf 'Improved Techniques for Training Score-Based Generative Model'
-            score = model_out 
+            score = model_out
             std = sde.marginal_prob(jnp.zeros_like(x), t)[1]
             score = batch_mul(model_out, 1.0 / std)
             if return_state:
@@ -193,7 +195,9 @@ class Ignore:
 class Concat:
     def __init__(self, output_shape, layer):
         self._layer = layer
-        self._hyper_bias = MLP(hidden_shapes=[], output_shape=output_shape, act='', bias=False)
+        self._hyper_bias = MLP(
+            hidden_shapes=[], output_shape=output_shape, act="", bias=False
+        )
 
     def __call__(self, x, t):
         t = jnp.array(t, dtype=float).reshape(-1, 1)
@@ -204,7 +208,7 @@ class Concat:
 class Squash:
     def __init__(self, output_shape, layer):
         self._layer = layer
-        self._hyper = MLP(hidden_shapes=[], output_shape=output_shape, act='')
+        self._hyper = MLP(hidden_shapes=[], output_shape=output_shape, act="")
 
     def __call__(self, x, t):
         t = jnp.array(t, dtype=float).reshape(-1, 1)
@@ -215,21 +219,25 @@ class Squash:
 class ConcatSquash:
     def __init__(self, output_shape, layer):
         self._layer = layer
-        self._hyper_bias = MLP(hidden_shapes=[], output_shape=output_shape, act='', bias=False)
-        self._hyper_gate = MLP(hidden_shapes=[], output_shape=output_shape, act='')
+        self._hyper_bias = MLP(
+            hidden_shapes=[], output_shape=output_shape, act="", bias=False
+        )
+        self._hyper_gate = MLP(hidden_shapes=[], output_shape=output_shape, act="")
 
     def __call__(self, x, t):
         t = jnp.array(t, dtype=float).reshape(-1, 1)
-        return self._layer(x) * jax.nn.sigmoid(self._hyper_gate(t)) + self._hyper_bias(t)
+        return self._layer(x) * jax.nn.sigmoid(self._hyper_gate(t)) + self._hyper_bias(
+            t
+        )
 
 
 def get_timestep_embedding(timesteps, embedding_dim=128):
     """
-      From Fairseq.
-      Build sinusoidal embeddings.
-      This matches the implementation in tensor2tensor, but differs slightly
-      from the description in Section 3.5 of "Attention Is All You Need".
-      https://github.com/pytorch/fairseq/blob/master/fairseq/modules/sinusoidal_positional_embedding.py
+    From Fairseq.
+    Build sinusoidal embeddings.
+    This matches the implementation in tensor2tensor, but differs slightly
+    from the description in Section 3.5 of "Attention Is All You Need".
+    https://github.com/pytorch/fairseq/blob/master/fairseq/modules/sinusoidal_positional_embedding.py
     """
     half_dim = embedding_dim // 2
     emb = math.log(10000) / (half_dim - 1)
@@ -238,29 +246,31 @@ def get_timestep_embedding(timesteps, embedding_dim=128):
     emb = timesteps * jnp.expand_dims(emb, 0)
     emb = jnp.concatenate([jnp.sin(emb), jnp.cos(emb)], -1)
     if embedding_dim % 2 == 1:  # zero pad
-        emb = jnp.pad(emb, [0,1])
+        emb = jnp.pad(emb, [0, 1])
 
     return emb
 
 
 @dataclass
 class ScoreNetwork:
-    def __init__(self, output_shape, encoder_layers=[16], pos_dim=16, decoder_layers=[128,128]):
+    def __init__(
+        self, output_shape, encoder_layers=[16], pos_dim=16, decoder_layers=[128, 128]
+    ):
         self.temb_dim = pos_dim
         t_enc_dim = pos_dim * 2
         # self.locals = [encoder_layers, pos_dim, decoder_layers, output_shape]
 
-        self.net = MLP(hidden_shapes=decoder_layers,
-                       output_shape=output_shape,
-                       act='lrelu')
+        self.net = MLP(
+            hidden_shapes=decoder_layers, output_shape=output_shape, act="lrelu"
+        )
 
-        self.t_encoder = MLP(hidden_shapes=encoder_layers,
-                             output_shape=t_enc_dim,
-                             act='lrelu')
+        self.t_encoder = MLP(
+            hidden_shapes=encoder_layers, output_shape=t_enc_dim, act="lrelu"
+        )
 
-        self.x_encoder = MLP(hidden_shapes=encoder_layers,
-                             output_shape=t_enc_dim,
-                             act='lrelu')
+        self.x_encoder = MLP(
+            hidden_shapes=encoder_layers, output_shape=t_enc_dim, act="lrelu"
+        )
 
     def __call__(self, x, t):
         t = jnp.array(t, dtype=float).reshape(-1, 1)
@@ -272,5 +282,5 @@ class ScoreNetwork:
         xemb = self.x_encoder(x)
         temb = jnp.broadcast_to(temb, [xemb.shape[0], *temb.shape[1:]])
         h = jnp.concatenate([xemb, temb], -1)
-        out = self.net(h) 
+        out = self.net(h)
         return out

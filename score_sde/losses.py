@@ -25,7 +25,8 @@ import optax
 import jax.numpy as jnp
 import jax.random as random
 
-from score_sde.sde import VESDE, VPSDE, SDE, Brownian
+from score_sde.sde import VESDE, VPSDE, SDE
+from riemannian_score_sde.sde import Brownian
 from score_sde.utils import batch_mul
 from score_sde.models import get_score_fn, get_model_fn
 from score_sde.utils import ParametrisedScoreFunction, TrainState
@@ -226,7 +227,7 @@ def get_pmap_step_fn(
     reduce_mean=False,
     continuous=True,
     likelihood_weighting=False,
-    eps: float = 1e-5
+    eps: float = 1e-5,
 ):
     """Create a one-step training/evaluation function.
 
@@ -329,7 +330,7 @@ def get_step_fn(
     reduce_mean=False,
     continuous=True,
     likelihood_weighting=False,
-    eps: float = 1e-5
+    eps: float = 1e-5,
 ):
     """Create a one-step training/evaluation function.
 
