@@ -5,6 +5,7 @@ from score_sde.utils import register_dataset
 
 
 from .gaussian_mixture import GaussianMixture
+from .unimodal import *
 
 
 def create_prefetch_dataset(
