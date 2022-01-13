@@ -17,10 +17,8 @@ manifold:
   dim: 2
 
 sde:
-  T: 3
-  N: 100
   beta_0: 0.1
-  beta_1: 1.
+  beta_f: 1.
 
 batch_size: 512
 warmup_steps: 10

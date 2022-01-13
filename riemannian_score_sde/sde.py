@@ -2,11 +2,9 @@ from score_sde.sde import SDE
 
 
 class Brownian(SDE):
-    def __init__(
-        self, manifold, tf: float, t0: float = 0, N=None, dt=None, beta_0=0.1, beta_f=20
-    ):
+    def __init__(self, manifold, tf: float, t0: float = 0, beta_0=0.1, beta_f=20):
         """Construct a Brownian motion on a compact manifold"""
-        super().__init__(tf, t0, N, dt)
+        super().__init__(tf, t0)
         self.beta_0 = beta_0
         self.beta_f = beta_f
         self.manifold = manifold

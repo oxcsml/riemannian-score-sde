@@ -9,6 +9,7 @@ import haiku as hk
 import optax
 
 from score_sde.utils import TrainState, save, restore
+
 # from score_sde.sampling import EulerMaruyamaManifoldPredictor, get_pc_sampler
 # from score_sde.likelihood import get_likelihood_fn, get_pmap_likelihood_fn
 
@@ -40,7 +41,9 @@ def run(cfg):
     #     return score(x, t)
 
     def score_model(x, t, div=False):
-        score = instantiate(cfg.generator, cfg.architecture, output_shape, manifold=manifold)
+        score = instantiate(
+            cfg.generator, cfg.architecture, output_shape, manifold=manifold
+        )
         if not div:
             return score(x, t)
         else:
@@ -59,24 +62,34 @@ def run(cfg):
     log.info("Stage : Instantiate optimiser")
 
     schedule_fn = instantiate(cfg.scheduler)
-    optimiser = optax.chain(instantiate(cfg.optim), optax.scale_by_schedule(schedule_fn))
+    optimiser = optax.chain(
+        instantiate(cfg.optim), optax.scale_by_schedule(schedule_fn)
+    )
     opt_state = optimiser.init(params)
 
     rng, next_rng = jax.random.split(rng)
     train_state = TrainState(
-        opt_state=opt_state, model_state=state, step=0, params=params, ema_rate=cfg.ema_rate, params_ema=params, rng=next_rng
+        opt_state=opt_state,
+        model_state=state,
+        step=0,
+        params=params,
+        ema_rate=cfg.ema_rate,
+        params_ema=params,
+        rng=next_rng,
     )
-    
-    train_step_fn = instantiate(cfg.loss, sde=sde, model=score_model, optimizer=optimiser)
+
+    train_step_fn = instantiate(
+        cfg.loss, sde=sde, model=score_model, optimizer=optimiser
+    )
     train_step_fn = jax.jit(train_step_fn)
 
     log.info("Stage : Training")
 
     for i in range(cfg.steps):
-        batch = {'data': next(dataset)}
+        batch = {"data": next(dataset)}
         rng, next_rng = jax.random.split(rng)
         (rng, train_state), loss = train_step_fn((next_rng, train_state), batch)
         if i % 10 == 0:
-            print(i, ': ', loss)
+            print(i, ": ", loss)
 
     # log.info("Stage : Testing")
