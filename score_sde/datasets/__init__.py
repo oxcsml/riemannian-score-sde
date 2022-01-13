@@ -4,7 +4,7 @@ import tensorflow_datasets as tfds
 from score_sde.utils import register_dataset
 
 
-from .gaussian_mixture import GaussianMixture
+from .mixture import *
 from .unimodal import *
 
 

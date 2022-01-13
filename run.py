@@ -83,7 +83,7 @@ def run(cfg):
         rng, next_rng = jax.random.split(rng)
         (rng, train_state), loss = train_step_fn((next_rng, train_state), batch)
         if i % 50 == 0:
-            print(i, ': ', loss)
+            print(f"{i:4d}: {loss:.3f}")
 
     # log.info("Stage : Testing")
 

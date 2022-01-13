@@ -10,7 +10,7 @@ class vMFDataset:
         self.manifold = manifold
         self.mu = jnp.array(mu)
         assert manifold.belongs(self.mu)
-        self.kappa = kappa
+        self.kappa = jnp.array([kappa])
         self.batch_dims = batch_dims
         self.rng = rng
 

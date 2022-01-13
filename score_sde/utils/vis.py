@@ -30,7 +30,7 @@ def plot_and_save(
     ax = remove_background(ax)
     fig.subplots_adjust(left=-0.2, bottom=-0.2, right=1.2, top=1.2, wspace=0, hspace=0)
     # ax.view_init(elev=30, azim=45)
-    ax.view_init(elev=0, azim=0)
+    ax.view_init(elev=0, azim=45)
     cmap = sns.cubehelix_palette(as_cmap=True)
     sphere = visualization.Sphere()
     sphere.draw(ax, color="red", marker=".")
