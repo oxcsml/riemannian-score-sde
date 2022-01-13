@@ -298,7 +298,7 @@ class VESDE(SDE):
 
 class Brownian(SDE):
 
-    def __init__(self, manifold, T=1, beta_min=0.1, beta_max=10, N=1000):
+    def __init__(self, manifold, T, beta_0, beta_1, N):
         """Construct a Brownian motion on a compact manifold.
 
         Args:
@@ -306,8 +306,8 @@ class Brownian(SDE):
         """
         super().__init__(N)
         self.manifold = manifold
-        self.beta_0 = beta_min
-        self.beta_1 = beta_max
+        self.beta_0 = beta_0
+        self.beta_1 = beta_1
         self._T = T
         self.N = N
 
