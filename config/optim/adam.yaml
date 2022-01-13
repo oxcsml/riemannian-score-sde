@@ -1,0 +1,7 @@
+# base_lr:  # base learning rate, rescaled by batch_size/256
+# object:
+_target_: optax.adam
+learning_rate: 2e-4 # ${eval:${optim.base_lr}*${batch_size}/256}
+b1: .9
+b2: 0.999
+eps: 1e-8

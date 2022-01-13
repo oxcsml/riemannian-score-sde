@@ -1,3 +1,5 @@
+import os
+import pickle
 from typing import Callable
 
 import jax
@@ -41,10 +43,10 @@ def get_exact_div_fn(fn):
 
         x_shape = x.shape
         t_shape = t.shape
-
-        x = x.reshape((-1, x_shape[-1]))
-        t = t.reshape((-1, t_shape[-1]))
+        x = jnp.expand_dims(x.reshape((-1, x_shape[-1])), 1)
+        t = jnp.expand_dims(t.reshape((-1, t_shape[-1])), 1)
         jac = jax.vmap(jax.jacrev(fn, argnums=0))(x, t)
+        jac = jac.reshape([*x_shape[:-1], x_shape[-1], x_shape[-1]])
         return jnp.trace(jac, axis1=-1, axis2=-2).reshape(x_shape[:-1])
 
     return div_fn
@@ -93,3 +95,24 @@ def replicate(tree, devices=None):
 def unreplicate(tree):
     """Returns a single instance of a replicated array."""
     return jax.tree_map(lambda x: x[0], tree)
+
+
+def save(ckpt_dir: str, state) -> None:
+    with open(os.path.join(ckpt_dir, "arrays.npy"), "wb") as f:
+        for x in jax.tree_leaves(state):
+            np.save(f, x, allow_pickle=False)
+
+    tree_struct = jax.tree_map(lambda t: 0, state)
+    with open(os.path.join(ckpt_dir, "tree.pkl"), "wb") as f:
+        pickle.dump(tree_struct, f)
+
+
+def restore(ckpt_dir):
+    with open(os.path.join(ckpt_dir, "tree.pkl"), "rb") as f:
+        tree_struct = pickle.load(f)
+
+    leaves, treedef = jax.tree_flatten(tree_struct)
+    with open(os.path.join(ckpt_dir, "arrays.npy"), "rb") as f:
+        flat_state = [np.load(f) for _ in leaves]
+
+    return jax.tree_unflatten(treedef, flat_state)

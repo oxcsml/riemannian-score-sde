@@ -1,0 +1,4 @@
+defaults:
+  - base
+ism_loss: false
+hutchinson_type: None

@@ -3,3 +3,4 @@ from .training import *
 from .registry import *
 from .typing import *
 from .data import *
+from .cfg import *

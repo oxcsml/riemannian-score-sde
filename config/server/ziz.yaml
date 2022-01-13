@@ -1,0 +1,28 @@
+# @package _global_
+defaults:
+  - base_ziz
+  - override /hydra/launcher: submitit_slurm
+
+# paths:
+#   experiments: /data/ziz/not-backed-up/scratch/${oc.env:USER}/${PROJECT_NAME}/results
+
+num_gpus: 1
+
+hydra:
+  launcher:
+    submitit_folder: ${hydra.sweep.dir}/.submitit/%j
+    timeout_min: 840
+    cpus_per_task: ${num_gpus}
+    tasks_per_node: 1
+    mem_gb: ${eval:126//8*${num_gpus}}
+    name: ${hydra.job.name}
+    partition: ziz-gpu
+    max_num_timeout: 0
+    array_parallelism: 32
+    setup: ["export XLA_FLAGS='--xla_gpu_cuda_data_dir=/opt/cuda'", "export PATH=/opt/cuda/bin/:$PATH", "export LD_LIBRARY_PATH=/opt/cuda-10.2/lib64:${LD_LIBRARY_PATH}", "export XLA_PYTHON_CLIENT_PREALLOCATE=false"]
+    executable: /data/localhost/not-backed-up/${oc.env:USER}/${PROJECT_NAME}/venv/bin/python
+    additional_parameters: {
+      "wckey": "bigbayes_project",
+      "gres": "gpu:${num_gpus}",
+      "nodelist": "zizgpu03.cpu.stats.ox.ac.uk",
+      }
