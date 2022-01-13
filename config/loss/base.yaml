@@ -3,6 +3,6 @@ train: true
 reduce_mean: false
 continuous: true
 likelihood_weighting: false
-eps: 1e-3
+eps: ${eps}
 ism_loss: ???
 hutchinson_type: ???

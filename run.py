@@ -1,6 +1,8 @@
+from functools import partial
+from pathlib import Path
+import logging
 import hydra
 from hydra.utils import instantiate, get_class
-import logging
 
 import jax
 from jax import numpy as jnp
@@ -9,9 +11,9 @@ import haiku as hk
 import optax
 
 from score_sde.utils import TrainState, save, restore
-# from score_sde.sampling import EulerMaruyamaManifoldPredictor, get_pc_sampler
-# from score_sde.likelihood import get_likelihood_fn, get_pmap_likelihood_fn
-
+from score_sde.sampling import EulerMaruyamaManifoldPredictor, get_pc_sampler
+from score_sde.likelihood import get_likelihood_fn
+from score_sde.utils.vis import plot_and_save
 
 log = logging.getLogger(__name__)
 
@@ -39,22 +41,26 @@ def run(cfg):
     #     score = instantiate(cfg.generator, cfg.architecture, output_shape, manifold=manifold)
     #     return score(x, t)
 
-    def score_model(x, t, div=False):
+    def score_model(x, t, div=False, hutchinson_type='None'):
         score = instantiate(cfg.generator, cfg.architecture, output_shape, manifold=manifold)
         if not div:
             return score(x, t)
         else:
-            return score.div(x, t)
+            return score.div(x, t, hutchinson_type)
 
     score_model = hk.transform_with_state(score_model)
 
     rng, next_rng = jax.random.split(rng)
     params, state = score_model.init(rng=next_rng, x=x, t=0)
-    out = score_model.apply(params, state, next_rng, x=x, t=0)
-    print(out)
-    out = score_model.apply(params, state, next_rng, x=x, t=0, div=True)
-    print(out)
-    raise
+    # out, _ = score_model.apply(params, state, next_rng, x=x, t=0)
+    # print(out.shape)
+    hutchinson_type='Rademacher'
+    # hutchinson_type='None'
+    rng, step_rng = jax.random.split(rng)
+    t = jax.random.uniform(step_rng, (x.shape[0],), minval=cfg.eps, maxval=sde.T)
+    # out, _ = score_model.apply(params, state, next_rng, x=x, t=t, div=True, hutchinson_type=hutchinson_type)
+    # print(out.shape)
+    # raise
 
     log.info("Stage : Instantiate optimiser")
 
@@ -76,7 +82,22 @@ def run(cfg):
         batch = {'data': next(dataset)}
         rng, next_rng = jax.random.split(rng)
         (rng, train_state), loss = train_step_fn((next_rng, train_state), batch)
-        if i % 10 == 0:
+        if i % 50 == 0:
             print(i, ': ', loss)
 
     # log.info("Stage : Testing")
+
+    x0 = next(dataset)
+    ## p_0 (backward)
+    t = cfg.eps
+    sampler = jax.jit(get_pc_sampler(sde, score_model, (cfg.batch_size,), predictor=EulerMaruyamaManifoldPredictor, corrector=None, continuous=True, forward=False, eps=cfg.eps))
+    rng, next_rng = jax.random.split(rng)
+    x, _ = sampler(next_rng, train_state, t=t)
+    likelihood_fn = get_likelihood_fn(sde, score_model, hutchinson_type='None', bits_per_dimension=False, eps=cfg.eps)
+    logp, z, nfe = likelihood_fn(rng, train_state, x)
+    print(nfe)
+    prob = jnp.exp(logp)
+    Path('logs/images').mkdir(parents=True, exist_ok=True)  # Create logs dir
+    plot_and_save(None, x, prob, None, out=f"logs/images/x0_backw.jpg")
+    prob = jnp.exp(dataset.log_prob(x0)) if hasattr(dataset, 'log_prob') else None
+    plot_and_save(None, x0, prob, None, out=f"logs/images/x0_true.jpg")
