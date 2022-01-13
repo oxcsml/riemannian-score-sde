@@ -1,0 +1,28 @@
+# @package _global_
+
+# to execute this experiment run:
+# python main.py experiment=s2_toy
+
+name: s2_toy
+
+defaults:
+  - /manifold: nsphere
+  - /sde: brownian
+  - /dataset: dirac
+  - /loss: dsm
+  - /generator: div_free
+  - /architecture: concat
+
+manifold:
+  dim: 2
+
+sde:
+  T: 3
+  N: 100
+  beta_0: 0.1
+  beta_1: 1.
+
+batch_size: 512
+warmup_steps: 10
+steps: 20 #00
+ema_rate: 0.999

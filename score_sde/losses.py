@@ -228,6 +228,8 @@ def get_pmap_step_fn(
     continuous=True,
     likelihood_weighting=False,
     eps: float = 1e-5,
+    ism_loss: bool = False,
+    hutchinson_type: str = "Rademacher",
 ):
     """Create a one-step training/evaluation function.
 
@@ -253,6 +255,8 @@ def get_pmap_step_fn(
             continuous=True,
             likelihood_weighting=likelihood_weighting,
             eps=eps,
+            ism_loss=ism_loss,
+            hutchinson_type=hutchinson_type,
         )
     else:
         assert (
@@ -331,6 +335,8 @@ def get_step_fn(
     continuous=True,
     likelihood_weighting=False,
     eps: float = 1e-5,
+    ism_loss: bool = False,
+    hutchinson_type: str = "Rademacher",
 ):
     """Create a one-step training/evaluation function.
 
@@ -356,6 +362,8 @@ def get_step_fn(
             continuous=True,
             likelihood_weighting=likelihood_weighting,
             eps=eps,
+            ism_loss=ism_loss,
+            hutchinson_type=hutchinson_type,
         )
     else:
         assert (
