@@ -1,4 +1,12 @@
+--find-links https://storage.googleapis.com/jax-releases/
 jax
-jaxlib
+jaxlib==0.1.74+cuda11.cudnn805  # not sure that version will work on other zizgpu0x
 dm-haiku
 optax
+
+hydra_core==1.1.1
+hydra_colorlog==1.1
+# submitit
+git+https://github.com/emilemathieu/submitit.git#egg=submitit
+# hydra-submitit-launcher
+git+https://github.com/emilemathieu/hydra.git#egg=hydra-submitit-launcher&subdirectory=plugins/hydra_submitit_launcher

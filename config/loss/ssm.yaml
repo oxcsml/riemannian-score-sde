@@ -1,0 +1,4 @@
+defaults:
+  - base
+ism_loss: true
+hutchinson_type: Rademacher
