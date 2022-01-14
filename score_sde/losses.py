@@ -90,47 +90,49 @@ def get_sde_loss_fn(
             continuous=continuous,
             return_state=True,
         )
-        data = batch["data"]
+        x_0 = batch["data"]
 
         rng, step_rng = random.split(rng)
-        t = random.uniform(step_rng, (data.shape[0],), minval=eps, maxval=sde.T)
-        # t = eps + random.beta(step_rng, a=1., b=3., shape=(data.shape[0],)) * sde.T
+        t = random.uniform(step_rng, (x_0.shape[0],), minval=eps, maxval=sde.T)
+        # t = eps + random.beta(step_rng, a=1., b=3., shape=(x_0.shape[0],)) * sde.T
 
         if isinstance(sde, Brownian):
-            # t = jnp.ones(data.shape[0]) * t[0]
+            # t = jnp.ones(x_0.shape[0]) * t[0]
             rng, step_rng = random.split(rng)
-            perturbed_data = sde.marginal_sample(step_rng, data, t)
-            score, new_model_state = score_fn(perturbed_data, t, rng=step_rng)
+            x_t = sde.marginal_sample(step_rng, x_0, t)
+            # x_t, x_s, dt = sde.marginal_sample(step_rng, x_0, t)
+            score, new_model_state = score_fn(x_t, t, rng=step_rng)
 
             if not ism_loss:  # DSM loss
-                logp_grad = sde.grad_marginal_log_prob(data, perturbed_data, t)[1]
+                # logp_grad = sde.grad_marginal_log_prob(x_0, x_s, dt)[1]
+                logp_grad = sde.grad_marginal_log_prob(x_0, x_t, t)[1]
                 losses = jnp.square(score - logp_grad)
                 # losses = batch_mul(losses, 1 / std)
                 losses = reduce_op(losses.reshape((losses.shape[0], -1)), axis=-1)
-            else:  # ISM loss  # TODO: NOT tested!
+            else:  # ISM loss
                 rng, step_rng = random.split(rng)
-                epsilon = div_noise(step_rng, data.shape, hutchinson_type)
-                drift_fn = get_drift_fn(sde, model, params, states)
+                epsilon = div_noise(step_rng, x_0.shape, hutchinson_type)
+                drift_fn = lambda x, t: score_fn(x, t, rng=step_rng)[0]
                 div_fn = get_div_fn(drift_fn, hutchinson_type)
-                div_score = div_fn(data, t, epsilon)
-                # div_score = p_div_fn(new_model_state, hutchinson_type, data, t, epsilon)
-                score_sq_norm = jnp.sum(jnp.square(score), -1)
-                losses = score_sq_norm - div_score
+                div_score = div_fn(x_t, t, epsilon)
+                sq_norm_score = sde.manifold.metric.squared_norm(score, x_t)
+                losses = 0.5 * sq_norm_score + div_score
             if likelihood_weighting:
-                raise NotImplementedError()
+                g2 = sde.sde(jnp.zeros_like(x_0), t)[1] ** 2
+                losses = losses * g2
         else:
             rng, step_rng = random.split(rng)
-            z = random.normal(step_rng, data.shape)
-            mean, std = sde.marginal_prob(data, t)
-            perturbed_data = mean + batch_mul(std, z)
+            z = random.normal(step_rng, x_0.shape)
+            mean, std = sde.marginal_prob(x_0, t)
+            x_t = mean + batch_mul(std, z)
             rng, step_rng = random.split(rng)
-            score, new_model_state = score_fn(perturbed_data, t, rng=step_rng)
+            score, new_model_state = score_fn(x_t, t, rng=step_rng)
 
             if not likelihood_weighting:
                 losses = jnp.square(batch_mul(score, std) + z)
                 losses = reduce_op(losses.reshape((losses.shape[0], -1)), axis=-1)
             else:
-                g2 = sde.sde(jnp.zeros_like(data), t)[1] ** 2
+                g2 = sde.sde(jnp.zeros_like(x_0), t)[1] ** 2
                 losses = jnp.square(score + batch_mul(z, 1.0 / std))
                 losses = reduce_op(losses.reshape((losses.shape[0], -1)), axis=-1) * g2
 
