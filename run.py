@@ -20,7 +20,6 @@ log = logging.getLogger(__name__)
 
 def run(cfg):
     log.info("Stage : Startup")
-    # print(cfg)
 
     rng = jax.random.PRNGKey(cfg.seed)
     manifold = instantiate(cfg.manifold)
@@ -35,10 +34,6 @@ def run(cfg):
     log.info("Stage : Instantiate model")
 
     output_shape = get_class(cfg.generator._target_).output_shape(manifold)
-
-    # def score_model(x, t):
-    #     score = instantiate(cfg.generator, cfg.architecture, output_shape, manifold=manifold)
-    #     return score(x, t)
 
     def score_model(x, t):
         score = instantiate(cfg.generator, cfg.architecture, output_shape, manifold=manifold)
