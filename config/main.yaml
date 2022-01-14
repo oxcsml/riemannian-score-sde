@@ -6,7 +6,6 @@ defaults:
   - server: base_ziz
   - experiment: s2_toy
 
-
   # - callbacks: wandb # set this to null if you don't want to use callbacks
   # - logger: wandb # set logger here or use command line (e.g. `python run.py logger=wandb`)
   # - hydra: default

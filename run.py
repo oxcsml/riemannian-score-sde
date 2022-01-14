@@ -18,7 +18,6 @@ from score_sde.utils.vis import plot_and_save
 log = logging.getLogger(__name__)
 
 
-@hydra.main(config_path="config", config_name="main")
 def run(cfg):
     log.info("Stage : Startup")
     # print(cfg)
@@ -41,26 +40,14 @@ def run(cfg):
     #     score = instantiate(cfg.generator, cfg.architecture, output_shape, manifold=manifold)
     #     return score(x, t)
 
-    def score_model(x, t, div=False, hutchinson_type='None'):
+    def score_model(x, t):
         score = instantiate(cfg.generator, cfg.architecture, output_shape, manifold=manifold)
-        if not div:
-            return score(x, t)
-        else:
-            return score.div(x, t, hutchinson_type)
+        return score(x, t)
 
     score_model = hk.transform_with_state(score_model)
 
     rng, next_rng = jax.random.split(rng)
     params, state = score_model.init(rng=next_rng, x=x, t=0)
-    # out, _ = score_model.apply(params, state, next_rng, x=x, t=0)
-    # print(out.shape)
-    hutchinson_type='Rademacher'
-    # hutchinson_type='None'
-    rng, step_rng = jax.random.split(rng)
-    t = jax.random.uniform(step_rng, (x.shape[0],), minval=cfg.eps, maxval=sde.T)
-    # out, _ = score_model.apply(params, state, next_rng, x=x, t=t, div=True, hutchinson_type=hutchinson_type)
-    # print(out.shape)
-    # raise
 
     log.info("Stage : Instantiate optimiser")
 

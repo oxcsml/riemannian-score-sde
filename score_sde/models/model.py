@@ -18,7 +18,7 @@
 """
 import functools
 from dataclasses import dataclass
-from typing import Any, NamedTuple, Callable
+from typing import Any, NamedTuple, Callable, Sequence
 import math
 from geomstats.geometry.hypersphere import Hypersphere
 from hydra.utils import instantiate
@@ -285,55 +285,83 @@ class ConcatEmbed(hk.Module):
         return out
 
 
-# def get_div_fn(drift_fn, hutchinson_type: str):
-#     """Pmapped divergence of the drift function."""
-#     if hutchinson_type == "None":
-#         return lambda x, t, eps: get_exact_div_fn(drift_fn)(x, t)
-#     else:
-#         return lambda x, t, eps: get_estimate_div_fn(drift_fn)(x, t, eps)
+def div_noise(rng: jax.random.KeyArray, shape: Sequence[int], hutchinson_type: str) -> jnp.ndarray:
+    """Sample noise for the hutchinson estimator."""
+    if hutchinson_type == "Gaussian":
+        epsilon = jax.random.normal(rng, shape)
+    elif hutchinson_type == "Rademacher":
+        epsilon = (
+            jax.random.randint(rng, shape, minval=0, maxval=2).astype(
+                jnp.float32
+            )
+            * 2
+            - 1
+        )
+    elif hutchinson_type == "None":
+        epsilon = None
+    else:
+        raise NotImplementedError(f"Hutchinson type {hutchinson_type} unknown.")
+    return epsilon
 
 
-# def get_estimate_div_fn(fn, Xi):
-#     """Create the divergence function of `fn` using the Hutchinson-Skilling trace estimator."""
-
-#     def div_fn(x: jnp.ndarray, t: float, eps: jnp.ndarray):
-#         grad_fn = lambda data: jnp.sum(fn(data, t) * eps)
-#         grad_fn_eps = jax.grad(grad_fn)(x)
-#         # out = grad_fn_eps * G(x) @ Xi * eps
-#         G = manifold.metric.metric_matrix(x)
-#         GXi = jnp.einsum('...ij,...jk->...ik', G, Xi)
-#         grad_fn_eps = jnp.einsum('...j,...jk->...k', grad_fn_eps, GXi)
-#         return jnp.sum(grad_fn_eps * eps, axis=tuple(range(1, len(x.shape))))
-
-#     return div_fn
+def get_div_fn(fi_fn, Xi, hutchinson_type: str):
+    """Pmapped divergence of the drift function."""
+    if hutchinson_type == "None":
+        return lambda x, t, eps: get_exact_div_fn(fi_fn, Xi)(x, t)
+    else:
+        return lambda x, t, eps: get_estimate_div_fn(fi_fn, Xi)(x, t, eps)
 
 
-# def get_exact_div_fn(fi, Xi):
-#     "flatten all but the last axis and compute the true divergence"
+def get_estimate_div_fn(fi_fn, Xi=None):
+    """Create the divergence function of `fn` using the Hutchinson-Skilling trace estimator."""
 
-#     def div_fn(
-#         x: jnp.ndarray,
-#         t: float,
-#     ):
-#         if len(t.shape) == len(x.shape) - 1:
-#             # Assume t is just missing the last dim of x
-#             t = jnp.expand_dims(t, axis=-1)
+    def div_fn(x: jnp.ndarray, t: float, eps: jnp.ndarray):
+        # grad_fn = lambda data: jnp.sum(fi_fn(data, t) * eps)
+        # grad_fn_eps = jax.grad(grad_fn)(x)
+        def grad_fn(data):
+            fi = fi_fn(data, t)
+            return jnp.sum(fi * eps), fi
+        (_, fi), grad_fn_eps = jax.value_and_grad(grad_fn, has_aux=True)(x)
+        # out = grad_fn_eps * G(x) @ Xi * eps
+        # G = manifold.metric.metric_matrix(x)
+        # Xi = jnp.einsum('...ij,...jk->...ik', G, Xi)
+        if Xi is not None:
+            grad_fn_eps = jnp.einsum('...d,...dn->...n', grad_fn_eps, Xi)
+        div = jnp.sum(grad_fn_eps * eps, axis=tuple(range(1, len(x.shape))))
+        return div, fi
 
-#         x_shape = x.shape
-#         x = jnp.expand_dims(x.reshape((-1, x_shape[-1])), 1)
-#         t = jnp.expand_dims(t.reshape((-1, t.shape[-1])), 1)
-#         jac = jax.vmap(jax.jacrev(fi, argnums=0))(x, t)
-#         jac = jac.reshape([*x_shape[:-1], x_shape[-1], x_shape[-1]])
-#         # return jnp.trace(jac * Xi(x), axis1=-1, axis2=-2).reshape(x_shape[:-1])
-#         G = manifold.metric.metric_matrix(x)
-#         GXi = jnp.einsum('...ij,...jk->...ik', G, Xi(x))
-#         return jnp.einsum('...ij,...ij->...', jac, GXi)
+    return div_fn
 
-#     return div_fn
+
+def get_exact_div_fn(fi_fn, Xi=None):
+    "flatten all but the last axis and compute the true divergence"
+
+    def div_fn(
+        x: jnp.ndarray,
+        t: float,
+    ):
+        if len(t.shape) == len(x.shape) - 1:
+            # Assume t is just missing the last dim of x
+            t = jnp.expand_dims(t, axis=-1)
+
+        x_shape = x.shape
+        x = jnp.expand_dims(x.reshape((-1, x_shape[-1])), 1)
+        t = jnp.expand_dims(t.reshape((-1, t.shape[-1])), 1)
+        jac = jax.vmap(jax.jacrev(fi_fn, argnums=0))(x, t)
+        jac = jac.reshape([*x_shape[:-1], -1, x_shape[-1]])
+        # G = manifold.metric.metric_matrix(x)
+        # Xi = jnp.einsum('...ij,...jk->...ik', G, Xi(x))
+        if Xi is not None:
+            jac = jnp.einsum('...nd,...dm->...nm', jac, Xi)
+        div = jnp.trace(jac, axis1=-1, axis2=-2).reshape(x_shape[:-1])
+        return div
+
+    return div_fn
 
 
 class VectorFieldGenerator(hk.Module, abc.ABC):
     def __init__(self, architecture, output_shape, manifold):
+        """X = fi * Xi with fi weights and Xi generators"""
         super().__init__()
         self.net = instantiate(architecture, output_shape=output_shape)
         self.manifold = manifold
@@ -344,78 +372,105 @@ class VectorFieldGenerator(hk.Module, abc.ABC):
         """Cardinality of the generating set."""
 
     def _weights(self, x, t):
-        """shape=[..., card]"""
+        """shape=[..., card=n]"""
         return self.net(x, t)
 
     @abc.abstractmethod
     def _generators(self, x):
-        """Set of generating vector fields: shape=[..., d, card]"""
+        """Set of generating vector fields: shape=[..., d, card=n]"""
 
-    def decomposition(self, x, t):
-        return self._weights(x, t), self._generators(x)
+    @property
+    def decomposition(self):
+        return lambda x, t: self._weights(x, t), lambda x: self._generators(x)
 
     def __call__(self, x, t):
-        fi, Xi = self.decomposition(x, t)
-        return jnp.einsum('...i,...ij->...i', fi, Xi)
+        fi_fn, Xi_fn = self.decomposition
+        fi, Xi = fi_fn(x, t), Xi_fn(x)
+        out = jnp.einsum('...n,...dn->...d', fi, Xi)
+        # assert self.manifold.is_tangent(out, x, atol=1e-6).all()
+        return out
 
-    @abc.abstractmethod
     def div_generators(self, x):
-        """Divergence of the generating vector fields: shape=[..., card]"""
+        """Divergence of the generating vector fields: shape=[..., card=n]"""
 
-    def div(self, x, t):
-        """Returns (fi*Xi, fi div(Xi)) so as to compute 
-        div(X) = Xi(fi) + fi div(Xi) with X = fi * Xi"""
-        fi, Xi = self.decomposition(x, t)
-        # term_1 = 
-        div_Xi = self.div_generators(x)
-        term_2 = jnp.einsum('...i,...i->...', fi, div_Xi)
+    def div_split(self, x, t, hutchinson_type):
+        """Returns div(X) = Xi(fi) + fi div(Xi)"""
+        fi_fn, Xi_fn = self.decomposition
+        Xi = Xi_fn(x)
+        if hutchinson_type == "None":
+            # splitting div is unecessary when computated exactly
+            # term_1 = get_exact_div_fn(fi_fn, Xi)(x, t)
+            out = get_exact_div_fn(self.__call__, None)(x, t)
+        else:
+            shape = [*x.shape[:-1], self.output_shape(self.manifold)]
+            eps = div_noise(hk.next_rng_key(), shape, hutchinson_type)
+            term_1, fi = get_estimate_div_fn(fi_fn, Xi)(x, t, eps)
+            div_Xi = self.div_generators(x)
+            term_2 = jnp.einsum('...n,...n->...', fi, div_Xi)
+            out = term_1 + term_2
+        return out
+
+    def divE(self, x, t, hutchinson_type):
+        """Euclidean divergence cf Rozen et al. 2021"""
+        if hutchinson_type == "None":
+            out = get_exact_div_fn(self.__call__, None)(x, t)
+        else:
+            shape = [*x.shape[:-1], self.output_shape(self.manifold)]
+            eps = div_noise(hk.next_rng_key(), shape, hutchinson_type)
+            out, _ = get_estimate_div_fn(self.__call__, None)(x, t, eps)
+        return out
 
 
 class DivFreeGenerator(VectorFieldGenerator):
     def __init__(self, architecture, output_shape, manifold):
         super().__init__(architecture, output_shape, manifold)
+        self.div = self.div_split
+        # self.div = self.divE
     
     @staticmethod
     def output_shape(manifold):
         return manifold.isom_group.dim
 
     def _generators(self, x):
-        return self.manifold.invariant_basis(x)
+        return self.manifold.div_free_generators(x)
 
     def div_generators(self, x):
-        return jnp.zeros([*x.shape[:-1]])
+        shape = [*x.shape[:-1], self.output_shape(self.manifold)]
+        return jnp.zeros(shape)
 
 
-class GradLapEigenGenerator:
+class EigenGenerator(VectorFieldGenerator):
+    """Gradient of laplacien eigenfunctions with eigenvalue=1"""
     def __init__(self, architecture, output_shape, manifold):
         super().__init__(architecture, output_shape, manifold)
         assert isinstance(manifold, Hypersphere)
+        self.div = self.div_split
 
     @staticmethod
     def output_shape(manifold):
         return manifold.embedding_space.dim
 
     def _generators(self, x):
-        return self.manifold.invariant_basis(x)
+        return self.manifold.eigen_generators(x)
 
     def div_generators(self, x):
-        return - self.manifold.dim * x
+        # NOTE: Empirically need this factor 2 but why??
+        return - self.manifold.dim * 2 * x
 
 
-class AmbiantGenerator(VectorFieldGenerator):
+class AmbientGenerator(VectorFieldGenerator):
+    """Equivalent to EigenGenerator"""
     def __init__(self, architecture, output_shape, manifold):
-        super().__init__()
-        self.net = instantiate(architecture, output_shape=output_shape)
-        self.manifold = manifold
+        super().__init__(architecture, output_shape, manifold)
+        self.div = self.divE
     
     @staticmethod
     def output_shape(manifold):
         return manifold.embedding_space.dim
+    
+    def _generators(self, x):
+        return self.manifold.eigen_generators(x)
 
-    def __call__(self, x, t):
-        out = self.net(x, t)
-        out = self.manifold.to_tangent(out, x)  # NOTE: regularize orthogonal component?
-        return out
-
-    def div(self, x, t):
-        raise NotImplementedError()
+    # def __call__(self, x, t):
+    #     # `to_tangent`` have an 1/sq_norm(x) term that wrongs the div
+    #     return self.manifold.to_tangent(self.net(x, t), x)
