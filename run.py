@@ -73,16 +73,17 @@ def run(cfg):
     x0 = next(dataset)
     ## p_0 (backward)
     t = cfg.eps
-    sampler = jax.jit(get_pc_sampler(sde, score_model, (cfg.batch_size,), predictor=EulerMaruyamaManifoldPredictor, corrector=None, continuous=True, forward=False, eps=cfg.eps))
+    sampler = jax.jit(get_pc_sampler(sde, score_model, (cfg.batch_size, model_manifold.dim), predictor=EulerMaruyamaManifoldPredictor, corrector=None, continuous=True, forward=False, eps=cfg.eps))
     rng, next_rng = jax.random.split(rng)
     x, _ = sampler(next_rng, train_state, t=t)
-    x = transform(x)
+    y = transform(x)
     likelihood_fn = get_likelihood_fn(sde, score_model, hutchinson_type='None', bits_per_dimension=False, eps=cfg.eps)
     # TODO: take into account logdetjac of transform
-    logp, z, nfe = likelihood_fn(rng, train_state, x)
+    logp, z, nfe = likelihood_fn(rng, train_state, transform.inv(y))
     print(nfe)
+    logp -= transform.log_abs_det_jacobian(x, y)
     prob = jnp.exp(logp)
     Path('logs/images').mkdir(parents=True, exist_ok=True)  # Create logs dir
-    plot_and_save(None, x, prob, None, out=f"logs/images/x0_backw.jpg")
+    plot_and_save(None, y, prob, None, out=f"logs/images/x0_backw.jpg")
     prob = jnp.exp(dataset.log_prob(x0)) if hasattr(dataset, 'log_prob') else None
     plot_and_save(None, x0, prob, None, out=f"logs/images/x0_true.jpg")
