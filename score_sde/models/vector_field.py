@@ -7,7 +7,7 @@ import jax.numpy as jnp
 
 from hydra.utils import instantiate
 from geomstats.geometry.hypersphere import Hypersphere
-
+from geomstats.geometry.base import VectorSpace, EmbeddedManifold
 
 def div_noise(rng: jax.random.KeyArray, shape: Sequence[int], hutchinson_type: str) -> jnp.ndarray:
     """Sample noise for the hutchinson estimator."""
@@ -177,7 +177,7 @@ class EigenGenerator(VectorFieldGenerator):
         return self.manifold.eigen_generators(x)
 
     def div_generators(self, x):
-        # NOTE: Empirically need this factor 2 but why??
+        # NOTE: Empirically need this factor 2 to match AmbientGenerator but why??
         return - self.manifold.dim * 2 * x
 
 
@@ -189,7 +189,11 @@ class AmbientGenerator(VectorFieldGenerator):
     
     @staticmethod
     def output_shape(manifold):
-        return manifold.embedding_space.dim
+        if isinstance(manifold, EmbeddedManifold):
+            output_shape = manifold.embedding_space.dim
+        else:
+            output_shape = manifold.dim
+        return output_shape
     
     def _generators(self, x):
         return self.manifold.eigen_generators(x)

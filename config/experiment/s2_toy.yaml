@@ -8,6 +8,7 @@ name: s2_toy
 defaults:
   - /manifold: nsphere
   - /sde: brownian
+  - /transform: id
   - /dataset: vmf
   - /loss: dsm
   - /generator: div_free

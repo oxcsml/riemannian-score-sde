@@ -8,6 +8,7 @@ from typing import Tuple, Callable
 import jax
 import numpy as np
 import jax.numpy as jnp
+from geomstats.geometry.euclidean import Euclidean
 
 # from .utils import batch_mul
 def batch_mul(a, b):
@@ -17,20 +18,15 @@ def batch_mul(a, b):
 class SDE(abc.ABC):
     """SDE abstract class. Functions are designed for a mini-batch of inputs."""
 
-    def __init__(self, N: int):
+    def __init__(self, T: float, N: int):
         """Construct an SDE.
 
         Args:
           N: number of discretization time steps.
         """
         super().__init__()
+        self.T = T
         self.N = N
-
-    @property
-    @abc.abstractmethod
-    def T(self) -> float:
-        """End time of the SDE."""
-        pass
 
     @abc.abstractmethod
     def sde(self, x: jnp.ndarray, t: float) -> Tuple[jnp.ndarray, jnp.ndarray]:
@@ -138,27 +134,24 @@ class SDE(abc.ABC):
 
 
 class VPSDE(SDE):
-    def __init__(self, beta_min=0.1, beta_max=20, N=1000):
+    def __init__(self, manifold, T, beta_0, beta_1, N):
         """Construct a Variance Preserving SDE.
 
         Args:
-          beta_min: value of beta(0)
-          beta_max: value of beta(1)
+          beta_0: value of beta(0)
+          beta_1: value of beta(1)
           N: number of discretization steps
         """
-        super().__init__(N)
-        self.beta_0 = beta_min
-        self.beta_1 = beta_max
-        self.N = N
-        self.discrete_betas = jnp.linspace(beta_min / N, beta_max / N, N)
+        super().__init__(T, N)
+        assert isinstance(manifold, Euclidean)
+        self.manifold = manifold
+        self.beta_0 = beta_0
+        self.beta_1 = beta_1
+        self.discrete_betas = jnp.linspace(beta_0 / N, beta_1 / N, N)
         self.alphas = 1.0 - self.discrete_betas
         self.alphas_cumprod = jnp.cumprod(self.alphas, axis=0)
         self.sqrt_alphas_cumprod = jnp.sqrt(self.alphas_cumprod)
         self.sqrt_1m_alphas_cumprod = jnp.sqrt(1.0 - self.alphas_cumprod)
-
-    @property
-    def T(self):
-        return 1
 
     def sde(self, x, t):
         beta_t = self.beta_0 + t * (self.beta_1 - self.beta_0)
@@ -304,16 +297,10 @@ class Brownian(SDE):
         Args:
           N: number of discretization steps
         """
-        super().__init__(N)
+        super().__init__(T, N)
         self.manifold = manifold
         self.beta_0 = beta_0
         self.beta_1 = beta_1
-        self._T = T
-        self.N = N
-
-    @property
-    def T(self):
-        return self._T
 
     def sde(self, x, t):
         beta_t = self.beta_0 + t * (self.beta_1 - self.beta_0)
