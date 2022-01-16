@@ -5,15 +5,20 @@ import operator
 import math
 import jax.numpy as jnp
 from geomstats.geometry.hypersphere import Hypersphere
+from geomstats.geometry.euclidean import Euclidean
 
 
 class Transform(abc.ABC):
+    def __init__(self, domain, codomain):
+        self.domain = domain
+        self.codomain = codomain
+
     @abc.abstractmethod
     def __call__(self, x):
         """Computes the transform `x => y`."""
 
     @abc.abstractmethod
-    def inv(self, x):
+    def inv(self, y):
         """Inverts the transform `y => x`."""
 
     @abc.abstractmethod
@@ -23,17 +28,29 @@ class Transform(abc.ABC):
 
 class ComposeTransform(Transform):
     def __init__(self, parts):
+        assert len(parts) > 0
+        # NOTE: Could check constraints on domains and codomains
+        super().__init__(parts[0].domain, parts[-1].codomain)
         self.parts = parts
 
     def __call__(self, x):
+        print('call')
         for part in self.parts:
+            print(part)
+            print('x', x[0])
             x = part(x)
+            print('y', x[0])
+            print('x prime', part.inv(x)[0])
         return x
 
-    def inv(self, x):
-        for part in self.parts:
-            x = part.inv(x)
-        return x
+    def inv(self, y):
+        print('inv')
+        print(y[0])
+        for part in self.parts[::-1]:
+            print(part)
+            y = part.inv(y)
+            print(y[0])
+        return y
 
     def log_abs_det_jacobian(self, x, y):
         xs = [x]
@@ -47,61 +64,67 @@ class ComposeTransform(Transform):
 
 
 class Id(Transform):
-    def __init__(self, **kwargs):
-        pass
+    def __init__(self, manifold, **kwargs):
+        super().__init__(manifold, manifold)
 
     def __call__(self, x):
         return x
 
-    def inv(self, x):
-        return x
+    def inv(self, y):
+        return y
 
     def log_abs_det_jacobian(self, x, y):
         return jnp.zeros((x.shape[:-1]))
 
 
 class ExpMap(Transform):
-    def __init__(self, manifold):
+    def __init__(self, manifold, base_point=None, **kwargs):
+        super().__init__(Euclidean(manifold.dim), manifold)
         self.manifold = manifold
-        self.base_point = manifold.base_point
+        self.base_point = manifold.identity if base_point is None else base_point
 
     def __call__(self, x):
         return self.manifold.metric.exp(x, base_point=self.base_point)
 
-    def inv(self, x):
-        return self.manifold.metric.log(x, base_point=self.base_point)
+    def inv(self, y):
+        return self.manifold.metric.log(y, base_point=self.base_point)
 
     def log_abs_det_jacobian(self, x, y):
-        return self.manifold.logdetexp(y, base_point=self.base_point)
+        return self.manifold.metric.logdetexp(x, y)
 
 
 class TanhExpMap(ComposeTransform):
-    def __init__(self, manifold):
+    def __init__(self, manifold, base_point=None, **kwargs):
         injectivity_radius = manifold.injectivity_radius
         if jnp.isposinf(injectivity_radius):
             parts = []
         else:
-            parts = [RadialTanhTransform(0.99 * injectivity_radius)]
-        parts.append(ExpMap(manifold))
+            parts = [RadialTanhTransform(0.99 * injectivity_radius, manifold.dim)]
+        exp_transform = ExpMap(manifold, base_point)
+        self.base_point = exp_transform.base_point
+        parts.append(exp_transform)
         super().__init__(parts)
 
 
 class InvStereographic(Transform):
-    def __init__(self, manifold):
+    def __init__(self, manifold, base_point=None, **kwargs):
         assert isinstance(manifold, Hypersphere)
+        super().__init__(Euclidean(manifold.dim), manifold)
         self.manifold = manifold
+        assert base_point is None or base_point == manifold.identity
+        self.base_point = manifold.identity
 
     def __call__(self, x):
         return self.manifold.inv_stereographic_projection(x)
 
-    def inv(self, x):
-        return self.manifold.stereographic_projection(x)
+    def inv(self, y):
+        return self.manifold.stereographic_projection(y)
 
     def log_abs_det_jacobian(self, x, y):
-        return self.manifold.inv_stereographic_projection_logdet(y)
+        return self.manifold.inv_stereographic_projection_logdet(x)
 
 
-class RadialTanhTransform:
+class RadialTanhTransform(Transform):
     r"""
     from: https://github.com/pimdh/relie/blob/master/relie/flow/radial_tanh_transform.py
     Transform R^d of radius (0, inf) to (0, R)
@@ -112,7 +135,8 @@ class RadialTanhTransform:
     # bijective = True
     # event_dim = 1
 
-    def __init__(self, radius):
+    def __init__(self, radius, dim):
+        super().__init__(Euclidean(dim), Euclidean(dim))
         self.radius = radius
 
     def __call__(self, x):
