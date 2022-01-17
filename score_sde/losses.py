@@ -31,6 +31,65 @@ from score_sde.utils import batch_mul
 from score_sde.models import get_score_fn, get_model_fn
 from score_sde.utils import ParametrisedScoreFunction, TrainState
 from score_sde.likelihood import div_noise, get_drift_fn, get_div_fn
+from score_sde.sampling import get_pc_sampler
+
+
+def get_ism_loss_fn(
+    sde: SDE,
+    model: ParametrisedScoreFunction,
+    train: bool,
+    reduce_mean: bool = True,
+    continuous: bool = True,
+    likelihood_weighting: bool = True,
+    eps: float = 1e-5,
+    ism_loss: bool = False,
+    hutchinson_type: str = "Rademacher",
+    discretisation_steps=1000,
+):
+    reduce_op = (
+        jnp.mean
+        if reduce_mean
+        else lambda *args, **kwargs: 0.5 * jnp.sum(*args, **kwargs)
+    )
+    return
+
+
+def get_ssm_loss_fn(
+    sde: SDE,
+    model: ParametrisedScoreFunction,
+    train: bool,
+    reduce_mean: bool = True,
+    continuous: bool = True,
+    likelihood_weighting: bool = True,
+    eps: float = 1e-5,
+    ism_loss: bool = False,
+    hutchinson_type: str = "Rademacher",
+    discretisation_steps=1000,
+):
+    reduce_op = (
+        jnp.mean
+        if reduce_mean
+        else lambda *args, **kwargs: 0.5 * jnp.sum(*args, **kwargs)
+    )
+    return
+
+
+def get_dsm_loss_fn(
+    sde: SDE,
+    model: ParametrisedScoreFunction,
+    train: bool,
+    reduce_mean: bool = True,
+    likelihood_weighting: bool = True,
+    eps: float = 1e-5,
+    ism_loss: bool = False,
+    discretisation_steps=1000,
+):
+    reduce_op = (
+        jnp.mean
+        if reduce_mean
+        else lambda *args, **kwargs: 0.5 * jnp.sum(*args, **kwargs)
+    )
+    pass
 
 
 def get_sde_loss_fn(
@@ -43,6 +102,7 @@ def get_sde_loss_fn(
     eps: float = 1e-5,
     ism_loss: bool = False,
     hutchinson_type: str = "Rademacher",
+    discretisation_steps=1000,
 ) -> Callable[[jax.random.KeyArray, dict, dict, dict], Tuple[float, dict]]:
     """Create a loss function for training with arbirary SDEs.
 
@@ -94,13 +154,33 @@ def get_sde_loss_fn(
         data = batch["data"]
 
         rng, step_rng = random.split(rng)
-        t = random.uniform(step_rng, (data.shape[0],), minval=eps, maxval=sde.T)
+        t = random.uniform(
+            step_rng, (data.shape[0],), minval=sde.t0 + eps, maxval=sde.tf
+        )
         # t = eps + random.beta(step_rng, a=1., b=3., shape=(data.shape[0],)) * sde.T
 
         if isinstance(sde, Brownian):
             # t = jnp.ones(data.shape[0]) * t[0]
             rng, step_rng = random.split(rng)
-            perturbed_data = sde.marginal_sample(step_rng, data, t)
+            # perturbed_data = sde.marginal_sample(step_rng, data, t)
+
+            # TODO: is this a good way of handling this?
+            if hasattr(sde, "analytic_marginal_sample"):
+                perturbed_data = sde.analytic_marginal_sample(step_rng, data, t)
+            else:
+                perturbed_data = sde.manifold.random_walk(rng, data, t)
+                if perturbed_data is None:
+                    # TODO: should pmap the pc_sampler?
+                    sampler = jax.jit(
+                        get_pc_sampler(
+                            sde,
+                            discretisation_steps,
+                            predictor="EulerMaruyamaManifoldPredictor",
+                            corrector=None,
+                        )
+                    )
+                    perturbed_data, _ = sampler(rng, data)
+
             score, new_model_state = score_fn(perturbed_data, t, rng=step_rng)
 
             if not ism_loss:  # DSM loss
