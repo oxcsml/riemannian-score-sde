@@ -172,13 +172,13 @@ class EulerMaruyamaPredictor(Predictor):
 
         if len(diffusion.shape) > 1 and diffusion.shape[-1] == diffusion.shape[-2]:
             # if square matrix diffusion coeffs
-            diffusion_term = jnp.einsum("...ij,j->...i", diffusion, z) * jnp.sqrt(
-                jnp.abs(dt)
+            diffusion_term = jnp.einsum(
+                "...ij,j,...->...i", diffusion, z, jnp.sqrt(jnp.abs(dt))
             )
         else:
             # if scalar diffusion coeffs (i.e. no extra dims on the diffusion)
-            diffusion_term = jnp.einsum("...,...i->...i", diffusion, z) * jnp.sqrt(
-                jnp.abs(dt)
+            diffusion_term = jnp.einsum(
+                "...,...i,...->...i", diffusion, z, jnp.sqrt(jnp.abs(dt))
             )
 
         x = x_mean + diffusion_term
@@ -189,7 +189,6 @@ class EulerMaruyamaPredictor(Predictor):
 class EulerMaruyamaManifoldPredictor(Predictor):
     def __init__(self, sde):
         super().__init__(sde)
-        self.forward = forward
 
     def update_fn(
         self, rng: jax.random.KeyArray, x: jnp.ndarray, t: float, dt: float
@@ -202,7 +201,18 @@ class EulerMaruyamaManifoldPredictor(Predictor):
         drift = drift * dt
         # NOTE: should we use retraction? can we not compute x_mean?
         # x_mean = self.sde.manifold.metric.exp(tangent_vec=drift, base_point=x)  # NOTE: do we really need this in practice? only if denoise=True
-        tangent_vector = drift + batch_mul(diffusion, jnp.sqrt(jnp.abs(dt)) * z)
+
+        if len(diffusion.shape) > 1 and diffusion.shape[-1] == diffusion.shape[-2]:
+            # if square matrix diffusion coeffs
+            tangent_vector = drift + jnp.einsum(
+                "...ij,j,...->...i", diffusion, z, jnp.sqrt(jnp.abs(dt))
+            )
+        else:
+            # if scalar diffusion coeffs (i.e. no extra dims on the diffusion)
+            tangent_vector = drift + jnp.einsum(
+                "...,...i,...->...i", diffusion, z, jnp.sqrt(jnp.abs(dt))
+            )
+
         x = self.sde.manifold.metric.exp(tangent_vec=tangent_vector, base_point=x)
         # x = self.sde.manifold.projection(x + self.sde.manifold.metric.metric_matrix @ tangent_vector)
         return x, x  # x_mean
@@ -553,8 +563,8 @@ def get_pc_sampler(
         # timesteps = jnp.linspace(T, eps, N)
         # timesteps = jnp.flip(timesteps) if forward else timesteps
 
-        t0 = sde.t0 if t0 is None else t0
-        tf = sde.tf if tf is None else tf
+        t0 = sde.t0 if t0 is None else t0 * jnp.ones(x.shape[:-1])
+        tf = sde.tf if tf is None else tf * jnp.ones(x.shape[:-1])
 
         # Only integrate to eps off the forward start time for numerical stability
         if isinstance(sde, RSDE):
