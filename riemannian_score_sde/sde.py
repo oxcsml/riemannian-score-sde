@@ -1,3 +1,5 @@
+import jax.numpy as jnp
+
 from score_sde.sde import SDE
 
 
@@ -21,20 +23,18 @@ class Brownian(SDE):
 
     def marginal_prob(self, x, t):
         """Should not rely on closed-form marginal probability"""
-        # TODO: Figure where emilie relied on this
-        # log_mean_coeff = (
-        #     -0.25 * t ** 2 * (self.beta_1 - self.beta_0) - 0.5 * t * self.beta_0
-        # )
-        # # mean = batch_mul(jnp.exp(log_mean_coeff), x)
-        # std = jnp.sqrt(1 - jnp.exp(2.0 * log_mean_coeff))
-        # # return mean, std
-        # return jnp.zeros_like(x), std
-        raise NotImplementedError()
+        # TODO: this is a Euclidean approx
+        log_mean_coeff = (
+            -0.25 * t ** 2 * (self.beta_f - self.beta_0) - 0.5 * t * self.beta_0
+        )
+        # mean = batch_mul(jnp.exp(log_mean_coeff), x)
+        std = jnp.sqrt(1 - jnp.exp(2.0 * log_mean_coeff))
+        # return mean, std
+        return jnp.zeros_like(x), std
 
     # def marginal_sample(self, rng, x, t):
-    #     #TODO: Redo this
+    #     # TODO: Redo this
     #     from score_sde.sampling import (
-    #         EulerMaruyamaManifoldPredictor,
     #         get_pc_sampler,
     #     )  # TODO: remove from class
 
@@ -56,7 +56,7 @@ class Brownian(SDE):
     def marginal_log_prob(self, x0, x, t, **kwargs):
         # TODO: Should indeed vmap?
         # NOTE: reshape: https://github.com/google/jax/issues/2303
-        s = 2 * (0.25 * t ** 2 * (self.beta_1 - self.beta_0) + 0.5 * t * self.beta_0)
+        s = 2 * (0.25 * t ** 2 * (self.beta_f - self.beta_0) + 0.5 * t * self.beta_0)
         return jnp.reshape(self.manifold.log_heat_kernel(x0, x, s, **kwargs), ())
 
     def sample_limiting_distribution(self, rng, shape):
