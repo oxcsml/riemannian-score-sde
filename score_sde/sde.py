@@ -8,6 +8,7 @@ from typing import Tuple, Callable
 import jax
 import numpy as np
 import jax.numpy as jnp
+from geomstats.geometry.euclidean import Euclidean
 
 # from .utils import batch_mul
 def batch_mul(a, b):

@@ -240,23 +240,7 @@ def vMF_pdf(x, mu, kappa):
     mu = jnp.broadcast_to(mu, shape)
     return constant * jnp.exp(kappa * (batch_mul(mu, x).sum(-1) - 1.))
 
-
-def save(ckpt_dir: str, name: str, state) -> None:
-    with open(os.path.join(ckpt_dir, f"{name}_arrays.npy"), "wb") as f:
-        for x in jax.tree_leaves(state):
-            np.save(f, x, allow_pickle=False)
-
-    tree_struct = jax.tree_map(lambda t: 0, state)
-    with open(os.path.join(ckpt_dir, f"{name}_tree.pkl"), "wb") as f:
-        pickle.dump(tree_struct, f)
-
-
-def restore(ckpt_dir, name: str):
-    with open(os.path.join(ckpt_dir, f"{name}_tree.pkl"), "rb") as f:
-        tree_struct = pickle.load(f)
- 
-    leaves, treedef = jax.tree_flatten(tree_struct)
-    with open(os.path.join(ckpt_dir, f"{name}_arrays.npy"), "rb") as f:
-        flat_state = [np.load(f) for _ in leaves]
-
-    return jax.tree_unflatten(treedef, flat_state)
+@jax.jit
+def log_prob_vmf(x, mu, kappa):
+    output = jnp.log(kappa) - jnp.log(2 * jnp.pi) - kappa - (1 - jnp.exp(- 2 * kappa))
+    return output + kappa * batch_mul(mu, x).sum(-1)

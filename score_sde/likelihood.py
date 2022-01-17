@@ -249,7 +249,7 @@ def get_likelihood_fn(
         """
         drift_fn = get_drift_fn(sde, model, train_state.params_ema, train_state.model_state)
         div_fn = get_div_fn(drift_fn, hutchinson_type)
-        # drift_fn, div_fn = jax.jit(drift_fn), jax.jit(div_fn)
+        drift_fn, div_fn = jax.jit(drift_fn), jax.jit(div_fn)
 
         rng, step_rng = jax.random.split(rng)
         shape = data.shape

@@ -22,7 +22,7 @@ import haiku as hk
 import optax
 import numpy as np
 
-from scripts.utils import plot_and_save3, plot_and_save_video3, vMF_pdf
+from scripts.utils import plot_and_save3, plot_and_save_video3, vMF_pdf, log_prob_vmf
 from scripts.utils import save, restore
 
 
@@ -223,16 +223,16 @@ def main(train=False):
     sde = Brownian(manifold, T=3, N=100, beta_min=1.0, beta_max=1.0)
     batch_size = 512
 
-    x0 = jnp.array([[1.0, 0.0, 0.0]])
-    x0b = jnp.repeat(jnp.expand_dims(x0, 0), batch_size, 0)
+    mu = jnp.array([[1.0, 0.0, 0.0]])
+    mub = jnp.repeat(jnp.expand_dims(mu, 0), batch_size, 0)
     kappa = 15
     dataset_init = vMFDataset(
-        [batch_size], jax.random.PRNGKey(0), manifold, mu=x0.reshape(3), kappa=kappa
+        [batch_size], jax.random.PRNGKey(0), manifold, mu=mu.reshape(3), kappa=kappa
     )
-    # dataset_init = DiracDataset([batch_size], mu=x0)
+    # dataset_init = DiracDataset([batch_size], mu=mu)
     x = next(dataset_init)
 
-    # score_model = partial(score_true, sde=sde, x0=x0b)
+    # score_model = partial(score_true, sde=sde, x0=mub)
     # score_model = partial(score_ambiant, sde=sde)
     score_model = partial(score_inv, sde=sde)
     score_model = hk.transform_with_state(score_model)
@@ -381,15 +381,14 @@ def main(train=False):
     x, _ = sampler(next_rng, train_state, t=t)
     # prob = jax.vmap(sde.marginal_log_prob)(x0, x, jnp.ones(x.shape[0]) * t)
     likelihood_fn = get_likelihood_fn(
-        sde, score_model, bits_per_dimension=False, eps=1e-3
+        sde, score_model, hutchinson_type="None", bits_per_dimension=False, eps=1e-3
     )
     logp, z, nfe = likelihood_fn(rng, train_state, x)
-    print(logp.shape)
-    # logp = jnp.log(jax.vmap(partial(vMF_pdf, kappa=15))(x=x.reshape(-1, 1, 3), mu=x0.reshape(-1, 1, 3))).reshape(-1)
-    constant = kappa / ((2 * jnp.pi) * (1.0 - jnp.exp(-2.0 * kappa)))
-    prob = constant * jnp.exp(kappa * (batch_mul(x0, x).sum(-1) - 1.0))
-    print(prob.shape)
-    plot_and_save3(x0, x, prob, None, out=f"images/s2_x0_backw_{name}.jpg")
+    print(nfe)
+    prob = jnp.exp(logp)
+    plot_and_save3(None, x, prob, None, out=f"images/s2_x0_backw_{name}.jpg")
+    prob = jnp.exp(log_prob_vmf(x0, mub, kappa))
+    plot_and_save3(None, x0, prob, None, out=f"images/s2_x0_true_{name}.jpg")
 
     # # score, _ = score_model.apply(train_state.params, train_state.model_state, None, x=jnp.array([[0.,1.,0.],[0.,0.,1.]]), t=t)
     # # print(jnp.linalg.norm(score))

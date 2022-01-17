@@ -8,7 +8,8 @@ name: s2_toy
 defaults:
   - /manifold: nsphere
   - /sde: brownian
-  - /dataset: dirac
+  - /transform: id
+  - /dataset: vmf
   - /loss: dsm
   - /generator: div_free
   - /architecture: concat
@@ -21,6 +22,7 @@ sde:
   beta_f: 1.
 
 batch_size: 512
-warmup_steps: 10
-steps: 20 #00
+warmup_steps: 100
+steps: 800
 ema_rate: 0.999
+eps: 1e-3
