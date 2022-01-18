@@ -1,6 +1,6 @@
 import jax.numpy as jnp
 
-from score_sde.sde import SDE
+from score_sde.sde import SDE, RSDE
 
 
 class Brownian(SDE):
@@ -32,26 +32,23 @@ class Brownian(SDE):
         # return mean, std
         return jnp.zeros_like(x), std
 
-    # def marginal_sample(self, rng, x, t):
-    #     # TODO: Redo this
-    #     from score_sde.sampling import (
-    #         get_pc_sampler,
-    #     )  # TODO: remove from class
+    def marginal_sample(self, rng, x, t):
+        from score_sde.sampling import (
+            EulerMaruyamaManifoldPredictor,
+            get_pc_sampler,
+        )  # TODO: remove from class
 
-    #     perturbed_x = self.manifold.random_walk(rng, x, t)
-    #     if perturbed_x is None:
-    #         # TODO: should pmap the pc_sampler?
-    #         sampler = get_pc_sampler(
-    #             self,
-    #             None,
-    #             x.shape,
-    #             predictor=EulerMaruyamaManifoldPredictor,
-    #             corrector=None,
-    #             continuous=True,
-    #             forward=True,
-    #         )
-    #         perturbed_x, _ = sampler(rng, None, x, t)
-    #     return perturbed_x
+        perturbed_x = self.manifold.random_walk(rng, x, t)
+        if perturbed_x is None:
+            # TODO: should pmap the pc_sampler?
+            sampler = get_pc_sampler(
+                self,
+                1000,
+                predictor="EulerMaruyamaManifoldPredictor",
+                corrector=None,
+            )
+            perturbed_x, _ = sampler(rng, x, t)
+        return perturbed_x
 
     def marginal_log_prob(self, x0, x, t, **kwargs):
         # TODO: Should indeed vmap?
@@ -64,3 +61,37 @@ class Brownian(SDE):
 
     def limiting_distribution_logp(self, z):
         return -jnp.ones([*z.shape[:-1]]) * self.manifold.metric.log_volume
+
+    def reverse(self, score_fn):
+        return ReverseBrownian(self, score_fn)
+
+
+class ReverseBrownian(Brownian):
+    """Reverse time SDE, assuming the drift coefficient is spatially homogenous"""
+
+    def __init__(self, sde: SDE, score_fn):
+        super().__init__(sde.manifold, tf=sde.t0, t0=sde.tf)
+
+        self.sde = sde
+        self.score_fn = score_fn
+
+    def coefficients(self, x, t):
+        forward_drift, diffusion = self.sde.coefficients(x, t)
+        score_fn = self.score_fn(x, t)
+
+        # compute G G^T score_fn
+        if len(diffusion.shape) > 1 and diffusion.shape[-1] == diffusion.shape[-2]:
+            # if square matrix diffusion coeffs
+            reverse_drift = forward_drift - jnp.einsum(
+                "...ij,...kj,...k->...i", diffusion, diffusion, score_fn
+            )
+        else:
+            # if scalar diffusion coeffs (i.e. no extra dims on the diffusion)
+            reverse_drift = forward_drift - jnp.einsum(
+                "...,...,...i->...i", diffusion, diffusion, score_fn
+            )
+
+        return reverse_drift, diffusion
+
+    def reverse(self):
+        return self.sde
