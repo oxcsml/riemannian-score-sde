@@ -71,9 +71,6 @@ def run(cfg):
         cfg.loss, sde=sde, model=score_model, optimizer=optimiser
     )
 
-    train_step_fn = instantiate(
-        cfg.loss, sde=sde, model=score_model, optimizer=optimiser
-    )
     train_step_fn = jax.jit(train_step_fn)
 
     log.info("Stage : Training")
@@ -85,7 +82,7 @@ def run(cfg):
         if i % 50 == 0:
             print(f"{i:4d}: {loss:.3f}")
 
-    # log.info("Stage : Testing")
+    log.info("Stage : Testing")
 
     x0 = next(dataset)
     ## p_0 (backward)
