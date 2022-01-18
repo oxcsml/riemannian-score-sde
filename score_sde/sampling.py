@@ -28,6 +28,7 @@ import jax.numpy as jnp
 import jax.random as random
 
 from score_sde.sde import SDE, RSDE, VPSDE, subVPSDE  # , VESDE
+from riemannian_score_sde.sde import ReverseBrownian
 from score_sde.models import get_score_fn
 from score_sde.utils import from_flattened_numpy, to_flattened_numpy
 from score_sde.utils import batch_mul, batch_add
@@ -168,7 +169,7 @@ class EulerMaruyamaPredictor(Predictor):
     ) -> Tuple[jnp.ndarray, jnp.ndarray]:
         z = jax.random.normal(rng, x.shape)
         drift, diffusion = self.sde.coefficients(x, t)
-        x_mean = x + drift * dt
+        x_mean = x + drift * dt[..., None]
 
         if len(diffusion.shape) > 1 and diffusion.shape[-1] == diffusion.shape[-2]:
             # if square matrix diffusion coeffs
@@ -198,7 +199,7 @@ class EulerMaruyamaManifoldPredictor(Predictor):
             state=rng, base_point=x, n_samples=x.shape[0]
         )
         drift, diffusion = self.sde.coefficients(x, t)
-        drift = drift * dt
+        drift = drift * dt[..., None]
         # NOTE: should we use retraction? can we not compute x_mean?
         # x_mean = self.sde.manifold.metric.exp(tangent_vec=drift, base_point=x)  # NOTE: do we really need this in practice? only if denoise=True
 
@@ -493,6 +494,7 @@ def get_pc_sampler(
     n_steps: int = 1,
     denoise: bool = True,
     eps: float = 1e-3,
+    return_t=False,
 ):
     """Create a Predictor-Corrector (PC) sampler.
 
@@ -515,27 +517,6 @@ def get_pc_sampler(
       A sampling function that takes random states, and a replcated training state and returns samples as well as
       the number of function evaluations during sampling.
     """
-    # Create predictor & corrector update functions
-    # predictor_update_fn = functools.partial(
-    #     shared_predictor_update_fn,
-    #     sde=sde,
-    #     model=model,
-    #     predictor=predictor,
-    #     forward=forward,
-    #     probability_flow=probability_flow,
-    #     continuous=continuous,
-    # )
-    # corrector_update_fn = functools.partial(
-    #     shared_corrector_update_fn,
-    #     sde=sde,
-    #     model=model,
-    #     corrector=corrector,
-    #     forward=forward,
-    #     continuous=continuous,
-    #     snr=snr,
-    #     n_steps=n_steps,
-    # )
-
     predictor = get_predictor(predictor if predictor is not None else "NonePredictor")(
         sde
     )
@@ -552,45 +533,25 @@ def get_pc_sampler(
         Returns:
           Samples, number of function evaluations
         """
-        # Initial sample
-        rng, step_rng = random.split(rng)
-        # if forward:
-        #     assert (x is not None) and (t is not None)
-        # else:
-        #     x = sde.prior_sampling(step_rng, shape)
 
-        # N = int(jnp.round(T / sde.T * sde.N))
-        # timesteps = jnp.linspace(T, eps, N)
-        # timesteps = jnp.flip(timesteps) if forward else timesteps
+        t0 = sde.t0 if t0 is None else t0
+        tf = sde.tf if tf is None else tf
 
-        t0 = sde.t0 if t0 is None else t0 * jnp.ones(x.shape[:-1])
-        tf = sde.tf if tf is None else tf * jnp.ones(x.shape[:-1])
+        t0 = jnp.broadcast_to(t0, x.shape[:-1])
+        tf = jnp.broadcast_to(tf, x.shape[:-1])
 
         # Only integrate to eps off the forward start time for numerical stability
-        if isinstance(sde, RSDE):
+        if isinstance(sde, RSDE) or isinstance(sde, ReverseBrownian):
             t0 = t0 + eps
         else:
             tf = tf - eps
 
         timesteps = jnp.linspace(start=t0, stop=tf, num=N, endpoint=True)
         dt = (tf - t0) / N
-        # N = sde.N
-        # if forward:
-        #     # N = int(jnp.round(t / sde.T * sde.N))
-        #     timesteps = jnp.linspace(eps, t, N)
-        #     dt = (t - eps) / N
-        # else:
-        #     t0 = eps if t is None else t
-        #     t0 = jnp.ones(shape[0]) * t0
-        #     # N = int(jnp.round((sde.T - t0) / sde.T * sde.N))
-        #     timesteps = jnp.linspace(sde.T, t0, N)
-        #     dt = (sde.T - t0) / N
-        # dt = jnp.expand_dims(dt, -1)
 
         def loop_body(i, val):
             rng, x, x_mean, x_hist = val
             t = timesteps[i]
-            # vec_t = jnp.ones(shape[0]) * t
             rng, step_rng = random.split(rng)
             x, x_mean = corrector.update_fn(step_rng, x, t, dt)
             rng, step_rng = random.split(rng)
@@ -604,7 +565,14 @@ def get_pc_sampler(
 
         _, x, x_mean, x_hist = jax.lax.fori_loop(0, N, loop_body, (rng, x, x, x_hist))
         # Denoising is equivalent to running one predictor step without adding noise.
-        return inverse_scaler(x_mean if denoise else x), inverse_scaler(x_hist)
+        if return_t:
+            return (
+                inverse_scaler(x_mean if denoise else x),
+                inverse_scaler(x_hist),
+                timesteps,
+            )
+        else:
+            return inverse_scaler(x_mean if denoise else x), inverse_scaler(x_hist)
 
     return pc_sampler
 
