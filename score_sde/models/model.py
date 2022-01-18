@@ -80,7 +80,7 @@ def get_score_fn(
             # NOTE: scaling the output with 1.0 / std helps cf 'Improved Techniques for Training Score-Based Generative Model'
             score = model_out
             std = sde.marginal_prob(jnp.zeros_like(x), t)[1]
-            score = batch_mul(model_out, 1.0 / std)
+            score = batch_mul(model_out, 1.0 / std[..., None])
             if return_state:
                 return score, new_state
             else:
