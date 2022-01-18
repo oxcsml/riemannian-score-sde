@@ -270,6 +270,9 @@ class ProbabilityFlowODE:
     def __init__(self, sde: SDE, score_fn=None):
         self.sde = sde
 
+        self.t0 = sde.t0
+        self.tf = sde.tf
+
         if score_fn is None and not isinstance(sde, RSDE):
             raise ValueError(
                 "Score function must be not None or SDE must be a reversed SDE"
@@ -282,7 +285,6 @@ class ProbabilityFlowODE:
     def coefficients(self, x, t):
         drift, diffusion = self.sde.coefficients(x, t)
         score_fn = self.score_fn(x, t)
-
         # compute G G^T score_fn
         if len(diffusion.shape) > 1 and diffusion.shape[-1] == diffusion.shape[-2]:
             # if square matrix diffusion coeffs
@@ -295,7 +297,7 @@ class ProbabilityFlowODE:
                 "...,...,...i->...i", diffusion, diffusion, score_fn
             )
 
-        return ode_drift, jnp.zeros_like(drift)
+        return ode_drift, jnp.zeros(drift.shape[:-1])
 
 
 class RSDE(SDE):
@@ -327,9 +329,6 @@ class RSDE(SDE):
 
     def reverse(self):
         return self.sde
-
-    def probability_ode(self):
-        return ProbabilityFlowODE(self)
 
 
 class VPSDE(SDE):
