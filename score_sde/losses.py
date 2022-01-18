@@ -155,7 +155,7 @@ def get_sde_loss_fn(
 
         rng, step_rng = random.split(rng)
         t = random.uniform(
-            step_rng, (data.shape[0],), minval=sde.t0 + eps, maxval=sde.tf
+            step_rng, (x_0.shape[0],), minval=sde.t0 + eps, maxval=sde.tf
         )
         # t = eps + random.beta(step_rng, a=1., b=3., shape=(data.shape[0],)) * sde.T
 
