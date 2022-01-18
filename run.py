@@ -14,6 +14,7 @@ from score_sde.utils import TrainState, save, restore
 from score_sde.sampling import EulerMaruyamaManifoldPredictor, get_pc_sampler
 from score_sde.likelihood import get_likelihood_fn
 from score_sde.utils.vis import plot_and_save
+from score_sde.models import get_score_fn
 
 log = logging.getLogger(__name__)
 
@@ -91,24 +92,29 @@ def run(cfg):
     t = cfg.eps
     sampler = jax.jit(
         get_pc_sampler(
-            sde,
-            score_model,
-            (cfg.batch_size, model_manifold.dim),
-            predictor=EulerMaruyamaManifoldPredictor,
+            sde.reverse(
+                get_score_fn(
+                    sde, score_model, train_state.params_ema, train_state.model_state
+                )
+            ),
+            1000,
+            predictor="EulerMaruyamaManifoldPredictor",
             corrector=None,
-            continuous=True,
-            forward=False,
             eps=cfg.eps,
         )
     )
     rng, next_rng = jax.random.split(rng)
-    x, _ = sampler(next_rng, train_state, t=t)
+    x, _ = sampler(next_rng, sde.sample_limiting_distribution(rng, x0.shape))
     y = transform(x)
     likelihood_fn = get_likelihood_fn(
-        sde, score_model, hutchinson_type="None", bits_per_dimension=False, eps=cfg.eps
+        sde,
+        get_score_fn(sde, score_model, train_state.params_ema, train_state.model_state),
+        hutchinson_type="None",
+        bits_per_dimension=False,
+        eps=cfg.eps,
     )
     # TODO: take into account logdetjac of transform
-    logp, z, nfe = likelihood_fn(rng, train_state, transform.inv(y))
+    logp, z, nfe = likelihood_fn(rng, x0)
     print(nfe)
     logp -= transform.log_abs_det_jacobian(x, y)
     prob = jnp.exp(logp)
