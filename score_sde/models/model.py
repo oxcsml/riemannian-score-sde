@@ -58,7 +58,6 @@ def get_score_fn(
     return_state=False,
 ):
     """Wraps `score_fn` so that the model output corresponds to a real time-dependent score function.
-
     Args:
       sde: An `sde.SDE` object that represents the forward SDE.
       model: A Haiku transformed function representing the score function model
@@ -67,7 +66,6 @@ def get_score_fn(
       train: `True` for training and `False` for evaluation.
       continuous: If `True`, the score-based model is expected to directly take continuous time steps.
       return_state: If `True`, return the new mutable states alongside the model output.
-
     Returns:
       A score function.
     """
@@ -80,7 +78,7 @@ def get_score_fn(
             # NOTE: scaling the output with 1.0 / std helps cf 'Improved Techniques for Training Score-Based Generative Model'
             score = model_out
             std = sde.marginal_prob(jnp.zeros_like(x), t)[1]
-            score = batch_mul(model_out, 1.0 / std[..., None])
+            score = batch_mul(model_out, 1.0 / std)
             if return_state:
                 return score, new_state
             else:
@@ -136,26 +134,22 @@ def get_score_fn(
 
 def get_model_fn(model, params, state, train=False):
     """Create a function to give the output of the score-based model.
-
     Args:
       model: A transformed Haiku function the represent the architecture of score-based model.
       params: A dictionary that contains all trainable parameters.
       states: A dictionary that contains all mutable states.
       train: `True` for training and `False` for evaluation.
-
     Returns:
       A model function.
     """
 
     def model_fn(x, labels, rng=None):
         """Compute the output of the score-based model.
-
         Args:
           x: A mini-batch of input data.
           labels: A mini-batch of conditioning variables for time steps. Should be interpreted differently
             for different models.
           rng: If present, it is the random state for dropout
-
         Returns:
           A tuple of (model output, new mutable states)
         """

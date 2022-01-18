@@ -41,7 +41,7 @@ def get_ism_loss_fn(
     reduce_mean: bool = True,
     continuous: bool = True,
     likelihood_weighting: bool = True,
-    eps: float = 1e-5,
+    eps: float = 1e-3,
     ism_loss: bool = False,
     hutchinson_type: str = "Rademacher",
     discretisation_steps=1000,
@@ -61,7 +61,7 @@ def get_ssm_loss_fn(
     reduce_mean: bool = True,
     continuous: bool = True,
     likelihood_weighting: bool = True,
-    eps: float = 1e-5,
+    eps: float = 1e-3,
     ism_loss: bool = False,
     hutchinson_type: str = "Rademacher",
     discretisation_steps=1000,
@@ -80,7 +80,7 @@ def get_dsm_loss_fn(
     train: bool,
     reduce_mean: bool = True,
     likelihood_weighting: bool = True,
-    eps: float = 1e-5,
+    eps: float = 1e-3,
     ism_loss: bool = False,
     discretisation_steps=1000,
 ):
@@ -99,10 +99,9 @@ def get_sde_loss_fn(
     reduce_mean: bool = True,
     continuous: bool = True,
     likelihood_weighting: bool = True,
-    eps: float = 1e-5,
+    eps: float = 1e-3,
     ism_loss: bool = False,
     hutchinson_type: str = "Rademacher",
-    discretisation_steps=1000,
 ) -> Callable[[jax.random.KeyArray, dict, dict, dict], Tuple[float, dict]]:
     """Create a loss function for training with arbirary SDEs.
 
@@ -181,7 +180,7 @@ def get_sde_loss_fn(
                 sq_norm_score = sde.manifold.metric.squared_norm(score, x_t)
                 losses = 0.5 * sq_norm_score + div_score
             if likelihood_weighting:
-                g2 = sde.sde(jnp.zeros_like(x_0), t)[1] ** 2
+                g2 = sde.coefficients(jnp.zeros_like(x_0), t)[1] ** 2
                 losses = losses * g2
         else:
             rng, step_rng = random.split(rng)
@@ -291,7 +290,7 @@ def get_pmap_step_fn(
     reduce_mean=False,
     continuous=True,
     likelihood_weighting=False,
-    eps: float = 1e-5,
+    eps: float = 1e-3,
     ism_loss: bool = False,
     hutchinson_type: str = "Rademacher",
 ):
@@ -398,7 +397,7 @@ def get_step_fn(
     reduce_mean=False,
     continuous=True,
     likelihood_weighting=False,
-    eps: float = 1e-5,
+    eps: float = 1e-3,
     ism_loss: bool = False,
     hutchinson_type: str = "Rademacher",
 ):
