@@ -100,21 +100,49 @@ def run(cfg):
             eps=cfg.eps,
         )
     )
+    # sampler = get_pc_sampler(
+    #     sde.reverse(
+    #         get_score_fn(
+    #             sde, score_model, train_state.params_ema, train_state.model_state
+    #         )
+    #     ),
+    #     1000,
+    #     predictor="EulerMaruyamaManifoldPredictor",
+    #     corrector=None,
+    #     eps=cfg.eps,
+    # )
     rng, next_rng = jax.random.split(rng)
     x, _ = sampler(next_rng, sde.sample_limiting_distribution(rng, x0.shape))
     y = transform(x)
-    likelihood_fn = get_likelihood_fn(
-        sde,
-        get_score_fn(sde, score_model, train_state.params_ema, train_state.model_state),
-        hutchinson_type="None",
-        bits_per_dimension=False,
-        eps=cfg.eps,
+    log.info("Jitting likelihood")
+    likelihood_fn = jax.jit(
+        get_likelihood_fn(
+            sde,
+            get_score_fn(
+                sde, score_model, train_state.params_ema, train_state.model_state
+            ),
+            hutchinson_type="None",
+            bits_per_dimension=False,
+            eps=cfg.eps,
+            N=100,
+        )
     )
+    # likelihood_fn = get_likelihood_fn(
+    #     sde,
+    #     get_score_fn(sde, score_model, train_state.params_ema, train_state.model_state),
+    #     hutchinson_type="None",
+    #     bits_per_dimension=False,
+    #     eps=cfg.eps,
+    #     N=100,
+    # )
     # TODO: take into account logdetjac of transform
+    log.info("Running likelihood")
     logp, z, nfe = likelihood_fn(rng, x0)
+    print(logp)
     print(nfe)
     logp -= transform.log_abs_det_jacobian(x, y)
     prob = jnp.exp(logp)
+    print(prob)
     Path("logs/images").mkdir(parents=True, exist_ok=True)  # Create logs dir
     plot_and_save(None, y, prob, None, out=f"logs/images/x0_backw.jpg")
     prob = jnp.exp(dataset.log_prob(x0)) if hasattr(dataset, "log_prob") else None

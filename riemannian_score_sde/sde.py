@@ -43,11 +43,11 @@ class Brownian(SDE):
             # TODO: should pmap the pc_sampler?
             sampler = get_pc_sampler(
                 self,
-                1000,
+                100,
                 predictor="EulerMaruyamaManifoldPredictor",
                 corrector=None,
             )
-            perturbed_x, _ = sampler(rng, x, t)
+            perturbed_x, _ = sampler(rng, x, tf=t)
         return perturbed_x
 
     def marginal_log_prob(self, x0, x, t, **kwargs):

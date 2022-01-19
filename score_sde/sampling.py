@@ -542,9 +542,9 @@ def get_pc_sampler(
 
         # Only integrate to eps off the forward start time for numerical stability
         if isinstance(sde, RSDE) or isinstance(sde, ReverseBrownian):
-            t0 = t0 + eps
+            tf = tf + eps
         else:
-            tf = tf - eps
+            t0 = t0 + eps
 
         timesteps = jnp.linspace(start=t0, stop=tf, num=N, endpoint=True)
         dt = (tf - t0) / N

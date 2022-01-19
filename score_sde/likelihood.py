@@ -403,8 +403,35 @@ def get_likelihood_fn(
         rng, step_rng = jax.random.split(rng)
         epsilon = div_noise(step_rng, path.shape, "Gaussian")
 
-        grad_logp = div_fn(path, t, epsilon)
-        delta_logp = grad_logp.sum(axis=0)
+        # grad_logp = div_fn(path, t, epsilon)
+        # delta_logp = grad_logp.sum(axis=0)
+
+        # iterative trapezium rule integrator
+        prev_delta_logp = div_fn(path[0], t[0], epsilon[0])
+        delta_logp = jnp.zeros_like(prev_delta_logp)
+        for i in range(1, path.shape[0]):
+            next_delta_logp = div_fn(path[i], t[i], epsilon[i])
+            delta_logp = delta_logp + (
+                ((next_delta_logp + prev_delta_logp) / 2) * (t[i] - t[i - 1])
+            )
+            prev_delta_logp = next_delta_logp
+
+        # prev_delta_logp = div_fn(path[0], t[0], epsilon[0])
+        # delta_logp = jnp.zeros_like(prev_delta_logp)
+
+        # def loop_body(i, val):
+        #     delta_logp, prev_delta_logp = val
+        #     next_delta_logp = div_fn(path[i], t[i], epsilon[i])
+        #     delta_logp = delta_logp + (
+        #         ((next_delta_logp + prev_delta_logp) / 2) * (t[i] - t[i - 1])
+        #     )
+        #     prev_delta_logp = next_delta_logp
+        #     return (delta_logp, prev_delta_logp)
+
+        # delta_logp, _ = jax.lax.fori_loop(
+        #     0, N, loop_body, (delta_logp, prev_delta_logp)
+        # )
+
         limiting_logp = sde.limiting_distribution_logp(z)
 
         posterior_logp = limiting_logp + delta_logp
