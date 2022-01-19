@@ -18,7 +18,7 @@ manifold:
   dim: 2
 
 sde:
-  beta_0: 0.1
+  beta_0: 1.
   beta_f: 1.
 
 batch_size: 512
