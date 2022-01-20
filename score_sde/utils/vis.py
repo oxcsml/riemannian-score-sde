@@ -23,7 +23,7 @@ def remove_background(ax):
 
 
 def plot_and_save(
-    x0, xt, prob, grad, x0prob=None, size=20, dpi=300, out="out.jpg", color="red"
+    x0, xt, prob, grad, x0prob=None, size=10, dpi=300, out="out.jpg", color="red"
 ):
     fig = plt.figure(figsize=(size, size))
     ax = fig.add_subplot(111, projection="3d")
@@ -48,6 +48,6 @@ def plot_and_save(
         )
         quiver.set_array(c)
 
-    plt.colorbar()
+    plt.colorbar(cax)
     plt.savefig(out, dpi=dpi, bbox_inches="tight", transparent=True)
     plt.close(fig)

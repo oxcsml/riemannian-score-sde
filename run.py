@@ -2,7 +2,8 @@ from functools import partial
 from pathlib import Path
 import logging
 import hydra
-from hydra.utils import instantiate, get_class
+from hydra.utils import instantiate, get_class, call
+import omegaconf
 
 import jax
 from jax import numpy as jnp
@@ -67,8 +68,18 @@ def run(cfg):
         rng=next_rng,
     )
 
+    loss_cfg = dict(cfg.loss)
+    if ("loss_fn" in loss_cfg) and isinstance(
+        loss_cfg["loss_fn"], omegaconf.DictConfig
+    ):
+        loss_cfg["loss_fn"] = call(
+            cfg.loss.loss_fn, sde=sde, model=score_model, eps=cfg.eps, train=True
+        )
+
     train_step_fn = instantiate(
-        cfg.loss, sde=sde, model=score_model, optimizer=optimiser
+        loss_cfg,
+        optimizer=optimiser,
+        train=True,
     )
 
     train_step_fn = jax.jit(train_step_fn)
@@ -87,53 +98,23 @@ def run(cfg):
     x0 = next(dataset)
     ## p_0 (backward)
     t = cfg.eps
-    # sampler = jax.jit(
-    sampler = get_pc_sampler(
-        sde.reverse(
-            get_score_fn(
-                sde, score_model, train_state.params_ema, train_state.model_state
-            )
-        ),
-        100,
-        predictor="EulerMaruyamaManifoldPredictor",
-        corrector=None,
-        eps=cfg.eps,
+    sampler = jax.jit(
+        get_pc_sampler(
+            sde.reverse(
+                get_score_fn(
+                    sde, score_model, train_state.params_ema, train_state.model_state
+                )
+            ),
+            100,
+            predictor="EulerMaruyamaManifoldPredictor",
+            corrector=None,
+            eps=cfg.eps,
+        )
     )
-    # )
-    # sampler = get_pc_sampler(
-    #     sde.reverse(
-    #         get_score_fn(
-    #             sde, score_model, train_state.params_ema, train_state.model_state
-    #         )
-    #     ),
-    #     1000,
-    #     predictor="EulerMaruyamaManifoldPredictor",
-    #     corrector=None,
-    #     eps=cfg.eps,
-    # )
     rng, next_rng = jax.random.split(rng)
     x, _ = sampler(next_rng, sde.sample_limiting_distribution(rng, x0.shape))
     y = transform(x)
-    log.info("Jitting likelihood")
-    # likelihood_fn = jax.jit(
-    #     get_likelihood_fn(
-    #         sde,
-    #         get_score_fn(
-    #             sde, score_model, train_state.params_ema, train_state.model_state
-    #         ),
-    #         hutchinson_type="None",
-    #         bits_per_dimension=False,
-    #         eps=cfg.eps,
-    #         N=100,
-    #     )
-    # )
-    # likelihood_fn = get_likelihood_fn(
-    #     sde,
-    #     get_score_fn(sde, score_model, train_state.params_ema, train_state.model_state),
-    #     hutchinson_type="None",
-    #     bits_per_dimension=False,
-    #     eps=cfg.eps,
-    # )
+
     likelihood_fn = get_likelihood_fn(
         sde,
         get_score_fn(
