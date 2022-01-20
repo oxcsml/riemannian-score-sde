@@ -87,19 +87,19 @@ def run(cfg):
     x0 = next(dataset)
     ## p_0 (backward)
     t = cfg.eps
-    sampler = jax.jit(
-        get_pc_sampler(
-            sde.reverse(
-                get_score_fn(
-                    sde, score_model, train_state.params_ema, train_state.model_state
-                )
-            ),
-            1000,
-            predictor="EulerMaruyamaManifoldPredictor",
-            corrector=None,
-            eps=cfg.eps,
-        )
+    # sampler = jax.jit(
+    sampler = get_pc_sampler(
+        sde.reverse(
+            get_score_fn(
+                sde, score_model, train_state.params_ema, train_state.model_state
+            )
+        ),
+        100,
+        predictor="EulerMaruyamaManifoldPredictor",
+        corrector=None,
+        eps=cfg.eps,
     )
+    # )
     # sampler = get_pc_sampler(
     #     sde.reverse(
     #         get_score_fn(
@@ -115,29 +115,41 @@ def run(cfg):
     x, _ = sampler(next_rng, sde.sample_limiting_distribution(rng, x0.shape))
     y = transform(x)
     log.info("Jitting likelihood")
-    likelihood_fn = jax.jit(
-        get_likelihood_fn(
-            sde,
-            get_score_fn(
-                sde, score_model, train_state.params_ema, train_state.model_state
-            ),
-            hutchinson_type="None",
-            bits_per_dimension=False,
-            eps=cfg.eps,
-            N=100,
-        )
-    )
+    # likelihood_fn = jax.jit(
+    #     get_likelihood_fn(
+    #         sde,
+    #         get_score_fn(
+    #             sde, score_model, train_state.params_ema, train_state.model_state
+    #         ),
+    #         hutchinson_type="None",
+    #         bits_per_dimension=False,
+    #         eps=cfg.eps,
+    #         N=100,
+    #     )
+    # )
     # likelihood_fn = get_likelihood_fn(
     #     sde,
     #     get_score_fn(sde, score_model, train_state.params_ema, train_state.model_state),
     #     hutchinson_type="None",
     #     bits_per_dimension=False,
     #     eps=cfg.eps,
-    #     N=100,
     # )
+    likelihood_fn = get_likelihood_fn(
+        sde,
+        get_score_fn(
+            sde,
+            score_model,
+            train_state.params_ema,
+            train_state.model_state,
+            continuous=True,
+        ),
+        hutchinson_type="None",
+        bits_per_dimension=False,
+        eps=cfg.eps,
+    )
     # TODO: take into account logdetjac of transform
     log.info("Running likelihood")
-    logp, z, nfe = likelihood_fn(rng, x0)
+    logp, z, nfe = likelihood_fn(rng, transform.inv(y))
     print(logp)
     print(nfe)
     logp -= transform.log_abs_det_jacobian(x, y)

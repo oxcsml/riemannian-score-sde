@@ -139,6 +139,10 @@ def batch_mul(a, b):
 
 
 class SDE(ABC):
+    # Specify if the sde returns full diffusion matrix, or just a scalar indicating diagonal variance
+
+    full_diffusion_matrix = False
+
     def __init__(self, tf: float = 1, t0: float = 0):
         """Abstract definition of an SDE"""
 
@@ -286,7 +290,7 @@ class ProbabilityFlowODE:
         drift, diffusion = self.sde.coefficients(x, t)
         score_fn = self.score_fn(x, t)
         # compute G G^T score_fn
-        if len(diffusion.shape) > 1 and diffusion.shape[-1] == diffusion.shape[-2]:
+        if self.sde.full_diffusion_matrix:
             # if square matrix diffusion coeffs
             ode_drift = drift - 0.5 * jnp.einsum(
                 "...ij,...kj,...k->...i", diffusion, diffusion, score_fn
@@ -314,7 +318,7 @@ class RSDE(SDE):
         score_fn = self.score_fn(x, t)
 
         # compute G G^T score_fn
-        if len(diffusion.shape) > 1 and diffusion.shape[-1] == diffusion.shape[-2]:
+        if self.sde.full_diffusion_matrix:
             # if square matrix diffusion coeffs
             reverse_drift = forward_drift - jnp.einsum(
                 "...ij,...kj,...k->...i", diffusion, diffusion, score_fn

@@ -80,7 +80,7 @@ class ReverseBrownian(Brownian):
         score_fn = self.score_fn(x, t)
 
         # compute G G^T score_fn
-        if len(diffusion.shape) > 1 and diffusion.shape[-1] == diffusion.shape[-2]:
+        if self.sde.full_diffusion_matrix:
             # if square matrix diffusion coeffs
             reverse_drift = forward_drift - jnp.einsum(
                 "...ij,...kj,...k->...i", diffusion, diffusion, score_fn

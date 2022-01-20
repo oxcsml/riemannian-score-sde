@@ -540,6 +540,9 @@ def get_pc_sampler(
         t0 = jnp.broadcast_to(t0, x.shape[:-1])
         tf = jnp.broadcast_to(tf, x.shape[:-1])
 
+        # TODO: to match rng state of old code, debugging.
+        rng, step_rng = random.split(rng)
+
         # Only integrate to eps off the forward start time for numerical stability
         if isinstance(sde, RSDE) or isinstance(sde, ReverseBrownian):
             tf = tf + eps
@@ -562,6 +565,10 @@ def get_pc_sampler(
             return rng, x, x_mean, x_hist
 
         x_hist = jnp.zeros((N, *x.shape))
+
+        # x_mean = x
+        # for i in range(N):
+        #     rng, x, x_mean, x_hist = loop_body(i, (rng, x, x, x_hist))
 
         _, x, x_mean, x_hist = jax.lax.fori_loop(0, N, loop_body, (rng, x, x, x_hist))
         # Denoising is equivalent to running one predictor step without adding noise.

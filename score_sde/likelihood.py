@@ -309,138 +309,138 @@ def get_pmap_likelihood_fn(
 #     return likelihood_fn
 
 
-# def get_likelihood_fn(
-#     sde: SDE,
-#     score_fn: ParametrisedScoreFunction,
-#     inverse_scaler=lambda x: x,
-#     hutchinson_type: str = "Rademacher",
-#     rtol: str = 1e-5,
-#     atol: str = 1e-5,
-#     method: str = "RK45",
-#     eps: str = 1e-5,
-#     bits_per_dimension=True,
-# ):
-#     def likelihood_fn(rng: jax.random.KeyArray, data: jnp.ndarray):
-#         """Compute an unbiased estimate to the log-likelihood in bits/dim.
-
-#         Args:
-#           rng: An array of random states. The list dimension equals the number of devices.
-#           train_state: Replicated training state for running on multiple devices.
-#           data: A JAX array of shape [#devices, batch size, ...].
-
-#         Returns:
-#           bpd: A JAX array of shape [#devices, batch size]. The log-likelihoods on `data` in bits/dim.
-#           z: A JAX array of the same shape as `data`. The latent representation of `data` under the
-#             probability flow ODE.
-#           nfe: An integer. The number of function evaluations used for running the black-box ODE solver.
-#         """
-
-#         pode = ProbabilityFlowODE(sde, score_fn)
-#         drift_fn = lambda x, t: pode.coefficients(x, t)[0]
-#         div_fn = get_div_fn(drift_fn, hutchinson_type)
-#         drift_fn, div_fn = jax.jit(drift_fn), jax.jit(div_fn)
-
-#         rng, step_rng = jax.random.split(rng)
-#         shape = data.shape
-#         epsilon = div_noise(step_rng, shape, hutchinson_type)
-
-#         def ode_func(t: float, x: jnp.ndarray) -> np.array:
-#             sample = from_flattened_numpy(x[: -shape[0]], shape)
-#             vec_t = jnp.ones((sample.shape[0],)) * t
-#             drift = to_flattened_numpy(drift_fn(sample, vec_t))
-#             logp_grad = to_flattened_numpy(div_fn(sample, vec_t, epsilon))
-#             return np.concatenate([drift, logp_grad], axis=0)
-
-#         init = jnp.concatenate(
-#             [to_flattened_numpy(data), np.zeros((shape[0],))], axis=0
-#         )
-#         solution = integrate.solve_ivp(
-#             ode_func, (sde.t0 + eps, sde.tf), init, rtol=rtol, atol=atol, method=method
-#         )
-
-#         nfe = solution.nfev
-#         zp = jnp.asarray(solution.y[:, -1])
-#         z = from_flattened_numpy(zp[: -shape[0]], shape)
-#         delta_logp = zp[-shape[0] :]  # .reshape((shape[0], shape[1]))
-#         prior_logp = sde.limiting_distribution_logp(z)
-#         posterior_logp = prior_logp + delta_logp
-#         bpd = -posterior_logp / np.log(2)
-#         N = np.prod(shape[2:])
-#         bpd = bpd / N
-#         # A hack to convert log-likelihoods to bits/dim
-#         # based on the gradient of the inverse data normalizer.
-#         offset = jnp.log2(jax.grad(inverse_scaler)(0.0)) + 8.0
-#         bpd += offset
-#         return bpd if bits_per_dimension else posterior_logp, z, nfe
-
-#     return likelihood_fn
-
-
-# This version explicitly rolls out the ODE using our integrators.
 def get_likelihood_fn(
     sde: SDE,
-    score_fn,  #: ParametrisedScoreFunction,
+    score_fn: ParametrisedScoreFunction,
     inverse_scaler=lambda x: x,
     hutchinson_type: str = "Rademacher",
-    # rtol: str = 1e-5,
-    # atol: str = 1e-5,
-    # method: str = "RK45",
-    eps: str = 1e-3,
+    rtol: str = 1e-5,
+    atol: str = 1e-5,
+    method: str = "RK45",
+    eps: str = 1e-5,
     bits_per_dimension=True,
-    N=1000,
 ):
-    pode = ProbabilityFlowODE(sde, score_fn)
+    def likelihood_fn(rng: jax.random.KeyArray, data: jnp.ndarray):
+        """Compute an unbiased estimate to the log-likelihood in bits/dim.
 
-    drift_fn = lambda x, t: pode.coefficients(x, t)[0]
-    div_fn = get_div_fn(drift_fn, "Gaussian")
-    # drift_fn, div_fn = jax.jit(drift_fn), jax.jit(div_fn)
-    sampler = get_pc_sampler(pode, N, return_t=True)
+        Args:
+          rng: An array of random states. The list dimension equals the number of devices.
+          train_state: Replicated training state for running on multiple devices.
+          data: A JAX array of shape [#devices, batch size, ...].
 
-    def likelihood_fn(rng, data):
+        Returns:
+          bpd: A JAX array of shape [#devices, batch size]. The log-likelihoods on `data` in bits/dim.
+          z: A JAX array of the same shape as `data`. The latent representation of `data` under the
+            probability flow ODE.
+          nfe: An integer. The number of function evaluations used for running the black-box ODE solver.
+        """
+
+        pode = ProbabilityFlowODE(sde, score_fn)
+        drift_fn = lambda x, t: pode.coefficients(x, t)[0]
+        div_fn = get_div_fn(drift_fn, hutchinson_type)
+        drift_fn, div_fn = jax.jit(drift_fn), jax.jit(div_fn)
+
         rng, step_rng = jax.random.split(rng)
-        z, path, t = sampler(rng, data)
+        shape = data.shape
+        epsilon = div_noise(step_rng, shape, hutchinson_type)
 
-        rng, step_rng = jax.random.split(rng)
-        epsilon = div_noise(step_rng, path.shape, "Gaussian")
+        def ode_func(t: float, x: jnp.ndarray) -> np.array:
+            sample = from_flattened_numpy(x[: -shape[0]], shape)
+            vec_t = jnp.ones((sample.shape[0],)) * t
+            drift = to_flattened_numpy(drift_fn(sample, vec_t))
+            logp_grad = to_flattened_numpy(div_fn(sample, vec_t, epsilon))
+            return np.concatenate([drift, logp_grad], axis=0)
 
-        # grad_logp = div_fn(path, t, epsilon)
-        # delta_logp = grad_logp.sum(axis=0)
+        init = jnp.concatenate(
+            [to_flattened_numpy(data), np.zeros((shape[0],))], axis=0
+        )
+        solution = integrate.solve_ivp(
+            ode_func, (sde.t0 + eps, sde.tf), init, rtol=rtol, atol=atol, method=method
+        )
 
-        # iterative trapezium rule integrator
-        prev_delta_logp = div_fn(path[0], t[0], epsilon[0])
-        delta_logp = jnp.zeros_like(prev_delta_logp)
-        for i in range(1, path.shape[0]):
-            next_delta_logp = div_fn(path[i], t[i], epsilon[i])
-            delta_logp = delta_logp + (
-                ((next_delta_logp + prev_delta_logp) / 2) * (t[i] - t[i - 1])
-            )
-            prev_delta_logp = next_delta_logp
-
-        # prev_delta_logp = div_fn(path[0], t[0], epsilon[0])
-        # delta_logp = jnp.zeros_like(prev_delta_logp)
-
-        # def loop_body(i, val):
-        #     delta_logp, prev_delta_logp = val
-        #     next_delta_logp = div_fn(path[i], t[i], epsilon[i])
-        #     delta_logp = delta_logp + (
-        #         ((next_delta_logp + prev_delta_logp) / 2) * (t[i] - t[i - 1])
-        #     )
-        #     prev_delta_logp = next_delta_logp
-        #     return (delta_logp, prev_delta_logp)
-
-        # delta_logp, _ = jax.lax.fori_loop(
-        #     0, N, loop_body, (delta_logp, prev_delta_logp)
-        # )
-
-        limiting_logp = sde.limiting_distribution_logp(z)
-
-        posterior_logp = limiting_logp + delta_logp
-        bpd = -posterior_logp / (np.log(2) * np.prod(data.shape[1:]))
+        nfe = solution.nfev
+        zp = jnp.asarray(solution.y[:, -1])
+        z = from_flattened_numpy(zp[: -shape[0]], shape)
+        delta_logp = zp[-shape[0] :]  # .reshape((shape[0], shape[1]))
+        prior_logp = sde.limiting_distribution_logp(z)
+        posterior_logp = prior_logp + delta_logp
+        bpd = -posterior_logp / np.log(2)
+        N = np.prod(shape[2:])
+        bpd = bpd / N
         # A hack to convert log-likelihoods to bits/dim
         # based on the gradient of the inverse data normalizer.
         offset = jnp.log2(jax.grad(inverse_scaler)(0.0)) + 8.0
         bpd += offset
-
-        return bpd if bits_per_dimension else posterior_logp, z, N
+        return bpd if bits_per_dimension else posterior_logp, z, nfe
 
     return likelihood_fn
+
+
+# This version explicitly rolls out the ODE using our integrators.
+# def get_likelihood_fn(
+#     sde: SDE,
+#     score_fn,  #: ParametrisedScoreFunction,
+#     inverse_scaler=lambda x: x,
+#     hutchinson_type: str = "Rademacher",
+#     # rtol: str = 1e-5,
+#     # atol: str = 1e-5,
+#     # method: str = "RK45",
+#     eps: str = 1e-3,
+#     bits_per_dimension=True,
+#     N=1000,
+# ):
+#     pode = ProbabilityFlowODE(sde, score_fn)
+
+#     drift_fn = lambda x, t: pode.coefficients(x, t)[0]
+#     div_fn = get_div_fn(drift_fn, "Gaussian")
+#     # drift_fn, div_fn = jax.jit(drift_fn), jax.jit(div_fn)
+#     sampler = get_pc_sampler(pode, N, return_t=True)
+
+#     def likelihood_fn(rng, data):
+#         rng, step_rng = jax.random.split(rng)
+#         z, path, t = sampler(rng, data)
+
+#         rng, step_rng = jax.random.split(rng)
+#         epsilon = div_noise(step_rng, path.shape, "Gaussian")
+
+#         # grad_logp = div_fn(path, t, epsilon)
+#         # delta_logp = grad_logp.sum(axis=0)
+
+#         # iterative trapezium rule integrator
+#         prev_delta_logp = div_fn(path[0], t[0], epsilon[0])
+#         delta_logp = jnp.zeros_like(prev_delta_logp)
+#         for i in range(1, path.shape[0]):
+#             next_delta_logp = div_fn(path[i], t[i], epsilon[i])
+#             delta_logp = delta_logp + (
+#                 ((next_delta_logp + prev_delta_logp) / 2) * (t[i] - t[i - 1])
+#             )
+#             prev_delta_logp = next_delta_logp
+
+#         # prev_delta_logp = div_fn(path[0], t[0], epsilon[0])
+#         # delta_logp = jnp.zeros_like(prev_delta_logp)
+
+#         # def loop_body(i, val):
+#         #     delta_logp, prev_delta_logp = val
+#         #     next_delta_logp = div_fn(path[i], t[i], epsilon[i])
+#         #     delta_logp = delta_logp + (
+#         #         ((next_delta_logp + prev_delta_logp) / 2) * (t[i] - t[i - 1])
+#         #     )
+#         #     prev_delta_logp = next_delta_logp
+#         #     return (delta_logp, prev_delta_logp)
+
+#         # delta_logp, _ = jax.lax.fori_loop(
+#         #     0, N, loop_body, (delta_logp, prev_delta_logp)
+#         # )
+
+#         limiting_logp = sde.limiting_distribution_logp(z)
+
+#         posterior_logp = limiting_logp + delta_logp
+#         bpd = -posterior_logp / (np.log(2) * np.prod(data.shape[1:]))
+#         # A hack to convert log-likelihoods to bits/dim
+#         # based on the gradient of the inverse data normalizer.
+#         offset = jnp.log2(jax.grad(inverse_scaler)(0.0)) + 8.0
+#         bpd += offset
+
+#         return bpd if bits_per_dimension else posterior_logp, z, N
+
+#     return likelihood_fn
