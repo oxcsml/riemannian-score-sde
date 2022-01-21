@@ -30,7 +30,8 @@ from score_sde.utils.jax import batch_mul
 from score_sde.utils import register_category
 from score_sde.utils.typing import ParametrisedScoreFunction
 
-from score_sde.sde import SDE, VESDE, VPSDE, subVPSDE, Brownian
+from score_sde.sde import SDE, VESDE, VPSDE, subVPSDE
+from riemannian_score_sde.sde import Brownian
 from .mlp import MLP
 
 
@@ -57,7 +58,6 @@ def get_score_fn(
     return_state=False,
 ):
     """Wraps `score_fn` so that the model output corresponds to a real time-dependent score function.
-
     Args:
       sde: An `sde.SDE` object that represents the forward SDE.
       model: A Haiku transformed function representing the score function model
@@ -66,17 +66,17 @@ def get_score_fn(
       train: `True` for training and `False` for evaluation.
       continuous: If `True`, the score-based model is expected to directly take continuous time steps.
       return_state: If `True`, return the new mutable states alongside the model output.
-
     Returns:
       A score function.
     """
     # model_fn = get_model_fn(model, params, states, train=train)
 
     if isinstance(sde, Brownian):
+
         def score_fn(x, t, rng=None):
             model_out, new_state = model.apply(params, state, rng, x=x, t=t)
             # NOTE: scaling the output with 1.0 / std helps cf 'Improved Techniques for Training Score-Based Generative Model'
-            score = model_out 
+            score = model_out
             std = sde.marginal_prob(jnp.zeros_like(x), t)[1]
             score = batch_mul(model_out, 1.0 / std)
             if return_state:
@@ -134,26 +134,22 @@ def get_score_fn(
 
 def get_model_fn(model, params, state, train=False):
     """Create a function to give the output of the score-based model.
-
     Args:
       model: A transformed Haiku function the represent the architecture of score-based model.
       params: A dictionary that contains all trainable parameters.
       states: A dictionary that contains all mutable states.
       train: `True` for training and `False` for evaluation.
-
     Returns:
       A model function.
     """
 
     def model_fn(x, labels, rng=None):
         """Compute the output of the score-based model.
-
         Args:
           x: A mini-batch of input data.
           labels: A mini-batch of conditioning variables for time steps. Should be interpreted differently
             for different models.
           rng: If present, it is the random state for dropout
-
         Returns:
           A tuple of (model output, new mutable states)
         """
@@ -168,7 +164,9 @@ def get_model_fn(model, params, state, train=False):
 class Concat(hk.Module):
     def __init__(self, output_shape, hidden_shapes, act):
         super().__init__()
-        self._layer = MLP(hidden_shapes=hidden_shapes, output_shape=output_shape, act=act)
+        self._layer = MLP(
+            hidden_shapes=hidden_shapes, output_shape=output_shape, act=act
+        )
 
     def __call__(self, x, t):
         t = jnp.array(t)
@@ -185,7 +183,9 @@ class Concat(hk.Module):
 class Ignore(hk.Module):
     def __init__(self, output_shape, hidden_shapes, act):
         super().__init__()
-        self._layer = MLP(hidden_shapes=hidden_shapes, output_shape=output_shape, act=act)
+        self._layer = MLP(
+            hidden_shapes=hidden_shapes, output_shape=output_shape, act=act
+        )
 
     def __call__(self, x, t):
         return self._layer(x)
@@ -195,8 +195,12 @@ class Ignore(hk.Module):
 class Sum(hk.Module):
     def __init__(self, output_shape, hidden_shapes, act):
         super().__init__()
-        self._layer = MLP(hidden_shapes=hidden_shapes, output_shape=output_shape, act=act)
-        self._hyper_bias = MLP(hidden_shapes=[], output_shape=output_shape, act='', bias=False)
+        self._layer = MLP(
+            hidden_shapes=hidden_shapes, output_shape=output_shape, act=act
+        )
+        self._hyper_bias = MLP(
+            hidden_shapes=[], output_shape=output_shape, act="", bias=False
+        )
 
     def __call__(self, x, t):
         t = jnp.array(t, dtype=float).reshape(-1, 1)
@@ -207,8 +211,10 @@ class Sum(hk.Module):
 class Squash(hk.Module):
     def __init__(self, output_shape, hidden_shapes, act):
         super().__init__()
-        self._layer = MLP(hidden_shapes=hidden_shapes, output_shape=output_shape, act=act)
-        self._hyper = MLP(hidden_shapes=[], output_shape=output_shape, act='')
+        self._layer = MLP(
+            hidden_shapes=hidden_shapes, output_shape=output_shape, act=act
+        )
+        self._hyper = MLP(hidden_shapes=[], output_shape=output_shape, act="")
 
     def __call__(self, x, t):
         t = jnp.array(t, dtype=float).reshape(-1, 1)
@@ -219,22 +225,28 @@ class Squash(hk.Module):
 class SquashSum(hk.Module):
     def __init__(self, output_shape, hidden_shapes, act):
         super().__init__()
-        self._layer = MLP(hidden_shapes=hidden_shapes, output_shape=output_shape, act=act)
-        self._hyper_bias = MLP(hidden_shapes=[], output_shape=output_shape, act='', bias=False)
-        self._hyper_gate = MLP(hidden_shapes=[], output_shape=output_shape, act='')
+        self._layer = MLP(
+            hidden_shapes=hidden_shapes, output_shape=output_shape, act=act
+        )
+        self._hyper_bias = MLP(
+            hidden_shapes=[], output_shape=output_shape, act="", bias=False
+        )
+        self._hyper_gate = MLP(hidden_shapes=[], output_shape=output_shape, act="")
 
     def __call__(self, x, t):
         t = jnp.array(t, dtype=float).reshape(-1, 1)
-        return self._layer(x) * jax.nn.sigmoid(self._hyper_gate(t)) + self._hyper_bias(t)
+        return self._layer(x) * jax.nn.sigmoid(self._hyper_gate(t)) + self._hyper_bias(
+            t
+        )
 
 
 def get_timestep_embedding(timesteps, embedding_dim=128):
     """
-      From Fairseq.
-      Build sinusoidal embeddings.
-      This matches the implementation in tensor2tensor, but differs slightly
-      from the description in Section 3.5 of "Attention Is All You Need".
-      https://github.com/pytorch/fairseq/blob/master/fairseq/modules/sinusoidal_positional_embedding.py
+    From Fairseq.
+    Build sinusoidal embeddings.
+    This matches the implementation in tensor2tensor, but differs slightly
+    from the description in Section 3.5 of "Attention Is All You Need".
+    https://github.com/pytorch/fairseq/blob/master/fairseq/modules/sinusoidal_positional_embedding.py
     """
     half_dim = embedding_dim // 2
     emb = math.log(10000) / (half_dim - 1)
@@ -243,29 +255,34 @@ def get_timestep_embedding(timesteps, embedding_dim=128):
     emb = timesteps * jnp.expand_dims(emb, 0)
     emb = jnp.concatenate([jnp.sin(emb), jnp.cos(emb)], -1)
     if embedding_dim % 2 == 1:  # zero pad
-        emb = jnp.pad(emb, [0,1])
+        emb = jnp.pad(emb, [0, 1])
 
     return emb
 
 
 @dataclass
 class ConcatEmbed(hk.Module):
-    def __init__(self, output_shape, encoder_layers=[16], pos_dim=16, decoder_layers=[128,128], act='lrelu'):
+    def __init__(
+        self,
+        output_shape,
+        encoder_layers=[16],
+        pos_dim=16,
+        decoder_layers=[128, 128],
+        act="lrelu",
+    ):
         super().__init__()
         self.temb_dim = pos_dim
         t_enc_dim = pos_dim * 2
 
-        self.net = MLP(hidden_shapes=decoder_layers,
-                       output_shape=output_shape,
-                       act=act)
+        self.net = MLP(hidden_shapes=decoder_layers, output_shape=output_shape, act=act)
 
-        self.t_encoder = MLP(hidden_shapes=encoder_layers,
-                             output_shape=t_enc_dim,
-                             act=act)
+        self.t_encoder = MLP(
+            hidden_shapes=encoder_layers, output_shape=t_enc_dim, act=act
+        )
 
-        self.x_encoder = MLP(hidden_shapes=encoder_layers,
-                             output_shape=t_enc_dim,
-                             act=act)
+        self.x_encoder = MLP(
+            hidden_shapes=encoder_layers, output_shape=t_enc_dim, act=act
+        )
 
     def __call__(self, x, t):
         t = jnp.array(t, dtype=float).reshape(-1, 1)
@@ -277,5 +294,5 @@ class ConcatEmbed(hk.Module):
         xemb = self.x_encoder(x)
         temb = jnp.broadcast_to(temb, [xemb.shape[0], *temb.shape[1:]])
         h = jnp.concatenate([xemb, temb], -1)
-        out = self.net(h) 
+        out = self.net(h)
         return out
