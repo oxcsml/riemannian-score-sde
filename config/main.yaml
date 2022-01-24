@@ -14,9 +14,15 @@ defaults:
   - optim: adam
   - scheduler: rcosine
 
+  - job
+  - launcher: local
+
   # enable color logging
+  - override hydra/launcher: submitit_local
   - override hydra/hydra_logging: colorlog
   - override hydra/job_logging: colorlog
+
+now: ${now:%Y-%m-%d}/${now:%H-%M-%S}
 
 seed: 0
 PROJECT_NAME: score_sde
@@ -25,3 +31,6 @@ work_dir: ${hydra:runtime.cwd}
 # path to folder with data
 data_dir: ${work_dir}/data/
 ckpt_dir: ckpt
+
+logdir: ${work_dir}/results
+# rundir: ${dataset.name}/${model.name}

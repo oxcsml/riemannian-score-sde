@@ -5,6 +5,7 @@ import numpy as np
 import hydra
 from omegaconf import DictConfig, OmegaConf
 
+
 class NoneHydra:
     def __init__(self, *args, **kwargs):
         pass
@@ -37,7 +38,7 @@ def partialclass(cls, *args, **kwds):
 
 
 def partialfunction(func, *args, **kwargs):
-    print('partialfunction')
+    print("partialfunction")
     print(func)
     print(args)
     print(kwargs)
