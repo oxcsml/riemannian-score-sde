@@ -1,0 +1,5 @@
+csv:
+  _target_: score_sde.utils.loggers_pl.CSVLogger
+  save_dir: logs
+  name: ""
+  # version: ""

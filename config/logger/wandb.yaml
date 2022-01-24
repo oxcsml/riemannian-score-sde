@@ -1,0 +1,8 @@
+wandb:
+    _target_: score_sde.utils.loggers_pl.WandbLogger
+    save_dir: ${logs_dir}
+    name: ${str:${seed}}
+    group: ${name}_${hydra:job.override_dirname}
+    entity: oxcsml
+    project: diffusion_manifold
+    offline: False
