@@ -1,2 +1,0 @@
-# @package hydra.launcher
-name: ${hydra.job.name}
