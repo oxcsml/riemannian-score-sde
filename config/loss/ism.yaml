@@ -1,4 +1,5 @@
-defaults:
-  - base
-ism_loss: true
-hutchinson_type: None
+_target_: score_sde.losses.get_ema_loss_step_fn
+loss_fn:
+  _target_: riemannian_score_sde.losses.get_ism_loss_fn
+  reduce_mean: true
+  likelihood_weighting: true

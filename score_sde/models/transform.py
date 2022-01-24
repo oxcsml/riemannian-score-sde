@@ -34,22 +34,13 @@ class ComposeTransform(Transform):
         self.parts = parts
 
     def __call__(self, x):
-        print('call')
         for part in self.parts:
-            print(part)
-            print('x', x[0])
             x = part(x)
-            print('y', x[0])
-            print('x prime', part.inv(x)[0])
         return x
 
     def inv(self, y):
-        print('inv')
-        print(y[0])
         for part in self.parts[::-1]:
-            print(part)
             y = part.inv(y)
-            print(y[0])
         return y
 
     def log_abs_det_jacobian(self, x, y):

@@ -2,7 +2,8 @@ from functools import partial
 from pathlib import Path
 import logging
 import hydra
-from hydra.utils import instantiate, get_class
+from hydra.utils import instantiate, get_class, call
+import omegaconf
 
 import jax
 from jax import numpy as jnp
@@ -14,6 +15,7 @@ from score_sde.utils import TrainState, save, restore
 from score_sde.sampling import EulerMaruyamaManifoldPredictor, get_pc_sampler
 from score_sde.likelihood import get_likelihood_fn
 from score_sde.utils.vis import plot_and_save
+from score_sde.models import get_score_fn
 
 log = logging.getLogger(__name__)
 
@@ -37,7 +39,9 @@ def run(cfg):
 
     def score_model(x, t):
         output_shape = get_class(cfg.generator._target_).output_shape(model_manifold)
-        score = instantiate(cfg.generator, cfg.architecture, output_shape, manifold=model_manifold)
+        score = instantiate(
+            cfg.generator, cfg.architecture, output_shape, manifold=model_manifold
+        )
         return score(x, t)
 
     score_model = hk.transform_with_state(score_model)
@@ -48,42 +52,91 @@ def run(cfg):
     log.info("Stage : Instantiate optimiser")
 
     schedule_fn = instantiate(cfg.scheduler)
-    optimiser = optax.chain(instantiate(cfg.optim), optax.scale_by_schedule(schedule_fn))
+    optimiser = optax.chain(
+        instantiate(cfg.optim), optax.scale_by_schedule(schedule_fn)
+    )
     opt_state = optimiser.init(params)
 
     rng, next_rng = jax.random.split(rng)
     train_state = TrainState(
-        opt_state=opt_state, model_state=state, step=0, params=params, ema_rate=cfg.ema_rate, params_ema=params, rng=next_rng
+        opt_state=opt_state,
+        model_state=state,
+        step=0,
+        params=params,
+        ema_rate=cfg.ema_rate,
+        params_ema=params,
+        rng=next_rng,
     )
 
-    train_step_fn = instantiate(cfg.loss, sde=sde, model=score_model, optimizer=optimiser)
+    loss_cfg = dict(cfg.loss)
+    if ("loss_fn" in loss_cfg) and isinstance(
+        loss_cfg["loss_fn"], omegaconf.DictConfig
+    ):
+        loss_cfg["loss_fn"] = call(
+            cfg.loss.loss_fn, sde=sde, model=score_model, eps=cfg.eps, train=True
+        )
+
+    train_step_fn = instantiate(
+        loss_cfg,
+        optimizer=optimiser,
+        train=True,
+    )
+
     train_step_fn = jax.jit(train_step_fn)
 
     log.info("Stage : Training")
 
     for i in range(cfg.steps):
-        batch = {'data': transform.inv(next(dataset))}
+        batch = {"data": transform.inv(next(dataset))}
         rng, next_rng = jax.random.split(rng)
         (rng, train_state), loss = train_step_fn((next_rng, train_state), batch)
         if i % 50 == 0:
             print(f"{i:4d}: {loss:.3f}")
 
-    # log.info("Stage : Testing")
+    log.info("Stage : Testing")
 
     x0 = next(dataset)
     ## p_0 (backward)
     t = cfg.eps
-    sampler = jax.jit(get_pc_sampler(sde, score_model, (cfg.batch_size, model_manifold.dim), predictor=EulerMaruyamaManifoldPredictor, corrector=None, continuous=True, forward=False, eps=cfg.eps))
+    sampler = jax.jit(
+        get_pc_sampler(
+            sde.reverse(
+                get_score_fn(
+                    sde, score_model, train_state.params_ema, train_state.model_state
+                )
+            ),
+            100,
+            predictor="EulerMaruyamaManifoldPredictor",
+            corrector=None,
+            eps=cfg.eps,
+        )
+    )
     rng, next_rng = jax.random.split(rng)
-    x, _ = sampler(next_rng, train_state, t=t)
+    x, _ = sampler(next_rng, sde.sample_limiting_distribution(rng, x0.shape))
     y = transform(x)
-    likelihood_fn = get_likelihood_fn(sde, score_model, hutchinson_type='None', bits_per_dimension=False, eps=cfg.eps)
+
+    likelihood_fn = get_likelihood_fn(
+        sde,
+        get_score_fn(
+            sde,
+            score_model,
+            train_state.params_ema,
+            train_state.model_state,
+            continuous=True,
+        ),
+        hutchinson_type="None",
+        bits_per_dimension=False,
+        eps=cfg.eps,
+    )
     # TODO: take into account logdetjac of transform
-    logp, z, nfe = likelihood_fn(rng, train_state, transform.inv(y))
+    log.info("Running likelihood")
+    logp, z, nfe = likelihood_fn(rng, transform.inv(y))
+    print(logp)
     print(nfe)
     logp -= transform.log_abs_det_jacobian(x, y)
     prob = jnp.exp(logp)
-    Path('logs/images').mkdir(parents=True, exist_ok=True)  # Create logs dir
+    print(prob)
+    Path("logs/images").mkdir(parents=True, exist_ok=True)  # Create logs dir
     plot_and_save(None, y, prob, None, out=f"logs/images/x0_backw.jpg")
-    prob = jnp.exp(dataset.log_prob(x0)) if hasattr(dataset, 'log_prob') else None
+    prob = jnp.exp(dataset.log_prob(x0)) if hasattr(dataset, "log_prob") else None
     plot_and_save(None, x0, prob, None, out=f"logs/images/x0_true.jpg")
