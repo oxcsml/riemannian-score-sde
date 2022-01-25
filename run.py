@@ -49,6 +49,8 @@ def run(cfg):
             (rng, train_state), loss = train_step_fn((next_rng, train_state), batch)
             logger.log_metrics({"train/loss": loss}, step)
             t.set_description(f"Loss: {loss:.3f}")
+            if jnp.isnan(loss).any():
+                raise ValueError("Loss is nan")
 
             if step > 0 and step % cfg.val_freq == 0:
                 # print(f"{step:4d}: {loss:.3f}")
