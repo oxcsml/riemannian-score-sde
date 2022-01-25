@@ -18,13 +18,9 @@ defaults:
 manifold:
   dim: 2
 
-sde:
-  beta_0: 1.
-  beta_f: 1.
-
 batch_size: 512
 warmup_steps: 100
 steps: 1000
-val_freq: inf
+val_freq: !!float inf
 ema_rate: 0.999
 eps: 1e-3
