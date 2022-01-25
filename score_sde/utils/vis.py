@@ -51,3 +51,22 @@ def plot_and_save(
     plt.colorbar(cax)
     plt.savefig(out, dpi=dpi, bbox_inches="tight", transparent=True)
     plt.close(fig)
+
+
+def setup_sphere_plot(size=10, dpi=300, elev=0, azim=45):
+    fig = plt.figure(figsize=(size, size))
+    ax = fig.add_subplot(111, projection="3d")
+    ax = remove_background(ax)
+    fig.subplots_adjust(left=-0.2, bottom=-0.2, right=1.2, top=1.2, wspace=0, hspace=0)
+    # ax.view_init(elev=30, azim=45)
+    ax.view_init(elev=elev, azim=azim)
+    sphere = visualization.Sphere()
+    sphere.draw(ax, color="red", marker=".")
+
+    return fig, ax
+
+
+def scatter_earth(x, ax=None, s=50, color="green"):
+    if ax is None:
+        ax = setup_sphere_plot()
+    cax = ax.scatter(x[:, 0], x[:, 1], -x[:, 2], s=s, color=color)
