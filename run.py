@@ -32,7 +32,8 @@ def run(cfg):
     log.info("Stage : Instantiate dataset")
 
     rng, next_rng = jax.random.split(rng)
-    dataset = instantiate(cfg.dataset, rng=next_rng, manifold=data_manifold)
+    # dataset = instantiate(cfg.dataset, rng=next_rng, manifold=data_manifold)
+    dataset = instantiate(cfg.dataset, rng=next_rng)
     x = transform.inv(next(dataset))
 
     log.info("Stage : Instantiate model")

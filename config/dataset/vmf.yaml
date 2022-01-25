@@ -4,3 +4,4 @@ batch_dims:
   - ${batch_size}
 mu: [1., 0., 0.]
 kappa: 15.  
+manifold: ${manifold}

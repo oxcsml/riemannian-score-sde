@@ -3,3 +3,4 @@ _convert_: partial
 batch_dims: 
   - ${batch_size}
 mu: [1., 0., 0.]
+manifold: ${manifold}

@@ -8,3 +8,4 @@ mu:
 kappa: 
   - 15.
   - 15.
+manifold: ${manifold}
