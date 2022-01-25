@@ -3,3 +3,4 @@ loss_fn:
   _target_: riemannian_score_sde.losses.get_dsm_loss_fn
   reduce_mean: true
   likelihood_weighting: true
+  eps: ${eps}

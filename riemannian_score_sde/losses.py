@@ -98,7 +98,7 @@ def get_ism_loss_fn(
             params,
             states,
             train=train,
-            continuous=continuous,
+            continuous=True,
             return_state=True,
         )
         x_0 = batch["data"]
