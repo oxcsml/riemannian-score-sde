@@ -7,8 +7,7 @@ defaults:
   - experiment: s2_toy
 
   # - callbacks: wandb # set this to null if you don't want to use callbacks
-  # - logger: wandb # set logger here or use command line (e.g. `python run.py logger=wandb`)
-  # - hydra: default
+  - logger: csv
   # - checkpoint: val_loss
 
   - optim: adam
@@ -20,6 +19,8 @@ defaults:
 
 now: ${now:%Y-%m-%d}/${now:%H-%M-%S}
 
+resume: false
+mode: all
 seed: 0
 PROJECT_NAME: score_sde
 work_dir: ${hydra:runtime.cwd}
@@ -27,6 +28,7 @@ work_dir: ${hydra:runtime.cwd}
 # path to folder with data
 data_dir: ${work_dir}/data/
 ckpt_dir: ckpt
+logs_dir: logs
 
 logdir: ${work_dir}/results
 # rundir: ${dataset.name}/${model.name}
