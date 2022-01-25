@@ -1,6 +1,9 @@
+import jax
 import jax.numpy as jnp
 
 from score_sde.sde import SDE, RSDE
+from score_sde.sde import VPSDE as VPSDEBase, RSDE as RSDEBase
+from score_sde.utils import batch_mul
 
 
 class Brownian(SDE):
@@ -95,3 +98,30 @@ class ReverseBrownian(Brownian):
 
     def reverse(self):
         return self.sde
+
+
+class VPSDE(VPSDEBase):
+    def __init__(self, manifold, tf: float, t0: float = 0, beta_0=0.1, beta_f=20):
+        super().__init__(tf, t0, beta_0, beta_f)
+        self.manifold = manifold
+
+    def marginal_sample(self, rng, x, t):
+        mean, std = self.marginal_prob(x, t)
+        z = jax.random.normal(rng, x.shape)
+        return mean + batch_mul(std, z)
+
+    def grad_marginal_log_prob(self, x0, x, t, **kwargs):
+        mean, std = self.marginal_prob(x0, t)
+        std = jnp.expand_dims(std, -1)
+        score = - 1 / (std ** 2) * (x - mean)
+        logp = None
+        return logp, score
+
+    def reverse(self, score_fn):
+        return RSDE(self, score_fn)
+
+
+class RSDE(RSDEBase):
+    def __init__(self, sde: SDE, score_fn):
+        super().__init__(sde, score_fn)
+        self.manifold = sde.manifold

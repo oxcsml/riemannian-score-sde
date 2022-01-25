@@ -92,7 +92,7 @@ def get_score_fn(
                 # For VP-trained models, t=0 corresponds to the lowest noise level
                 # The maximum value of time embedding is assumed to 999 for
                 # continuously-trained models.
-                labels = t * 999
+                labels = t * 999  # TODO: remove?
                 model_out, new_state = model.apply(params, state, rng, x=x, t=labels)
                 std = sde.marginal_prob(jnp.zeros_like(x), t)[1]
             else:

@@ -1,0 +1,8 @@
+# @package _global_
+
+defaults:
+  - /sde: vp
+  - /transform: stereo
+  # - /loss: dsm_euc
+  - /loss: dsm
+  - /generator: ambient

@@ -18,6 +18,62 @@ from score_sde.likelihood import div_noise, get_drift_fn, get_div_fn
 from score_sde.sampling import get_pc_sampler
 
 
+def get_dsm_loss_fn(
+    sde: SDE,
+    model: ParametrisedScoreFunction,
+    train: bool = True,
+    reduce_mean: bool = True,
+    likelihood_weighting: bool = True,
+    eps: float = 1e-3,
+):
+    reduce_op = (
+        jnp.mean
+        if reduce_mean
+        else lambda *args, **kwargs: 0.5 * jnp.sum(*args, **kwargs)
+    )
+
+    def loss_fn(
+        rng: jax.random.KeyArray, params: dict, states: dict, batch: dict
+    ) -> Tuple[float, dict]:
+        score_fn = get_score_fn(
+            sde,
+            model,
+            params,
+            states,
+            train=train,
+            continuous=True,
+            return_state=True,
+        )
+        x_0 = batch["data"]
+
+        rng, step_rng = random.split(rng)
+        # uniformly sample from SDE timeframe
+        t = random.uniform(
+            step_rng, (x_0.shape[0],), minval=sde.t0 + eps, maxval=sde.tf
+        )
+        rng, step_rng = random.split(rng)
+
+        # sample p(x_t | x_0)
+        x_t = sde.marginal_sample(step_rng, x_0, t)
+        # compute approximate score at x_t
+        score, new_model_state = score_fn(x_t, t, rng=step_rng)
+        # compute $\nabla \log p(x_t | x_0)$
+        logp_grad = sde.grad_marginal_log_prob(x_0, x_t, t)[1]
+
+        # compute $E_{p{x_0}}[|| s_\theta(x_t, t) - \nabla \log p(x_t | x_0)||^2]$
+        losses = jnp.square(score - logp_grad)
+        losses = reduce_op(losses.reshape((losses.shape[0], -1)), axis=-1)
+
+        if likelihood_weighting:
+            g2 = sde.coefficients(jnp.zeros_like(x_0), t)[1] ** 2
+            losses = losses * g2
+
+        loss = jnp.mean(losses)
+        return loss, new_model_state
+
+    return loss_fn
+
+
 def get_ism_loss_fn(
     sde: SDE,
     model: ParametrisedScoreFunction,

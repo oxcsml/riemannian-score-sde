@@ -8,10 +8,7 @@ name: fire
 defaults:
   - /dataset: fire
   - /manifold: nsphere
-  - /sde: brownian
-  - /transform: id
-  - /loss: dsm
-  - /generator: div_free
+  - /model: dsm
   - /architecture: concat
 
 data_dir: /data/ziz/not-backed-up/datasets-ziz-all/earth_datasets

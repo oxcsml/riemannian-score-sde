@@ -210,7 +210,6 @@ class RSDE(SDE):
 class VPSDE(SDE):
     def __init__(self, tf: float, t0: float = 0, beta_0=0.1, beta_f=20):
         super().__init__(tf, t0)
-
         self.beta_0 = beta_0
         self.beta_f = beta_f
 

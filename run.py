@@ -10,6 +10,7 @@ from jax import numpy as jnp
 import numpy as np
 import haiku as hk
 import optax
+from sklearn import manifold
 from tqdm import tqdm
 
 from score_sde.utils import TrainState, save, restore
@@ -78,9 +79,9 @@ def run(cfg):
         logp = 0.
         for step in range(K):
             x = next(dataset)
-            y = transform.inv(x)
-            logp_step, _, _ = likelihood_fn(rng, x)
-            logp_step -= transform.log_abs_det_jacobian(x, y)
+            z = transform.inv(x)
+            logp_step, _, _ = likelihood_fn(rng, z)
+            logp_step -= transform.log_abs_det_jacobian(z, x)
             logp += logp_step.mean()
         logp /= K
 
@@ -91,13 +92,13 @@ def run(cfg):
         dataset = eval_ds if stage == "eval" else test_ds
 
         x0 = next(dataset)
+        z0 = transform.inv(x0)
         ## p_0 (backward)
-        t = cfg.eps
         sampler = jax.jit(
             get_pc_sampler(
                 sde.reverse(
                     get_score_fn(
-                        sde, score_model, train_state.params_ema, train_state.model_state
+                        sde, score_model, train_state.params_ema, train_state.model_state, continuous=True
                     )
                 ),
                 100,
@@ -107,7 +108,7 @@ def run(cfg):
             )
         )
         rng, next_rng = jax.random.split(rng)
-        z, _ = sampler(next_rng, sde.sample_limiting_distribution(rng, x0.shape))
+        z, _ = sampler(next_rng, sde.sample_limiting_distribution(rng, z0.shape))
         x = transform(z)
         log.info("Running likelihood")
         likelihood_fn = get_likelihood_fn(
@@ -151,7 +152,7 @@ def run(cfg):
     # dataset = instantiate(cfg.dataset, rng=next_rng, manifold=data_manifold)
     dataset = instantiate(cfg.dataset, rng=next_rng)
     train_ds, eval_ds, test_ds =  dataset, dataset, dataset
-    x = transform.inv(next(dataset))
+    z = transform.inv(next(dataset))
 
     log.info("Stage : Instantiate model")
 
@@ -165,7 +166,7 @@ def run(cfg):
     score_model = hk.transform_with_state(score_model)
 
     rng, next_rng = jax.random.split(rng)
-    params, state = score_model.init(rng=next_rng, x=x, t=0)
+    params, state = score_model.init(rng=next_rng, x=z, t=0)
 
     log.info("Stage : Instantiate optimiser")
 

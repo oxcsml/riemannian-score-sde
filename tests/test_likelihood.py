@@ -10,8 +10,7 @@ from jax import numpy as jnp
 import numpy as np
 import haiku as hk
 
-from score_sde.utils import TrainState, save, restore
-from score_sde.sampling import EulerMaruyamaManifoldPredictor, get_pc_sampler
+import geomstats.backend as gs
 from score_sde.likelihood import get_likelihood_fn
 from score_sde.models import get_score_fn
 
@@ -31,7 +30,7 @@ def main(cfg):
     rng = jax.random.PRNGKey(cfg.seed)
     rng, next_rng = jax.random.split(rng)
     dataset = instantiate(cfg.dataset, rng=next_rng, manifold=data_manifold)
-    x = next(dataset)
+    z = transform.inv(next(dataset))
 
 
     def score_model(x, t, div=False, hutchinson_type='None'):
@@ -60,27 +59,18 @@ def main(cfg):
             eps=cfg.eps,
         )
 
-        y = transform.inv(x)
-        logp, z, nfe = likelihood_fn(rng, x)
-        logp -= transform.log_abs_det_jacobian(x, y)
-        return logp, z, nfe
-
+        z = transform.inv(x)
+        logp, zT, nfe = likelihood_fn(rng, z)
+        logp -= transform.log_abs_det_jacobian(z, x)
+        return logp, zT, nfe
 
     rng, next_rng = jax.random.split(rng)
-    params, state = score_model.init(rng=next_rng, x=x, t=0)
-    # out, _ = score_model.apply(params, state, next_rng, x=x, t=0)
-    # print(out.shape)
-
-    rng, step_rng = jax.random.split(rng)
-    score = lambda x, t: score_model.apply(params, state, next_rng, x=x, t=t, div=False)[0]
-    div = lambda x, t, hutchinson_type: score_model.apply(params, state, next_rng, x=x, t=t, div=True, hutchinson_type=hutchinson_type)[0]
-
+    params, state = score_model.init(rng=next_rng, x=z, t=0)
 
     N = 500
     eps = 0.
     theta = jnp.linspace(eps, jnp.pi - eps, N // 2)
     phi = jnp.linspace(eps, 2 * jnp.pi - eps, N)
-
 
     theta, phi = jnp.meshgrid(theta, phi)
     theta = theta.reshape(-1, 1)
@@ -91,19 +81,14 @@ def main(cfg):
         jnp.cos(theta)
     ], axis=-1)
 
-    logp, z, nfe = loglike(params, state, xs)
-    belongs_manifold = model_manifold.belongs(z).all()
-    print("belongs_manifold", belongs_manifold)
-
+    logp, zT, nfe = loglike(params, state, xs)
+    print("nfe", nfe)
+    belongs_manifold = model_manifold.belongs(zT, atol=gs.atol/2)
+    print("belongs_manifold", jnp.sum(belongs_manifold) / belongs_manifold.shape[0])
 
     prob = jnp.exp(logp)
-    # volume = 4 * math.pi * radius ** 2
     volume = (2 * np.pi) * np.pi
-    # lambda_x = jnp.ones_like(theta)
     lambda_x = jnp.sin(theta).reshape((-1))
-    print(prob.shape)
-    print(lambda_x.shape)
-    # Z = batch_mul(prob, lambda_x).mean() * volume
     Z = (prob * lambda_x).mean() * volume
     print("Z", Z.item())
 

@@ -68,21 +68,22 @@ def get_dsm_loss_fn(
             step_rng, (x_0.shape[0],), minval=sde.t0 + eps, maxval=sde.tf
         )
         rng, step_rng = random.split(rng)
-
-        # sample p(x_t | x_0)
-        x_t = sde.marginal_sample(step_rng, x_0, t)
-        # compute approximate score at x_t
+        z = random.normal(step_rng, x_0.shape)
+        mean, std = sde.marginal_prob(x_0, t)
+        # reparametrised sample x_t|x_0 = mean + std * z with z ~ N(0,1)
+        x_t = mean + batch_mul(std, z)
         score, new_model_state = score_fn(x_t, t, rng=step_rng)
-        # compute $\nabla \log p(x_t | x_0)$
-        logp_grad = sde.grad_marginal_log_prob(x_0, x_t, t)[1]
+        # grad log p(x_t|x_0) = - 1/std^2 (x_t - mean) = - z / std
 
-        # compute $E_{p{x_0}}[|| s_\theta(x_t, t) - \nabla \log p(x_t | x_0)||^2]$
-        losses = jnp.square(score - logp_grad)
-        losses = reduce_op(losses.reshape((losses.shape[0], -1)), axis=-1)
-
-        if likelihood_weighting:
+        if not likelihood_weighting:
+            losses = jnp.square(batch_mul(score, std) + z)
+            # losses = 1/std^2 * DSM(x_t, x_0)
+            losses = reduce_op(losses.reshape((losses.shape[0], -1)), axis=-1)
+        else:
             g2 = sde.coefficients(jnp.zeros_like(x_0), t)[1] ** 2
-            losses = losses * g2
+            # losses = DSM(x_t, x_0)
+            losses = jnp.square(score + batch_mul(z, 1.0 / std))
+            losses = reduce_op(losses.reshape((losses.shape[0], -1)), axis=-1) * g2
 
         loss = jnp.mean(losses)
         return loss, new_model_state
