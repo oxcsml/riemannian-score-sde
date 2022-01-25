@@ -1,0 +1,31 @@
+# @package _global_
+
+# to execute this experiment run:
+# python main.py experiment=s2_toy
+
+name: earthquake
+
+defaults:
+  - /dataset: earthquake
+  - /manifold: nsphere
+  - /sde: brownian
+  - /transform: id
+  - /loss: dsm
+  - /generator: div_free
+  - /architecture: concat
+
+data_dir: /data/ziz/not-backed-up/datasets-ziz-all/earth_datasets
+
+manifold:
+  dim: 2
+
+sde:
+  beta_0: 1.
+  beta_f: 1.
+
+batch_size: 512
+warmup_steps: 100
+steps: 800
+val_freq: 100
+ema_rate: 0.999
+eps: 1e-3
