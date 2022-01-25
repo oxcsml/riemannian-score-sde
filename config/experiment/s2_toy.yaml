@@ -24,5 +24,6 @@ sde:
 batch_size: 512
 warmup_steps: 100
 steps: 800
+val_freq: 100
 ema_rate: 0.999
 eps: 1e-3

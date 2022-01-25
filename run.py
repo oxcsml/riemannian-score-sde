@@ -10,6 +10,7 @@ from jax import numpy as jnp
 import numpy as np
 import haiku as hk
 import optax
+from tqdm import tqdm
 
 from score_sde.utils import TrainState, save, restore
 from score_sde.utils.loggers_pl import LoggerCollection
@@ -19,6 +20,7 @@ from score_sde.utils.vis import plot_and_save
 from score_sde.models import get_score_fn
 
 log = logging.getLogger(__name__)
+
 
 def run(cfg):
     def train(train_state):
@@ -39,20 +41,52 @@ def run(cfg):
         train_step_fn = jax.jit(train_step_fn)
 
         rng = train_state.rng
-
-        for step in range(cfg.steps):
+        t = tqdm(range(cfg.steps), total=cfg.steps, bar_format="{desc}{bar}{r_bar}", miniters=50)
+        for step in t:
             batch = {"data": transform.inv(next(train_ds))}
             rng, next_rng = jax.random.split(rng)
             (rng, train_state), loss = train_step_fn((next_rng, train_state), batch)
             logger.log_metrics({"train/loss": loss}, step)
-            if step % 50 == 0:
-                print(f"{step:4d}: {loss:.3f}")
+            t.set_description(f"Loss: {loss:.3f}")
+
+            if step % cfg.val_freq == 0:
+                # print(f"{step:4d}: {loss:.3f}")
                 save(ckpt_path, train_state)
-                # evaluate(train_state, "eval", step)
+                evaluate(train_state, "eval", step)
 
         return train_state
 
     def evaluate(train_state, stage, step):
+        rng = jax.random.PRNGKey(cfg.seed)
+        dataset = eval_ds if stage == "eval" else test_ds
+
+        likelihood_fn = get_likelihood_fn(
+            sde,
+            get_score_fn(
+                sde,
+                score_model,
+                train_state.params_ema,
+                train_state.model_state,
+                continuous=True,
+            ),
+            hutchinson_type="None",
+            bits_per_dimension=False,
+            eps=cfg.eps,
+        )
+
+        K = 5
+        logp = 0.
+        for step in range(K):
+            x = next(dataset)
+            y = transform.inv(x)
+            logp_step, _, _ = likelihood_fn(rng, x)
+            logp_step -= transform.log_abs_det_jacobian(x, y)
+            logp += logp_step.mean()
+        logp /= K
+
+        logger.log_metrics({f"{stage}/logp": logp.mean()}, step)
+
+    def generate_plots(train_state, stage):
         rng = jax.random.PRNGKey(cfg.seed)
         dataset = eval_ds if stage == "eval" else test_ds
 
@@ -73,9 +107,9 @@ def run(cfg):
             )
         )
         rng, next_rng = jax.random.split(rng)
-        x, _ = sampler(next_rng, sde.sample_limiting_distribution(rng, x0.shape))
-        y = transform(x)
-
+        z, _ = sampler(next_rng, sde.sample_limiting_distribution(rng, x0.shape))
+        x = transform(z)
+        log.info("Running likelihood")
         likelihood_fn = get_likelihood_fn(
             sde,
             get_score_fn(
@@ -89,17 +123,11 @@ def run(cfg):
             bits_per_dimension=False,
             eps=cfg.eps,
         )
-        # TODO: take into account logdetjac of transform
-        log.info("Running likelihood")
-        logp, z, nfe = likelihood_fn(rng, transform.inv(y))
-        # print(logp)
+        logp, z, nfe = likelihood_fn(rng, transform.inv(x))
         print(nfe)
-        logp -= transform.log_abs_det_jacobian(x, y)
-        logger.log_metrics({f"{stage}/logp": logp.mean()}, step)
-        prob = jnp.exp(logp)
-        # print(prob)
+        logp -= transform.log_abs_det_jacobian(z, x)
         Path("logs/images").mkdir(parents=True, exist_ok=True)  # Create logs dir
-        plot_and_save(None, y, prob, None, out=f"logs/images/x0_backw.jpg")
+        plot_and_save(None, x, jnp.exp(logp), None, out=f"logs/images/x0_backw.jpg")
         prob = jnp.exp(dataset.log_prob(x0)) if hasattr(dataset, "log_prob") else None
         plot_and_save(None, x0, prob, None, out=f"logs/images/x0_true.jpg")
 
@@ -166,5 +194,6 @@ def run(cfg):
     if cfg.mode == "test" or cfg.mode == "all": 
         log.info("Stage : Test")
         evaluate(train_state, "test", cfg.steps)
+        generate_plots(train_state, "test")
     logger.save()
    
