@@ -13,12 +13,8 @@ defaults:
 
   - optim: adam
   - scheduler: rcosine
-
-  - job
-  - launcher: local
-
+  
   # enable color logging
-  - override hydra/launcher: submitit_local
   - override hydra/hydra_logging: colorlog
   - override hydra/job_logging: colorlog
 

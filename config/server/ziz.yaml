@@ -19,7 +19,7 @@ hydra:
     partition: ziz-gpu
     max_num_timeout: 0
     array_parallelism: 32
-    setup: ["export XLA_FLAGS='--xla_gpu_cuda_data_dir=/opt/cuda'", "export PATH=/opt/cuda/bin/:$PATH", "export LD_LIBRARY_PATH=/opt/cuda-10.2/lib64:${LD_LIBRARY_PATH}", "export XLA_PYTHON_CLIENT_PREALLOCATE=false"]
+    setup: ["export XLA_FLAGS='--xla_gpu_cuda_data_dir=/opt/cuda'", "export PATH=/opt/cuda/bin/:$PATH", "export LD_LIBRARY_PATH=/opt/cuda-10.2/lib64:$LD_LIBRARY_PATH", "export XLA_PYTHON_CLIENT_PREALLOCATE=false"]
     executable: /data/localhost/not-backed-up/${oc.env:USER}/${PROJECT_NAME}/venv/bin/python
     additional_parameters: {
       "wckey": "bigbayes_project",
