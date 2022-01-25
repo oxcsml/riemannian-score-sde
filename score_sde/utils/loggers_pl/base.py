@@ -23,7 +23,7 @@ from typing import Any, Callable, Dict, Iterable, List, Mapping, MutableMapping,
 from weakref import ReferenceType
 
 import numpy as np
-import torch
+# import torch
 
 # import pytorch_lightning as pl
 # from pytorch_lightning.callbacks.model_checkpoint import ModelCheckpoint
@@ -276,7 +276,7 @@ class LightningLoggerBase(ABC):
             # convert relevant np scalars to python types first (instead of str)
             if isinstance(params[k], (np.bool_, np.integer, np.floating)):
                 params[k] = params[k].item()
-            elif type(params[k]) not in [bool, int, float, str, torch.Tensor]:
+            elif type(params[k]) not in [bool, int, float, str]: #, torch.Tensor]:
                 params[k] = str(params[k])
         return params
 
