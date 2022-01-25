@@ -74,7 +74,7 @@ def run(cfg):
             eps=cfg.eps,
         )
 
-        K = 5
+        K = len(dataset) if hasattr(dataset, "__len__") else 5
         logp = 0.
         for step in range(K):
             x = next(dataset)
