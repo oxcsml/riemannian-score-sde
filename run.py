@@ -50,16 +50,16 @@ def run(cfg):
             logger.log_metrics({"train/loss": loss}, step)
             t.set_description(f"Loss: {loss:.3f}")
 
-            if step % cfg.val_freq == 0:
+            if step > 0 and step % cfg.val_freq == 0:
                 # print(f"{step:4d}: {loss:.3f}")
                 save(ckpt_path, train_state)
-                evaluate(train_state, "eval", step)
+                evaluate(train_state, "val", step)
 
         return train_state
 
-    def evaluate(train_state, stage, step):
+    def evaluate(train_state, stage, step=None):
         rng = jax.random.PRNGKey(cfg.seed)
-        dataset = eval_ds if stage == "eval" else test_ds
+        dataset = eval_ds if stage == "val" else test_ds
 
         likelihood_fn = get_likelihood_fn(
             sde,
@@ -77,7 +77,7 @@ def run(cfg):
 
         K = len(dataset) if hasattr(dataset, "__len__") else 5
         logp = 0.
-        for step in range(K):
+        for k in range(K):
             x = next(dataset)
             z = transform.inv(x)
             logp_step, _, _ = likelihood_fn(rng, z)
@@ -195,7 +195,7 @@ def run(cfg):
         train_state = train(train_state)
     if cfg.mode == "test" or cfg.mode == "all": 
         log.info("Stage : Test")
-        evaluate(train_state, "test", cfg.steps)
+        evaluate(train_state, "test")
         generate_plots(train_state, "test")
     logger.save()
    
