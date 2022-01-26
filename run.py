@@ -83,13 +83,10 @@ def run(cfg):
             eps=cfg.eps,
         )
 
-<<<<<<< HEAD
         logp = 0.0
         N = 0
-        # for k in range(K):
         if hasattr(dataset, "__len__"):
             for x in dataset:
-                # x = next(dataset)
                 z = transform.inv(x)
                 logp_step, _, _ = likelihood_fn(rng, z)
                 logp_step -= transform.log_abs_det_jacobian(z, x)
@@ -105,18 +102,6 @@ def run(cfg):
                 logp_step -= transform.log_abs_det_jacobian(z, x)
                 logp += logp_step.sum()
                 N += logp_step.shape[0]
-=======
-        logp = 0.
-        N = 0
-        for x in dataset:
-            z = transform.inv(x)
-            logp_step, _, _ = likelihood_fn(rng, z)
-            logp_step -= transform.log_abs_det_jacobian(z, x)
-            logp += logp_step.sum()
-            N += logp_step.shape[0]
-            if not hasattr(dataset, "__len__") and N > 2000:
-                break
->>>>>>> 50b572e... fix vmf pdf
         logp /= N
 
         logger.log_metrics({f"{stage}/logp": logp.mean()}, step)
