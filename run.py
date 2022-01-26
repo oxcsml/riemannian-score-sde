@@ -14,7 +14,7 @@ from sklearn import manifold
 from tqdm import tqdm
 
 from score_sde.utils import TrainState, save, restore
-from score_sde.utils.loggers_pl import LoggerCollection
+from score_sde.utils.loggers_pl import LoggerCollection, Logger
 from score_sde.sampling import EulerMaruyamaManifoldPredictor, get_pc_sampler
 from score_sde.likelihood import get_likelihood_fn
 from score_sde.utils.vis import plot_and_save
@@ -42,7 +42,12 @@ def run(cfg):
         train_step_fn = jax.jit(train_step_fn)
 
         rng = train_state.rng
-        t = tqdm(range(cfg.steps), total=cfg.steps, bar_format="{desc}{bar}{r_bar}", miniters=50)
+        t = tqdm(
+            range(cfg.steps),
+            total=cfg.steps,
+            bar_format="{desc}{bar}{r_bar}",
+            miniters=50,
+        )
         for step in t:
             batch = {"data": transform.inv(next(train_ds))}
             rng, next_rng = jax.random.split(rng)
@@ -78,7 +83,7 @@ def run(cfg):
         )
 
         # N = len(dataset) if hasattr(dataset, "__len__") else 5
-        logp = 0.
+        logp = 0.0
         N = 0
         # for k in range(K):
         for x in dataset:
@@ -103,7 +108,11 @@ def run(cfg):
             get_pc_sampler(
                 sde.reverse(
                     get_score_fn(
-                        sde, score_model, train_state.params_ema, train_state.model_state, continuous=True
+                        sde,
+                        score_model,
+                        train_state.params_ema,
+                        train_state.model_state,
+                        continuous=True,
                     )
                 ),
                 100,
@@ -142,7 +151,11 @@ def run(cfg):
     run_path = os.getcwd()
     ckpt_path = os.path.join(run_path, cfg.ckpt_dir)
     os.makedirs(ckpt_path, exist_ok=True)
-    logger = LoggerCollection([instantiate(logger_cfg) for logger_cfg in cfg.logger.values()])
+    logger = LoggerCollection(
+        [instantiate(logger_cfg) for logger_cfg in cfg.logger.values()]
+    )
+    Logger.instance().set_logger(logger)
+    # Logger.get() -> returns global logger anywhere from here
 
     # TODO: should sample random seed given a run id?
     rng = jax.random.PRNGKey(cfg.seed)
@@ -156,7 +169,7 @@ def run(cfg):
     rng, next_rng = jax.random.split(rng)
     # dataset = instantiate(cfg.dataset, rng=next_rng, manifold=data_manifold)
     dataset = instantiate(cfg.dataset, rng=next_rng)
-    train_ds, eval_ds, test_ds =  dataset, dataset, dataset
+    train_ds, eval_ds, test_ds = dataset, dataset, dataset
     z = transform.inv(next(dataset))
 
     log.info("Stage : Instantiate model")
@@ -176,7 +189,7 @@ def run(cfg):
     log.info("Stage : Instantiate optimiser")
 
     schedule_fn = instantiate(cfg.scheduler)
-    optimiser = optax.chain(    
+    optimiser = optax.chain(
         instantiate(cfg.optim), optax.scale_by_schedule(schedule_fn)
     )
     opt_state = optimiser.init(params)
@@ -198,9 +211,8 @@ def run(cfg):
     if cfg.mode == "train" or cfg.mode == "all":
         log.info("Stage : Training")
         train_state = train(train_state)
-    if cfg.mode == "test" or cfg.mode == "all": 
+    if cfg.mode == "test" or cfg.mode == "all":
         log.info("Stage : Test")
         evaluate(train_state, "test")
         generate_plots(train_state, "test")
     logger.save()
-   
