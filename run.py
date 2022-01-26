@@ -4,6 +4,7 @@ import logging
 
 from hydra.utils import instantiate, get_class, call
 import omegaconf
+from omegaconf import OmegaConf
 
 import jax
 from jax import numpy as jnp
@@ -165,9 +166,9 @@ def run(cfg):
     run_path = os.getcwd()
     ckpt_path = os.path.join(run_path, cfg.ckpt_dir)
     os.makedirs(ckpt_path, exist_ok=True)
-    logger = LoggerCollection(
-        [instantiate(logger_cfg) for logger_cfg in cfg.logger.values()]
-    )
+    loggers = [instantiate(logger_cfg) for logger_cfg in cfg.logger.values()]
+    logger = LoggerCollection(loggers)
+    logger.log_hyperparams(OmegaConf.to_container(cfg, resolve=True))
     Logger.instance().set_logger(logger)
     # Logger.get() -> returns global logger anywhere from here
 
