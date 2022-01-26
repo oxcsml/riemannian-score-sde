@@ -423,6 +423,10 @@ class LoggerCollection(LightningLoggerBase):
         for logger in self._logger_iterable:
             logger.log_image(*args, **kwargs)
 
+    def log_plot(self, *args, **kwargs) -> None:
+        for logger in self._logger_iterable:
+            logger.log_plot(*args, **kwargs)
+
     def save(self) -> None:
         for logger in self._logger_iterable:
             logger.save()

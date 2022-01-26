@@ -424,6 +424,10 @@ class WandbLogger(LightningLoggerBase):
         metrics = {key: [wandb.Image(img, **kwarg) for img, kwarg in zip(images, kwarg_list)]}
         self.log_metrics(metrics, step)
 
+    def log_plot(self, name, plt, step):
+        self.experiment.log({name: [wandb.Image(plt, caption=step)]}, commit=False)
+        self.experiment.log({name: [wandb.Image(plt, caption=step)]}, commit=True)
+
     @property
     def save_dir(self) -> Optional[str]:
         """Gets the save directory.

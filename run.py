@@ -17,7 +17,7 @@ from score_sde.utils import TrainState, save, restore
 from score_sde.utils.loggers_pl import LoggerCollection, Logger
 from score_sde.sampling import EulerMaruyamaManifoldPredictor, get_pc_sampler
 from score_sde.likelihood import get_likelihood_fn
-from score_sde.utils.vis import plot_and_save
+from score_sde.utils.vis import plot
 from score_sde.models import get_score_fn
 from score_sde.datasets import random_split, DataLoader, TensorDataset
 from score_sde.utils.tmp import compute_normalization
@@ -60,7 +60,6 @@ def run(cfg):
                 raise ValueError("Loss is nan")
 
             if step > 0 and step % cfg.val_freq == 0:
-                # print(f"{step:4d}: {loss:.3f}")
                 save(ckpt_path, train_state)
                 evaluate(train_state, "val", step)
 
@@ -111,7 +110,7 @@ def run(cfg):
             print(Z)
             logger.log_metrics({f"{stage}/Z": Z}, step)
 
-    def generate_plots(train_state, stage):
+    def generate_plots(train_state, stage, step=None):
         rng = jax.random.PRNGKey(cfg.seed)
         dataset = eval_ds if stage == "eval" else test_ds
 
@@ -157,9 +156,11 @@ def run(cfg):
         print(nfe)
         logp -= transform.log_abs_det_jacobian(z, x)
         Path("logs/images").mkdir(parents=True, exist_ok=True)  # Create logs dir
-        plot_and_save(None, x, jnp.exp(logp), None, out=f"logs/images/x0_backw.jpg")
+        plt = plot(None, x, jnp.exp(logp), None, out=f"logs/images/x0_backw.jpg")
+        logger.log_plot("x0_backw", plt, cfg.steps)
         prob = jnp.exp(dataset.log_prob(x0)) if hasattr(dataset, "log_prob") else None
-        plot_and_save(None, x0, prob, None, out=f"logs/images/x0_true.jpg")
+        plt = plot(None, x0, prob, None, out=f"logs/images/x0_true.jpg")
+        logger.log_plot("x0_true", plt, cfg.steps)
 
     ### Main
     log.info("Stage : Startup")

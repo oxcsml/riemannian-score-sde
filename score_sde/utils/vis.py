@@ -22,7 +22,43 @@ def remove_background(ax):
     return ax
 
 
-def plot_and_save(
+def set_aspect_equal_3d(ax):
+    """Fix equal aspect bug for 3D plots."""
+
+    xlim = ax.get_xlim3d()
+    ylim = ax.get_ylim3d()
+    zlim = ax.get_zlim3d()
+
+    xmean = np.mean(xlim)
+    ymean = np.mean(ylim)
+    zmean = np.mean(zlim)
+
+    plot_radius = max([abs(lim - mean_) for lims, mean_ in ((xlim, xmean), (ylim, ymean), (zlim, zmean)) for lim in lims])
+
+    ax.set_xlim3d([xmean - plot_radius, xmean + plot_radius])
+    ax.set_ylim3d([ymean - plot_radius, ymean + plot_radius])
+    ax.set_zlim3d([zmean - plot_radius, zmean + plot_radius])
+
+
+def sphere_plot(ax):
+    # assert manifold.dim == 2
+    radius = 1.
+    set_aspect_equal_3d(ax)
+
+    u = np.linspace(0, 2 * np.pi, 100)
+    v = np.linspace(0, np.pi, 100)
+
+    x = 1 * np.outer(np.cos(u), np.sin(v))
+    y = 1 * np.outer(np.sin(u), np.sin(v))
+    z = 1 * np.outer(np.ones(np.size(u)), np.cos(v))
+    ax.plot_surface(x, y, z, rstride=4, cstride=4, color="grey", linewidth=0, alpha=0.2)
+
+    # ax.set_xlim3d(-radius, radius)
+    # ax.set_ylim3d(-radius, radius)
+    # ax.set_zlim3d(-radius, radius)
+
+
+def plot(
     x0, xt, prob, grad, x0prob=None, size=10, dpi=300, out="out.jpg", color="red"
 ):
     fig = plt.figure(figsize=(size, size))
@@ -30,17 +66,18 @@ def plot_and_save(
     ax = remove_background(ax)
     fig.subplots_adjust(left=-0.2, bottom=-0.2, right=1.2, top=1.2, wspace=0, hspace=0)
     # ax.view_init(elev=30, azim=45)
-    ax.view_init(elev=0, azim=45)
+    ax.view_init(elev=0, azim=0)
     cmap = sns.cubehelix_palette(as_cmap=True)
     sphere = visualization.Sphere()
     sphere.draw(ax, color="red", marker=".")
+    # sphere_plot(ax)
     # sphere.plot_heatmap(ax, pdf, n_points=16000, alpha=0.2, cmap=cmap)
     if x0 is not None:
         cax = ax.scatter(x0[:, 0], x0[:, 1], x0[:, 2], s=50, color="green")
     if xt is not None:
         x, y, z = xt[:, 0], xt[:, 1], xt[:, 2]
         c = prob if prob is not None else np.ones([*xt.shape[:-1]])
-        cax = ax.scatter(x, y, z, s=50, c=c, cmap=cmap)
+        cax = ax.scatter(x, y, z, s=50, vmin=0., vmax=2., c=c, cmap=cmap)
     if grad is not None:
         u, v, w = grad[:, 0], grad[:, 1], grad[:, 2]
         quiver = ax.quiver(
@@ -49,8 +86,9 @@ def plot_and_save(
         quiver.set_array(c)
 
     plt.colorbar(cax)
-    plt.savefig(out, dpi=dpi, bbox_inches="tight", transparent=True)
+    # plt.savefig(out, dpi=dpi, bbox_inches="tight", transparent=True)
     plt.close(fig)
+    return fig
 
 
 def setup_sphere_plot(size=10, dpi=300, elev=0, azim=45):
