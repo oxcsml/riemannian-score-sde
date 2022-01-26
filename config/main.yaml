@@ -22,7 +22,7 @@ now: ${now:%Y-%m-%d}/${now:%H-%M-%S}
 resume: false
 mode: all
 seed: 0
-PROJECT_NAME: score_sde
+PROJECT_NAME: score-sde
 work_dir: ${hydra:runtime.cwd}
 
 # path to folder with data

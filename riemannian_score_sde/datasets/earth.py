@@ -8,12 +8,8 @@ import jax.numpy as jnp
 
 
 class SphericalDataset(CSVDataset):
-    def __init__(
-        self, file, batch_dims, rng, extrinsic=False, delimiter=",", skip_header=1
-    ):
-        super().__init__(
-            file, batch_dims, rng, delimiter=delimiter, skip_header=skip_header
-        )
+    def __init__(self, file, extrinsic=False, delimiter=",", skip_header=1):
+        super().__init__(file, delimiter=delimiter, skip_header=skip_header)
 
         self.manifold = gs.geometry.hypersphere.Hypersphere(2)
         self.intrinsic_data = (
@@ -23,26 +19,20 @@ class SphericalDataset(CSVDataset):
 
 
 class VolcanicErruption(SphericalDataset):
-    def __init__(self, batch_dims, rng, data_dir="data"):
-        super().__init__(
-            os.path.join(data_dir, "volerup.csv"), batch_dims, rng, skip_header=2
-        )
+    def __init__(self, data_dir="data"):
+        super().__init__(os.path.join(data_dir, "volerup.csv"), skip_header=2)
 
 
 class Fire(SphericalDataset):
-    def __init__(self, batch_dims, rng, data_dir="data"):
-        super().__init__(os.path.join(data_dir, "fire.csv"), batch_dims, rng)
+    def __init__(self, data_dir="data"):
+        super().__init__(os.path.join(data_dir, "fire.csv"))
 
 
 class Flood(SphericalDataset):
-    def __init__(self, batch_dims, rng, data_dir="data"):
-        super().__init__(
-            os.path.join(data_dir, "flood.csv"), batch_dims, rng, skip_header=2
-        )
+    def __init__(self, data_dir="data"):
+        super().__init__(os.path.join(data_dir, "flood.csv"), skip_header=2)
 
 
 class Earthquake(SphericalDataset):
-    def __init__(self, batch_dims, rng, data_dir="data"):
-        super().__init__(
-            os.path.join(data_dir, "quakes_all.csv"), batch_dims, rng, skip_header=4
-        )
+    def __init__(self, data_dir="data"):
+        super().__init__(os.path.join(data_dir, "quakes_all.csv"), skip_header=4)

@@ -11,42 +11,47 @@ import jax
 
 from riemannian_score_sde.datasets import *
 from score_sde.utils.vis import setup_sphere_plot, scatter_earth
-
+from score_sde.datasets import DataLoader, SubDataset, TensorDataset, random_split
 
 # %%
 
-data = VolcanicErruption((100,), jax.random.PRNGKey(0))
+data = VolcanicErruption()
 fig, ax = setup_sphere_plot()
 scatter_earth(data.data, ax=ax)
 
 # %%
 
-data = Fire((100,), jax.random.PRNGKey(0))
+data = Fire()
 fig, ax = setup_sphere_plot(azim=-45, elev=45)
 scatter_earth(data.data, ax=ax)
 
 # %%
 
-data = Flood((100,), jax.random.PRNGKey(0))
+data = Flood()
 fig, ax = setup_sphere_plot()
 scatter_earth(data.data, ax=ax)
 
 # %%
 
-data = Earthquake((100,), jax.random.PRNGKey(0))
+data = Earthquake()
 fig, ax = setup_sphere_plot(azim=90, elev=-0)
 scatter_earth(data.data, ax=ax)
 # ax.set_aspect('equal')
 
 # %%
-import matplotlib.pyplot as plt
-plt.scatter(data.intrinsic_data[..., 1], data.intrinsic_data[..., 0],s=0.5)
-plt.gca().set_aspect('equal')
-
-
-# %%
-data = Earthquake((1000,), jax.random.PRNGKey(0))
-for batch in data:
+dataloader = DataLoader(Earthquake(), 100, jax.random.PRNGKey(0))
+for batch in dataloader:
     print(batch.shape)
 
+# %%
+len(SubDataset(Earthquake(), jnp.arange(100)))
+# %%
+td = TensorDataset(jnp.arange(100)[:, None])
+subset = SubDataset(td, jnp.arange(50))
+
+for b in DataLoader(subset, 10, jax.random.PRNGKey(0), shuffle=False):
+    print(b)
+# %%
+
+print([len(ds) for ds in random_split(td, [80,10,10], jax.random.PRNGKey(0))])
 # %%

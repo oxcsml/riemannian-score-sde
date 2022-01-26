@@ -7,6 +7,7 @@ from score_sde.utils import register_dataset
 from .mixture import *
 from .unimodal import *
 from .tensordataset import *
+from .split import *
 
 
 def create_prefetch_dataset(

@@ -19,6 +19,7 @@ from score_sde.sampling import EulerMaruyamaManifoldPredictor, get_pc_sampler
 from score_sde.likelihood import get_likelihood_fn
 from score_sde.utils.vis import plot_and_save
 from score_sde.models import get_score_fn
+from score_sde.datasets import split, DataLoader, TensorDataset
 
 log = logging.getLogger(__name__)
 
@@ -82,17 +83,27 @@ def run(cfg):
             eps=cfg.eps,
         )
 
-        # N = len(dataset) if hasattr(dataset, "__len__") else 5
         logp = 0.0
         N = 0
         # for k in range(K):
-        for x in dataset:
-            # x = next(dataset)
-            z = transform.inv(x)
-            logp_step, _, _ = likelihood_fn(rng, z)
-            logp_step -= transform.log_abs_det_jacobian(z, x)
-            logp += logp_step.sum()
-            N += logp_step.shape[0]
+        if hasattr(dataset, "__len__"):
+            for x in dataset:
+                # x = next(dataset)
+                z = transform.inv(x)
+                logp_step, _, _ = likelihood_fn(rng, z)
+                logp_step -= transform.log_abs_det_jacobian(z, x)
+                logp += logp_step.sum()
+                N += logp_step.shape[0]
+        else:
+            # TODO: handle infinate datasets more elegnatly
+            samples = 500
+            for i in range(samples):
+                x = next(dataset)
+                z = transform.inv(x)
+                logp_step, _, _ = likelihood_fn(rng, z)
+                logp_step -= transform.log_abs_det_jacobian(z, x)
+                logp += logp_step.sum()
+                N += logp_step.shape[0]
         logp /= N
 
         logger.log_metrics({f"{stage}/logp": logp.mean()}, step)
@@ -169,8 +180,36 @@ def run(cfg):
     rng, next_rng = jax.random.split(rng)
     # dataset = instantiate(cfg.dataset, rng=next_rng, manifold=data_manifold)
     dataset = instantiate(cfg.dataset, rng=next_rng)
-    train_ds, eval_ds, test_ds = dataset, dataset, dataset
-    z = transform.inv(next(dataset))
+    # TODO: Handle infinate datasets more elegantly?
+    if isinstance(dataset, TensorDataset):
+        train_ds, eval_ds, test_ds = split(dataset, lengths=cfg.splits)
+        train_ds, eval_ds, test_ds = (
+            DataLoader(
+                train_ds,
+                batch_dims=cfg.batch_size,
+                rng=next_rng,
+                shuffle=True,
+                drop_last=False,
+            ),
+            DataLoader(
+                eval_ds,
+                batch_dims=cfg.batch_size,
+                rng=next_rng,
+                shuffle=True,
+                drop_last=False,
+            ),
+            DataLoader(
+                test_ds,
+                batch_dims=cfg.batch_size,
+                rng=next_rng,
+                shuffle=True,
+                drop_last=False,
+            ),
+        )
+    else:
+        train_ds, eval_ds, test_ds = dataset, dataset, dataset
+
+    z = transform.inv(next(train_ds))
 
     log.info("Stage : Instantiate model")
 

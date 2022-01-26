@@ -18,6 +18,7 @@ defaults:
 manifold:
   dim: 2
 
+splits: [0.8,0.1,0.1]
 batch_size: 512
 warmup_steps: 100
 steps: 1000

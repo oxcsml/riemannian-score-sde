@@ -1,5 +1,3 @@
 _target_: riemannian_score_sde.datasets.earth.VolcanicErruption
 _convert_: partial
-batch_dims:
-  - ${batch_size}
 data_dir: ${data_dir}
