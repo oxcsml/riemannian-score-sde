@@ -77,15 +77,18 @@ def run(cfg):
             eps=cfg.eps,
         )
 
-        K = len(dataset) if hasattr(dataset, "__len__") else 5
+        # N = len(dataset) if hasattr(dataset, "__len__") else 5
         logp = 0.
-        for k in range(K):
-            x = next(dataset)
+        N = 0
+        # for k in range(K):
+        for x in dataset:
+            # x = next(dataset)
             z = transform.inv(x)
             logp_step, _, _ = likelihood_fn(rng, z)
             logp_step -= transform.log_abs_det_jacobian(z, x)
-            logp += logp_step.mean()
-        logp /= K
+            logp += logp_step.sum()
+            N += logp_step.shape[0]
+        logp /= N
 
         logger.log_metrics({f"{stage}/logp": logp.mean()}, step)
 
