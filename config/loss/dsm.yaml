@@ -4,3 +4,6 @@ loss_fn:
   reduce_mean: true
   likelihood_weighting: true
   eps: ${eps}
+  rescale: false
+  thresh: 0.1
+  n_max: 10

@@ -71,7 +71,7 @@ class SDE(ABC):
         """
         raise NotImplementedError()
 
-    def grad_marginal_log_prob(self, x0, x, t):
+    def grad_marginal_log_prob(self, x0, x, t, **kwargs):
         """Compute the log marginal distribution and its gradient
 
         Parameters
@@ -83,8 +83,9 @@ class SDE(ABC):
         t : float
             Time of diffusion
         """
+        marginal_log_prob = lambda x0, x, t: self.marginal_log_prob(x0, x, t, **kwargs)
         logp_grad_fn = jax.value_and_grad(
-            self.marginal_log_prob, argnums=1, has_aux=False
+            marginal_log_prob, argnums=1, has_aux=False
         )
         logp, logp_grad = jax.vmap(logp_grad_fn)(x0, x, t)
         logp_grad = self.manifold.to_tangent(logp_grad, x)

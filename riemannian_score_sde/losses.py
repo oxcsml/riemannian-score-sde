@@ -25,6 +25,8 @@ def get_dsm_loss_fn(
     reduce_mean: bool = True,
     likelihood_weighting: bool = True,
     eps: float = 1e-3,
+    rescale = False,
+    **kwargs
 ):
     reduce_op = (
         jnp.mean
@@ -58,7 +60,10 @@ def get_dsm_loss_fn(
         # compute approximate score at x_t
         score, new_model_state = score_fn(x_t, t, rng=step_rng)
         # compute $\nabla \log p(x_t | x_0)$
-        logp_grad = sde.grad_marginal_log_prob(x_0, x_t, t)[1]
+        logp_grad = sde.grad_marginal_log_prob(x_0, x_t, t, **kwargs)[1]
+        if rescale:
+            std = jnp.expand_dims(sde.marginal_prob(jnp.zeros_like(x_t), t)[1], -1)
+            score, logp_grad = batch_mul(std, score), batch_mul(std, logp_grad)
 
         # compute $E_{p{x_0}}[|| s_\theta(x_t, t) - \nabla \log p(x_t | x_0)||^2]$
         losses = jnp.square(score - logp_grad)
