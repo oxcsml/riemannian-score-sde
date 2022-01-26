@@ -15,13 +15,16 @@ class NoneHydra:
 
 
 # Define useful resolver for hydra config
-OmegaConf.register_new_resolver("int", lambda x: int(x))
-OmegaConf.register_new_resolver("eval", lambda x: eval(x))
-OmegaConf.register_new_resolver("str", lambda x: str(x))
-OmegaConf.register_new_resolver("prod", lambda x: np.prod(x))
-OmegaConf.register_new_resolver("where", lambda condition, x, y: x if condition else y)
-OmegaConf.register_new_resolver("isequal", lambda x, y: x == y)
-OmegaConf.register_new_resolver("pi", lambda x: x * math.pi)
+# TODO: temp fix using replace due to double import in sweeps
+OmegaConf.register_new_resolver("int", lambda x: int(x), replace=True)
+OmegaConf.register_new_resolver("eval", lambda x: eval(x), replace=True)
+OmegaConf.register_new_resolver("str", lambda x: str(x), replace=True)
+OmegaConf.register_new_resolver("prod", lambda x: np.prod(x), replace=True)
+OmegaConf.register_new_resolver(
+    "where", lambda condition, x, y: x if condition else y, replace=True
+)
+OmegaConf.register_new_resolver("isequal", lambda x, y: x == y, replace=True)
+OmegaConf.register_new_resolver("pi", lambda x: x * math.pi, replace=True)
 
 
 def partialclass(cls, *args, **kwds):
