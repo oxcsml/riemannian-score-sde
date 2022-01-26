@@ -6,19 +6,5 @@
 name: flood
 
 defaults:
+  - earth_data
   - /dataset: flood
-  - /manifold: nsphere
-  - /model: dsm
-  - /architecture: concat
-
-data_dir: /data/ziz/not-backed-up/datasets-ziz-all/earth_datasets
-
-manifold:
-  dim: 2
-
-batch_size: 512
-warmup_steps: 100
-steps: 800
-val_freq: 100
-ema_rate: 0.999
-eps: 1e-3

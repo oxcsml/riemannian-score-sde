@@ -88,8 +88,8 @@ def random_split(dataset, lengths, rng):
     if sum(lengths) == len(dataset):
         pass
     elif sum(lengths) == 1:
-        legnths = [int(l * len(dataset)) for l in lengths]
-        legnths[-1] = sum(lengths[:-1])
+        lengths = [int(l * len(dataset)) for l in lengths]
+        lengths[-1] = len(dataset) - int(sum(lengths[:-1]))
     else:
         raise ValueError(
             "Sum of input lengths does not equal the length of the input dataset"

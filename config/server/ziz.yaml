@@ -23,6 +23,10 @@ hydra:
     executable: /data/localhost/not-backed-up/${oc.env:USER}/${PROJECT_NAME}/venv/bin/python
     additional_parameters: {
       "wckey": "bigbayes_project",
-      "gres": "gpu:${num_gpus}",
-      "nodelist": "zizgpu03.cpu.stats.ox.ac.uk",
-      }
+      "gres": "gpu:GeForce_GTX_1080Ti:${num_gpus}",
+      # "nodelist": [
+      #   "zizgpu01.cpu.stats.ox.ac.uk", 
+      #   "zizgpu03.cpu.stats.ox.ac.uk", 
+      #   "zizgpu04.cpu.stats.ox.ac.uk"
+      # ],
+    }

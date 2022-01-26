@@ -19,7 +19,7 @@ from score_sde.sampling import EulerMaruyamaManifoldPredictor, get_pc_sampler
 from score_sde.likelihood import get_likelihood_fn
 from score_sde.utils.vis import plot_and_save
 from score_sde.models import get_score_fn
-from score_sde.datasets import split, DataLoader, TensorDataset
+from score_sde.datasets import random_split, DataLoader, TensorDataset
 
 log = logging.getLogger(__name__)
 
@@ -95,8 +95,8 @@ def run(cfg):
                 logp += logp_step.sum()
                 N += logp_step.shape[0]
         else:
-            # TODO: handle infinate datasets more elegnatly
-            samples = 500
+            # TODO: handle infinite datasets more elegnatly
+            samples = 10
             for i in range(samples):
                 x = next(dataset)
                 z = transform.inv(x)
@@ -179,10 +179,16 @@ def run(cfg):
 
     rng, next_rng = jax.random.split(rng)
     # dataset = instantiate(cfg.dataset, rng=next_rng, manifold=data_manifold)
-    dataset = instantiate(cfg.dataset, rng=next_rng)
     # TODO: Handle infinate datasets more elegantly?
+    try:
+        dataset = instantiate(cfg.dataset, rng=next_rng)
+    except:
+        dataset = instantiate(cfg.dataset)
+
     if isinstance(dataset, TensorDataset):
-        train_ds, eval_ds, test_ds = split(dataset, lengths=cfg.splits)
+        train_ds, eval_ds, test_ds = random_split(
+            dataset, lengths=cfg.splits, rng=next_rng
+        )
         train_ds, eval_ds, test_ds = (
             DataLoader(
                 train_ds,
