@@ -1,13 +1,16 @@
-import jax
+import math
 import jax.numpy as jnp
 import numpy as np
+from scipy.special import ive
 from score_sde.utils import batch_mul
+
 
 class vMFDataset:
     def __init__(
         self, batch_dims, rng, manifold, mu, kappa
     ):
         self.manifold = manifold
+        self.d = self.manifold.dim + 1
         self.mu = jnp.array(mu)
         assert manifold.belongs(self.mu)
         self.kappa = jnp.array([kappa])
@@ -29,9 +32,24 @@ class vMFDataset:
         return samples
         # return jnp.expand_dims(samples, axis=-1)
 
+    def _log_normalization(self):
+        output = -(
+            (self.d / 2 - 1) * jnp.log(self.kappa)
+            - (self.d / 2) * math.log(2 * math.pi)
+            - (self.kappa + jnp.log(ive(self.d / 2 - 1, self.kappa)))
+        )
+        return output.reshape([1, *output.shape[:-1]])
+
     def log_prob(self, x):
-        output = jnp.log(self.kappa) - jnp.log(2 * jnp.pi) - self.kappa - (1 - jnp.exp(- 2 * self.kappa))
-        return output + self.kappa * (jnp.expand_dims(self.mu, 0) * x).sum(-1)
+        return self._log_unnormalized_prob(x) - self._log_normalization()
+
+    def _log_unnormalized_prob(self, x):
+        output = self.kappa * (jnp.expand_dims(self.mu, 0) * x).sum(-1, keepdims=True)
+        return output.reshape([*output.shape[:-1]])
+
+    def entropy(self):
+        output = -self.kappa * ive(self.d / 2, self.kappa) / ive((self.d / 2) - 1, self.kappa)
+        return output.reshape([*output.shape[:-1]]) + self._log_normalization()
 
 
 class DiracDataset:

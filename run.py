@@ -10,7 +10,6 @@ from jax import numpy as jnp
 import numpy as np
 import haiku as hk
 import optax
-from sklearn import manifold
 from tqdm import tqdm
 
 from score_sde.utils import TrainState, save, restore
@@ -20,6 +19,7 @@ from score_sde.likelihood import get_likelihood_fn
 from score_sde.utils.vis import plot_and_save
 from score_sde.models import get_score_fn
 from score_sde.datasets import random_split, DataLoader, TensorDataset
+from score_sde.utils.tmp import compute_normalization
 
 log = logging.getLogger(__name__)
 
@@ -83,6 +83,7 @@ def run(cfg):
             eps=cfg.eps,
         )
 
+<<<<<<< HEAD
         logp = 0.0
         N = 0
         # for k in range(K):
@@ -104,9 +105,25 @@ def run(cfg):
                 logp_step -= transform.log_abs_det_jacobian(z, x)
                 logp += logp_step.sum()
                 N += logp_step.shape[0]
+=======
+        logp = 0.
+        N = 0
+        for x in dataset:
+            z = transform.inv(x)
+            logp_step, _, _ = likelihood_fn(rng, z)
+            logp_step -= transform.log_abs_det_jacobian(z, x)
+            logp += logp_step.sum()
+            N += logp_step.shape[0]
+            if not hasattr(dataset, "__len__") and N > 2000:
+                break
+>>>>>>> 50b572e... fix vmf pdf
         logp /= N
 
         logger.log_metrics({f"{stage}/logp": logp.mean()}, step)
+        if stage == "test":
+            Z = compute_normalization(likelihood_fn, transform, model_manifold)
+            print(Z)
+            logger.log_metrics({f"{stage}/Z": Z}, step)
 
     def generate_plots(train_state, stage):
         rng = jax.random.PRNGKey(cfg.seed)
@@ -149,6 +166,7 @@ def run(cfg):
             bits_per_dimension=False,
             eps=cfg.eps,
         )
+        # x = x0
         logp, z, nfe = likelihood_fn(rng, transform.inv(x))
         print(nfe)
         logp -= transform.log_abs_det_jacobian(z, x)
