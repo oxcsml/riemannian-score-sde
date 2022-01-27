@@ -29,7 +29,7 @@ hydra:
     config:
       # configuration for the ${hydra.job.override_dirname} runtime variable
       override_dirname:
-        exclude_keys: [name, experiment, server, seed, run, resume, num_workers, num_gpus, val_freq, logger, mode]
+        exclude_keys: [name, experiment, server, seed, run, resume, num_workers, num_gpus, val_freq, logger, mode, n_jobs]
 
 # git:
 #   commit: ${git_commit:}
