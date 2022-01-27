@@ -3,3 +3,4 @@ csv:
   save_dir: logs
   name: ""
   # version: ""
+  flush_logs_every_n_steps: 1000
