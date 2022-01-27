@@ -22,42 +22,6 @@ def remove_background(ax):
     return ax
 
 
-def set_aspect_equal_3d(ax):
-    """Fix equal aspect bug for 3D plots."""
-
-    xlim = ax.get_xlim3d()
-    ylim = ax.get_ylim3d()
-    zlim = ax.get_zlim3d()
-
-    xmean = np.mean(xlim)
-    ymean = np.mean(ylim)
-    zmean = np.mean(zlim)
-
-    plot_radius = max([abs(lim - mean_) for lims, mean_ in ((xlim, xmean), (ylim, ymean), (zlim, zmean)) for lim in lims])
-
-    ax.set_xlim3d([xmean - plot_radius, xmean + plot_radius])
-    ax.set_ylim3d([ymean - plot_radius, ymean + plot_radius])
-    ax.set_zlim3d([zmean - plot_radius, zmean + plot_radius])
-
-
-def sphere_plot(ax):
-    # assert manifold.dim == 2
-    radius = 1.
-    set_aspect_equal_3d(ax)
-
-    u = np.linspace(0, 2 * np.pi, 100)
-    v = np.linspace(0, np.pi, 100)
-
-    x = 1 * np.outer(np.cos(u), np.sin(v))
-    y = 1 * np.outer(np.sin(u), np.sin(v))
-    z = 1 * np.outer(np.ones(np.size(u)), np.cos(v))
-    ax.plot_surface(x, y, z, rstride=4, cstride=4, color="grey", linewidth=0, alpha=0.2)
-
-    # ax.set_xlim3d(-radius, radius)
-    # ax.set_ylim3d(-radius, radius)
-    # ax.set_zlim3d(-radius, radius)
-
-
 def plot(
     x0, xt, prob, grad, x0prob=None, size=10, dpi=300, out="out.jpg", color="red"
 ):
