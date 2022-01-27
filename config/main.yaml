@@ -3,7 +3,7 @@ defaults:
   - _self_
   # - user
 
-  - server: base_ziz
+  - server: local_ziz
   - experiment: s2_toy
 
   # - callbacks: wandb # set this to null if you don't want to use callbacks

@@ -66,9 +66,9 @@ def run(cfg):
         return train_state
 
     def evaluate(train_state, stage, step=None):
+        log.info("Running evaluation")
         rng = jax.random.PRNGKey(cfg.seed)
         dataset = eval_ds if stage == "val" else test_ds
-
         likelihood_fn = get_likelihood_fn(
             sde,
             get_score_fn(
@@ -111,6 +111,7 @@ def run(cfg):
             logger.log_metrics({f"{stage}/Z": Z}, step)
 
     def generate_plots(train_state, stage, step=None):
+        log.info("Generating plots")
         rng = jax.random.PRNGKey(cfg.seed)
         dataset = eval_ds if stage == "eval" else test_ds
 
@@ -137,7 +138,7 @@ def run(cfg):
         rng, next_rng = jax.random.split(rng)
         z, _ = sampler(next_rng, sde.sample_limiting_distribution(rng, z0.shape))
         x = transform(z)
-        log.info("Running likelihood")
+
         likelihood_fn = get_likelihood_fn(
             sde,
             get_score_fn(
@@ -266,3 +267,4 @@ def run(cfg):
         evaluate(train_state, "test")
         generate_plots(train_state, "test")
     logger.save()
+    logger.finalize('success')

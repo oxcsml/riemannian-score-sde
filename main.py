@@ -6,6 +6,7 @@ from score_sde.utils.cfg import *
 def main(cfg):
     os.environ['GEOMSTATS_BACKEND'] = 'jax'
     os.environ['XLA_PYTHON_CLIENT_PREALLOCATE'] = 'false'
+    os.environ["WANDB_START_METHOD"] = "thread"
 
     from run import run
 

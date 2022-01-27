@@ -469,6 +469,7 @@ class WandbLogger(LightningLoggerBase):
         # log checkpoints as artifacts
         if self._checkpoint_callback:
             self._scan_and_log_checkpoints(self._checkpoint_callback)
+        wandb.finish()
 
     def _scan_and_log_checkpoints(self, checkpoint_callback: "ReferenceType[ModelCheckpoint]") -> None:
         # get checkpoints to be saved with associated score

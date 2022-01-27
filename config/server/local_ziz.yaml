@@ -2,4 +2,10 @@
 
 defaults:
   - base_ziz
-  - override /hydra/launcher: submitit_local
+  - override /hydra/launcher: joblib
+
+n_jobs: 2
+
+hydra:
+  launcher:
+    n_jobs: ${n_jobs}
