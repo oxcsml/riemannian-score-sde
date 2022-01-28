@@ -22,7 +22,7 @@ setup(
     description="",
     # license="Apache License 2.0",
     keywords="",
-    install_requires=requirements,
+    # install_requires=requirements,
     packages=find_namespace_packages(
         include=["score_sde", "riemannian_score-sde", "stochastic-process-score-sde"]
     ),

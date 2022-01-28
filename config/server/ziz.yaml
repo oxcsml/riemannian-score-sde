@@ -10,6 +10,9 @@ n_jobs: 2
 num_gpus: 1
 
 hydra:
+  # job:
+  #   env_set:
+  #     XLA_FLAGS: --xla_gpu_cuda_data_dir=/opt/cuda11.1
   launcher:
     submitit_folder: ${hydra.sweep.dir}/.submitit/%j
     timeout_min: 840
@@ -20,14 +23,11 @@ hydra:
     partition: ziz-gpu
     max_num_timeout: 0
     array_parallelism: 32
-    setup: ["export XLA_FLAGS='--xla_gpu_cuda_data_dir=/opt/cuda'", "export PATH=/opt/cuda/bin/:$PATH", "export LD_LIBRARY_PATH=/opt/cuda-10.2/lib64:$LD_LIBRARY_PATH", "export XLA_PYTHON_CLIENT_PREALLOCATE=false"]
+    setup: ["export XLA_FLAGS='--xla_gpu_cuda_data_dir=/opt/cuda'", "export PATH=/opt/cuda/bin/:$PATH", "export LD_LIBRARY_PATH=/opt/cuda/lib64:$LD_LIBRARY_PATH", "export XLA_PYTHON_CLIENT_PREALLOCATE=false"]
+    # setup: ["export XLA_PYTHON_CLIENT_PREALLOCATE=false"]
     executable: /data/localhost/not-backed-up/${oc.env:USER}/${PROJECT_NAME}/venv/bin/python
     additional_parameters: {
       "wckey": "bigbayes_project",
-      "gres": "gpu:GeForce_GTX_1080Ti:${num_gpus}",
-      # "nodelist": [
-      #   "zizgpu01.cpu.stats.ox.ac.uk", 
-      #   "zizgpu03.cpu.stats.ox.ac.uk", 
-      #   "zizgpu04.cpu.stats.ox.ac.uk"
-      # ],
+      "gres": "gpu:${num_gpus}",
+      # "nodelist": "zizgpu04.cpu.stats.ox.ac.uk"
     }
