@@ -6,6 +6,7 @@ defaults:
 # paths:
 #   experiments: /data/ziz/not-backed-up/scratch/${oc.env:USER}/${PROJECT_NAME}/results
 
+n_jobs: 2
 num_gpus: 1
 
 hydra:

@@ -1,6 +1,6 @@
 wandb:
     _target_: score_sde.utils.loggers_pl.WandbLogger
-    save_dir: ${logs_dir}
+    save_dir: null # /data/localhost/not-backed-up/mhutchin/score-sde/logs #${logs_dir}
     name: ${str:${seed}}
     group: ${name}_${hydra:job.override_dirname}
     entity: oxcsml

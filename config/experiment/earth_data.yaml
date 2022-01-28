@@ -8,8 +8,8 @@ defaults:
   - /model: dsm
   - /architecture: concat
 
-data_dir: /data/ziz/not-backed-up/datasets-ziz-all/earth_datasets
-
+data_dir: /data/ziz/not-backed-up/scratch/score-sde/data
+# log_dir: /data/ziz/not-backed-up/scratch/score-sde/results
 manifold:
   dim: 2
 
