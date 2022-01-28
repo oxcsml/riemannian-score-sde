@@ -272,4 +272,4 @@ def run(cfg):
         evaluate(train_state, "test")
         generate_plots(train_state, "test")
     logger.save()
-    logger.finalize('success' if success else 'failure')
+    logger.finalize("success" if success else "failure")
