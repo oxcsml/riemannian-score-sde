@@ -56,8 +56,7 @@ def run(cfg):
             (rng, train_state), loss = train_step_fn((next_rng, train_state), batch)
             if jnp.isnan(loss).any():
                 log.warning("Loss is nan")
-                success = False
-                break
+                return train_state, False
 
             if step % 50 == 0:
                 logger.log_metrics({"train/loss": loss}, step)
@@ -67,7 +66,7 @@ def run(cfg):
                 save(ckpt_path, train_state)
                 evaluate(train_state, "val", step)
 
-        return train_state, success
+        return train_state, True
 
     def evaluate(train_state, stage, step=None):
         log.info("Running evaluation")
@@ -169,7 +168,6 @@ def run(cfg):
 
     ### Main
     log.info("Stage : Startup")
-    success = True
     run_path = os.getcwd()
     ckpt_path = os.path.join(run_path, cfg.ckpt_dir)
     os.makedirs(ckpt_path, exist_ok=True)
@@ -267,9 +265,10 @@ def run(cfg):
     if cfg.mode == "train" or cfg.mode == "all":
         log.info("Stage : Training")
         train_state, success = train(train_state)
-    if (cfg.mode == "test" or cfg.mode == "all") and success:
+    if (cfg.mode == "test") or (cfg.mode == "all" and success):
         log.info("Stage : Test")
         evaluate(train_state, "test")
         generate_plots(train_state, "test")
+        success = True
     logger.save()
     logger.finalize("success" if success else "failure")
