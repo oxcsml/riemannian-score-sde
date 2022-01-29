@@ -1,0 +1,4 @@
+_target_: optax.linear_schedule
+init_value: 0.0
+end_value: 1.0
+transition_steps: ${warmup_steps}

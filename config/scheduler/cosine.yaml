@@ -1,0 +1,4 @@
+_target_: optax.cosine_decay_schedule
+init_value: 1.0
+decay_steps: ${steps}
+alpha: 0.0
