@@ -19,20 +19,20 @@ class SphericalDataset(CSVDataset):
 
 
 class VolcanicErruption(SphericalDataset):
-    def __init__(self, data_dir="data"):
+    def __init__(self, data_dir="data", **kwargs):
         super().__init__(os.path.join(data_dir, "volerup.csv"), skip_header=2)
 
 
 class Fire(SphericalDataset):
-    def __init__(self, data_dir="data"):
+    def __init__(self, data_dir="data", **kwargs):
         super().__init__(os.path.join(data_dir, "fire.csv"))
 
 
 class Flood(SphericalDataset):
-    def __init__(self, data_dir="data"):
+    def __init__(self, data_dir="data", **kwargs):
         super().__init__(os.path.join(data_dir, "flood.csv"), skip_header=2)
 
 
 class Earthquake(SphericalDataset):
-    def __init__(self, data_dir="data"):
+    def __init__(self, data_dir="data", **kwargs):
         super().__init__(os.path.join(data_dir, "quakes_all.csv"), skip_header=4)
