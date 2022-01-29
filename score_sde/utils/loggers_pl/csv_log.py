@@ -216,7 +216,7 @@ class CSVLogger(LightningLoggerBase):
     @rank_zero_only
     def log_plot(self, name, plt, step) -> None:
         path = self.create_and_get_image_dir(name, step)
-        plt.savefig(path, dpi=300, bbox_inches="tight")
+        plt.savefig(path, dpi=150, bbox_inches="tight")
 
     @rank_zero_only
     def save(self) -> None:
