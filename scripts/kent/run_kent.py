@@ -70,7 +70,7 @@ def main(cfg):
     output = run_kent(X, cfg.initializations, cfg.n_components, cfg.iterations, cfg.seed)
 
     output_dir = cfg.output_dir
-    file_name = f'{cfg.dataset}_{cfg.seed}_{cfg.n_components}_{cfg.initializations}_{cfg.itertations}.pkl'
+    file_name = f'{cfg.dataset}_{cfg.seed}_{cfg.n_components}_{cfg.initializations}_{cfg.iterations}.pkl'
     fp = os.path.join(output_dir, file_name)
     with open(fp, 'wb') as f:
         pickle.dump(output, f)
