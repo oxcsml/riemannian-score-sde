@@ -1,5 +1,7 @@
+import os
+os.environ['GEOMSTATS_BACKEND'] = 'jax'
 from functools import partial
-
+import math
 import matplotlib.pyplot as plt
 from matplotlib.patches import Circle
 import seaborn as sns
@@ -10,7 +12,8 @@ import jax
 from jax import numpy as jnp
 import numpy as np
 from scipy.stats import gaussian_kde
-from score_sde.sde import SDE, batch_mul
+# from score_sde.sde import SDE
+from score_sde.utils import batch_mul
 from riemannian_score_sde.sde import Brownian
 from scipy.interpolate import splev, splrep
 
@@ -21,16 +24,51 @@ from scripts.utils import (
     vMF_pdf,
 )
 
+# def plot(x, ys, dim_0_names, dim_1_names, out):
+#     fontsize = 12
+#     K, J, _ = ys.shape
+#     fig, axis = plt.subplots(
+#         # nrows=1, ncols=K, figsize=(12, 5), sharex=True, sharey=False
+#         nrows=K, ncols=1, figsize=(3, 6), sharex=True, sharey=False
+#     )
+#     axis = axis if isinstance(axis, np.ndarray) else [axis]
+#     # colours = sns.cubehelix_palette(n_colors=J, light=1.0, dark=0.0, start=0.5, rot=-0.75, reverse=False)
+#     colours = sns.cubehelix_palette(n_colors=J, reverse=False)
+#     # colours = ["green", "blue"]
+#     for k in range(K):
+#         for j in range(J):
+#             linestyle = "--" if j == J - 1 else "-"
+#             axis[k].plot(
+#                 x,
+#                 ys[k, j],
+#                 color=colours[j],
+#                 alpha=0.8,
+#                 label=dim_1_names[j],
+#                 linestyle=linestyle,
+#                 lw=3,
+#             )
+#         axis[k].set_title(dim_0_names[k]) #, y=-0.01)
+#     axis[-1].legend(loc="best", fontsize=fontsize*4/5)
+#     axis[-1].set_xlabel(r"Signed distance$(x_0, x)$", fontsize=fontsize)
+#     plt.xticks([-math.pi/4, 0., math.pi/4], [r"$-\pi/4$", 0, r"$\pi/4$"], fontsize=fontsize)
+#     axis[1].set_ylabel("Density", fontsize=fontsize)
+#     plt.savefig("{}.png".format(out), dpi=300, bbox_inches="tight")
+#     plt.clf()
+#     plt.close("all")
+
 
 def plot(x, ys, dim_0_names, dim_1_names, out):
+    fontsize = 15
     K, J, _ = ys.shape
     fig, axis = plt.subplots(
-        nrows=1, ncols=K, figsize=(12, 5), sharex=True, sharey=False
+        nrows=1, ncols=K, figsize=(12, 2), sharex=True, sharey=False
+        # nrows=K, ncols=1, figsize=(3, 6), sharex=True, sharey=False
     )
     axis = axis if isinstance(axis, np.ndarray) else [axis]
     # colours = sns.cubehelix_palette(n_colors=J, light=1.0, dark=0.0, start=0.5, rot=-0.75, reverse=False)
     colours = sns.cubehelix_palette(n_colors=J, reverse=False)
     # colours = ["green", "blue"]
+
     for k in range(K):
         for j in range(J):
             linestyle = "--" if j == J - 1 else "-"
@@ -38,14 +76,17 @@ def plot(x, ys, dim_0_names, dim_1_names, out):
                 x,
                 ys[k, j],
                 color=colours[j],
-                alpha=0.5,
+                alpha=0.8,
                 label=dim_1_names[j],
                 linestyle=linestyle,
+                lw=3,
             )
-        axis[k].set_title(dim_0_names[k])
-    axis[-1].legend(loc="best")
-    axis[0].set_xlabel("dist")
-    axis[0].set_ylabel("pdf")
+        axis[k].set_title(dim_0_names[k], fontsize=fontsize) #, y=-0.01)
+        axis[k].tick_params(axis='both', which='major', labelsize=13)
+    axis[-1].legend(loc="best", fontsize=12.5)
+    axis[1].set_xlabel(r"Signed $d_{\mathcal{M}}(x_0, x)$", fontsize=fontsize)
+    plt.xticks([-math.pi/4, 0., math.pi/4], [r"$-\pi/4$", 0, r"$\pi/4$"])
+    axis[0].set_ylabel("Density", fontsize=fontsize)
     plt.savefig("{}.png".format(out), dpi=300, bbox_inches="tight")
     plt.clf()
     plt.close("all")
@@ -56,14 +97,14 @@ def batch_mul(a, b):
 
 
 # @partial(jax.jit, static_argnums=(3,4,5))
-# def heat_kernel(y, s, x, tol, n_max, manifold):
-#     return jnp.exp(manifold.log_heat_kernel(x, y, s, tol=tol, n_max=n_max))
+# def heat_kernel(y, s, x, thresh, n_max, manifold):
+#     return jnp.exp(manifold.log_heat_kernel(x, y, s, thresh=thresh, n_max=n_max))
 
 
 @partial(jax.jit, static_argnums=(3, 4, 5))
-def heat_kernel(y, s, x, tol, n_max, sde):
+def heat_kernel(y, s, x, thresh, n_max, sde):
     s = jnp.ones((x.shape[0], 1)) * s
-    marginal_log_prob = partial(sde.marginal_log_prob, tol=tol, n_max=n_max)
+    marginal_log_prob = partial(sde.marginal_log_prob, thresh=thresh, n_max=n_max)
     return jnp.exp(jax.vmap(marginal_log_prob)(x, y, s))
 
 
@@ -86,8 +127,8 @@ def brownian_motion_traj(previous_x, traj, dt, N, manifold):
     return x, traj
 
 
-@partial(jax.jit, static_argnums=(3))
-def brownian_motion(previous_x, dt, timesteps, sde):
+@partial(jax.jit, static_argnums=(4))
+def brownian_motion(previous_x, N, dt, timesteps, sde):
     rng = jax.random.PRNGKey(0)
 
     def body(step, val):
@@ -96,12 +137,12 @@ def brownian_motion(previous_x, dt, timesteps, sde):
         rng, z = sde.manifold.random_normal_tangent(
             state=rng, base_point=x, n_samples=x.shape[0]
         )
-        drift, diffusion = sde.sde(x, t)
+        drift, diffusion = sde.coefficients(x, t)# sde.sde(x, t)
         tangent_vector = drift * dt + batch_mul(diffusion, jnp.sqrt(dt) * z)
         x = sde.manifold.metric.exp(tangent_vec=tangent_vector, base_point=x)
         return rng, x
 
-    _, x = jax.lax.fori_loop(0, sde.N, body, (rng, previous_x))
+    _, x = jax.lax.fori_loop(0, N, body, (rng, previous_x))
     return x
 
 
@@ -127,8 +168,8 @@ def spherical_to_cartesian(theta, phi):
 def test_s2_normalisation():
     S2 = Hypersphere(dim=2)
     x0 = jnp.expand_dims(jnp.array([1.0, 0.0, 0.0]), 0)
-    kernel = partial(heat_kernel, x=x0, manifold=S2, tol=0.05, n_max=10)
-    # kernel = partial(heat_kernel, x=x0, manifold=S2, tol=jnp.inf, n_max=1)
+    kernel = partial(heat_kernel, x=x0, manifold=S2, thresh=0.05, n_max=10)
+    # kernel = partial(heat_kernel, x=x0, manifold=S2, thresh=jnp.inf, n_max=1)
 
     K = 5000
     eps = 0.0  # 1e-3
@@ -163,17 +204,19 @@ def test_s2():
     S2 = Hypersphere(dim=2)
     x0 = jnp.expand_dims(jnp.array([1.0, 0.0, 0.0]), 0)
     x0b = jnp.repeat(x0, 2 * 500, 0)
-    # sde = Brownian(S2, T=3, N=100, beta_min=0.1, beta_max=1)
-    sde = Brownian(S2, T=1, N=100, beta_min=0.1, beta_max=10)
-    # sde = Brownian(S2, T=3, N=100, beta_min=1., beta_max=1)
+    sde = Brownian(S2, tf=3, beta_0=1, beta_f=1)
+    # sde = Brownian(S2, tf=1, beta_0=0.1, beta_f=3)
+    # sde = Brownian(S2, tf=3, beta_0=1., beta_f=1)
     kernel = partial(heat_kernel, sde=sde)
     S2_brownian_motion = partial(brownian_motion, sde=sde)
 
     # ts = jnp.linspace(0, 1., 4+1)[1:]
     # ts = [0.002, 0.005, 0.01, 0.02, 0.05]
     # ts = [0.1, 0.2, 0.5, 1., 2., 5.]
-    ts = [0.02, 0.05, 0.1, 0.2, 0.5, 1.0]
-    # ts = [0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 5.]
+    # ts = [0.02, 0.05, 0.1, 0.2, 0.5, 1.0]
+    # ts = [0.02, 0.05, 0.1, 0.2, 0.5, 1.0]
+    ts = [0.01, 0.1, sde.tf]
+    # eps = 0.
     eps = jnp.pi * 3 / 4
     r = jnp.linspace(0.0, jnp.pi - eps, M)
     r = jnp.concatenate([-jnp.flip(r), r]).reshape(-1, 1)
@@ -182,26 +225,27 @@ def test_s2():
     # r = S2.metric.norm(v0)
     x = S2.metric.exp(v0, x0)
 
-    probs_trunc_5 = jnp.array([kernel(x=x0b, y=x, s=t, tol=0.0, n_max=5) for t in ts])
-    probs_trunc_10 = jnp.array([kernel(x=x0b, y=x, s=t, tol=0.0, n_max=10) for t in ts])
-    # probs_trunc_20 = jnp.array([kernel(x=x0b, y=x, s=t, tol=0., n_max=20) for t in ts])
-    probs_trunc_50 = jnp.array([kernel(x=x0b, y=x, s=t, tol=0.0, n_max=50) for t in ts])
-    probs_dev = jnp.array([kernel(x=x0b, y=x, s=t, tol=jnp.inf, n_max=1) for t in ts])
+    probs_trunc_5 = jnp.array([kernel(x=x0b, y=x, s=t, thresh=0.0, n_max=5) for t in ts])
+    probs_trunc_10 = jnp.array([kernel(x=x0b, y=x, s=t, thresh=0.0, n_max=10) for t in ts])
+    # probs_trunc_20 = jnp.array([kernel(x=x0b, y=x, s=t, thresh=0., n_max=20) for t in ts])
+    probs_trunc_50 = jnp.array([kernel(x=x0b, y=x, s=t, thresh=0.0, n_max=50) for t in ts])
+    probs_dev = jnp.array([kernel(x=x0b, y=x, s=t, thresh=jnp.inf, n_max=1) for t in ts])
 
     ### Sample heat kernel + density estimation
-    K = 1000000
-    previous_x = jnp.repeat(x0, K, axis=0)
-    probs_samples = jnp.zeros((len(ts), M))
+    # K = 1000000
+    # previous_x = jnp.repeat(x0, K, axis=0)
+    # probs_samples = jnp.zeros((len(ts), M))
+    # N = 100
 
-    for i, t in enumerate(ts):
-        print(t)
-        eps = 1e-3
-        dt = (t - eps) / sde.N
-        timesteps = jnp.linspace(eps, t, sde.N)
-        y = S2_brownian_motion(previous_x, dt, timesteps)
-        kde = vmf_kde(y, kappa=50 / t)
-        prob = kde(x)
-        probs_samples = probs_samples.at[i].set(prob)
+    # for i, t in enumerate(ts):
+    #     print(t)
+    #     eps = 1e-3
+    #     dt = (t - eps) / N
+    #     timesteps = jnp.linspace(eps, t, N)
+    #     y = S2_brownian_motion(previous_x, N, dt, timesteps)
+    #     kde = vmf_kde(y, kappa=50 / t)
+    #     prob = kde(x)
+    #     probs_samples = probs_samples.at[i].set(prob)
 
     probs = jnp.concatenate(
         list(
@@ -211,26 +255,28 @@ def test_s2():
                     probs_trunc_5,
                     probs_trunc_10,
                     probs_trunc_50,
-                    probs_samples,
+                    # probs_samples,
                     probs_dev,
                 ],
             )
         ),
         axis=1,
     )
+    dim_0_names = list(map(lambda x: f"t={x}", ts))
     dim_1_names = [
-        "truncated(5)",
-        "truncated(10)",
-        "truncated(50)",
-        "samples",
-        "developement",
+        "Sturm-Liouville (5)",
+        "Sturm-Liouville (10)",
+        "Sturm-Liouville (50)",
+        # "samples",
+        "Varadhan expansion",
     ]
     plot(
         r,
         probs,
-        ts,
+        dim_0_names,
         dim_1_names,
-        out=f"images/s2_heat_kernel_beta_{sde.T}_{sde.beta_0:.1f}_{sde.beta_1:.1f}",
+        # out=f"images/arxiv/s2_heat_kernel_beta_{sde.tf}_{sde.beta_0:.1f}_{sde.beta_f:.1f}",
+        out=f"images/arxiv/s2_heat_kernel",
     )
 
 
@@ -287,10 +333,10 @@ def test_s1():
     v0 = jnp.array([[0.0, 1.0]]) * r
     # r = S1.metric.norm(v0)
     x = S1.metric.exp(v0, x0)
-    probs_trunc_1 = jnp.array([kernel(x=x0, y=x, s=t, tol=0.0, n_max=0) for t in ts])
-    probs_trunc_3 = jnp.array([kernel(x=x0, y=x, s=t, tol=0.0, n_max=1) for t in ts])
-    probs_trunc_10 = jnp.array([kernel(x=x0, y=x, s=t, tol=0.0, n_max=5) for t in ts])
-    probs_dev = jnp.array([kernel(x=x0, y=x, s=t, tol=jnp.inf, n_max=1) for t in ts])
+    probs_trunc_1 = jnp.array([kernel(x=x0, y=x, s=t, thresh=0.0, n_max=0) for t in ts])
+    probs_trunc_3 = jnp.array([kernel(x=x0, y=x, s=t, thresh=0.0, n_max=1) for t in ts])
+    probs_trunc_10 = jnp.array([kernel(x=x0, y=x, s=t, thresh=0.0, n_max=5) for t in ts])
+    probs_dev = jnp.array([kernel(x=x0, y=x, s=t, thresh=jnp.inf, n_max=1) for t in ts])
 
     ### Sample heat kernel + density estimation
     K = 100000
@@ -334,6 +380,7 @@ def test_s1():
         ),
         axis=1,
     )
+    dim_0_names = list(map(lambda x: f"t={x}", ts))
     dim_1_names = [
         "truncated(1)",
         "truncated(3)",
@@ -341,7 +388,7 @@ def test_s1():
         "samples",
         "developement",
     ]
-    plot(r, probs, ts, dim_1_names, out="images/s1_heat_kernel")
+    plot(r, probs, dim_0_names, dim_1_names, out="images/s1_heat_kernel")
     # plot_s1(r, probs, ts, dim_1_names, out="images/s1_heat_kernel")
 
     ### histogram
