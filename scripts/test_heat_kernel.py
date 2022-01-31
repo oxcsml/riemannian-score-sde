@@ -25,8 +25,12 @@ from scripts.utils import (
 def plot(x, ys, dim_0_names, dim_1_names, out):
     K, J, _ = ys.shape
     fig, axis = plt.subplots(
-        nrows=1, ncols=K, figsize=(12, 5), sharex=True, sharey=False
+        nrows=1, ncols=K, figsize=(6.27, 3), sharex=True, sharey=False
     )
+    plt.rcParams["text.usetex"] = True
+    plt.rcParams["font.family"] = ["Latin Modern Roman"]
+    plt.rcParams.update({"font.size": 10.95})
+
     axis = axis if isinstance(axis, np.ndarray) else [axis]
     # colours = sns.cubehelix_palette(n_colors=J, light=1.0, dark=0.0, start=0.5, rot=-0.75, reverse=False)
     colours = sns.cubehelix_palette(n_colors=J, reverse=False)
@@ -46,7 +50,7 @@ def plot(x, ys, dim_0_names, dim_1_names, out):
     axis[-1].legend(loc="best")
     axis[0].set_xlabel("dist")
     axis[0].set_ylabel("pdf")
-    plt.savefig("{}.png".format(out), dpi=300, bbox_inches="tight")
+    plt.savefig("{}.pdf".format(out), dpi=300, bbox_inches="tight")
     plt.clf()
     plt.close("all")
 
