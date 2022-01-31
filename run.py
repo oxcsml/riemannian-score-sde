@@ -168,6 +168,7 @@ def run(cfg):
 
     ### Main
     log.info("Stage : Startup")
+    log.info(f"Jax devices: {jax.devices()}")
     run_path = os.getcwd()
     ckpt_path = os.path.join(run_path, cfg.ckpt_dir)
     os.makedirs(ckpt_path, exist_ok=True)
@@ -221,6 +222,9 @@ def run(cfg):
                 drop_last=False,
             ),
         )
+        log.info(
+            f"Train size: {len(train_ds.dataset)}. Val size: {len(eval_ds.dataset)}. Test size: {len(test_ds.dataset)}"
+        )
     else:
         train_ds, eval_ds, test_ds = dataset, dataset, dataset
 
@@ -231,7 +235,11 @@ def run(cfg):
     def score_model(x, t):
         output_shape = get_class(cfg.generator._target_).output_shape(model_manifold)
         score = instantiate(
-            cfg.generator, cfg.architecture, output_shape, manifold=model_manifold
+            cfg.generator,
+            cfg.architecture,
+            cfg.embedding,
+            output_shape,
+            manifold=model_manifold,
         )
         return score(x, t)
 

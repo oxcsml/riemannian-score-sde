@@ -1,0 +1,5 @@
+_target_: riemannian_score_sde.models.LaplacianEigenfunctionEmbedding
+
+n_manifold: 11
+n_time: 72
+max_t: 1.
