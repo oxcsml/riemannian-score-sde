@@ -1,0 +1,77 @@
+\section{Eigenfunctions, eigenvalues of the Laplace-Beltrami operator}
+\label{sec:eigenf-eigenv-lapl}
+
+
+In this section, we recall the eigenfunctions and eigenvalues of the
+Laplace-Beltrami operator in two specific cases: the $d$-dimensional torus and
+the $d$-dimensional sphere.
+
+\paragraph{The case of the torus}
+Let $\{b_i\}_{i=1}^d$ be a basis of $\rset^d$.  We consider the associated
+lattice on $\rset^d$, i.e.
+$\Gamma = \ensembleLigne{\sum_{i=1}^d \alpha_i b_i}{\{\alpha_i\}_{i=1}^d \in
+  \zset^d}$. Finally, the associated $d$-dimensional torus is defined as
+$\tset_\Gamma = \rset^d / \Gamma$. Denote
+$\rmB = (b_1, \dots, b_d) \in \rset^{d \times d}$. Let
+$\{\bar{b}_i\}_{i=1}^d \in (\rset^d)^d$ such that
+$(\rmB^{-1})^\top = (\bar{b}_1, \dots, \bar{b}_d)$. We define
+$\Gamma^\star = \ensembleLigne{\sum_{i=1}^d \alpha_i
+  \bar{b}_i}{\{\alpha_i\}_{i=1}^d \in \zset^d}$, the dual lattice. Note that for
+any $x \in \Gamma$ and $y \in \Gamma^\star$ we have that
+$\langle x, y \rangle \in \zset$ and that if $\{b_i\}_{i=1}^d$ is an orthonormal
+basis then $\Gamma = \Gamma^\star$. The torus $\rset^d/\Gamma$ is a (flat)
+compact Riemannian manifold. The set of eigenvalues of the Laplace-Beltrami
+operator is given by
+$\ensembleLigne{-4 \uppi^2 \normLigne{y}^2}{y \in \Gamma^\star}$. The
+eigenfunctions of the Laplace-Beltrami operator are given by
+$\ensembleLigne{x \mapsto \sin(2 \uppi \langle x, y \rangle)}{y \in
+  \Gamma^\star}$ and
+$\ensembleLigne{x \mapsto \cos(2 \uppi \langle x, y \rangle)}{y \in
+  \Gamma^\star}$. 
+
+
+\paragraph{The case of the sphere} Next, we investigate the case of the
+$d$-dimensional sphere \citep[see][]{saloff1994precise}. The set of eigenvalues of
+the Laplace-Beltrami operator is given by
+$\ensembleLigne{-k(k+d-1)}{k \in \nset}$. Note that $\lambda_k = k(k+d-1)$ has
+multiplicity $d_k = (k+d-2)!/\{(d-1)!k\}(2k+d-1)$. The eigenfunctions of the
+Laplace-Beltrami operator are known as the spherical harmonics and can be
+defined in terms of Legendre polynomials. When investigating the heat kernel on
+the $d$-dimensional sphere, we are interested in the product
+$(x,y) \mapsto \sum_{\phi \in \Phi_n} \phi(x)\phi(y)$, where $\Phi_n$ is the set
+of eigenfunctions associated with the eigenvalue $\lambda_n$ for $n \in
+\nset$. This function can be described using the Gegenbauer polynomials
+\cite[see][Theorem 2.9]{atkinson2012spherical}. More precisely, we have that for any
+$n \in \nset$ and $x,y \in \mathbb{S}^d$
+\begin{align}
+  G_n(x,y) &= \textstyle{ \sum_{\phi \in \Phi_n} \phi(x) \phi(y)} \\
+  &= \textstyle{n! \Gamma((d-1)/2) \sum_{k=0}^{\floor{n/2}} (-1)^k (1- \langle x,y \rangle^2)\langle x,y \rangle^{n-2k} / (4^k k! (n -2k)! \Gamma(k + (d-1)/2) ) ,}
+\end{align}
+where here $\Gamma: \ \rset_+ \to \rset$ is given for any $v > 0$ by
+$\Gamma(v) = \int_0^{+\infty} t^{v-1} \rmd t^{-t} \rmd t$.  In the special case
+where $d=1$, then the heat kernel coincide with the wrapped Gaussian density and
+can be easily evaluated.
+
+% with $\{\lambda_n\}_n$ and $\{\psi_n\}_n$ respectively the eigenvalues and eigenfunctions of the Laplace-Beltrami operator $\Delta_\mathcal{M}$.
+% For instance with $\mathbb{S}^d$, we know \citep{borovitskiy2020Matern,devito2019Reproducing,zhao2018Exact} that $\lambda_n = n(n + d - 1)$ and $$\psi_n(x) \psi_n(y) = \frac{2n+d-1}{d-1} \frac{1}{A_{\mathbb{S}^n}} \mathcal{C}_n^{(d-1)/2}(x \cdot y)$$  where $\mathcal{C}_n^{(d-1)/2}$ are Gegenbauer polynomials.
+% An exact sampling scheme exists for $\mathbb{S}^d$ \cite{mijatovic2020note} but it is non trivial to implement \footnote{https://github.com/konkam/ExactWrightFisher.jl}.
+
+% When $d=2$, then the eigenfunctions are the spherical harmonics and the Gegenbauer polynomials are the Legendre polynomials $P_n$, we thus get \citep{jammalamadaka2019Harmonic,mardia2000Directional}: 
+% $$p_t(x, y) = \sum^\infty_{n=0} e^{- n(n+1) \cdot t } ~\frac{2n + 1}{4 \pi} P_n(x \cdot y).$$
+% When $d=1$, the heat kernel and Wrapped normal density coincide which means one can easily sample $X_t|X_0$.
+% Additionally, around $t \approx 0$, \cref{eq:heat_kernel} can be expended as
+% $$p_t(x, y) = (4\pi t)^{-d/2} G(r)^{-1/2} \exp \left(-\frac{r^2}{4t}\right) + \mathcal{O}(1)$$
+% with $r=d_\mathcal{M}(x,y)$.  Higher order expansions can be obtained
+% \cite{rey2019diffusion,zhao2018Exact}.  One could get an unbiased estimator of
+% \cref{eq:heat_kernel} via the Russian roulette estimator
+% $\sum_n \Delta_n = \mathbb{E}_{N \sim p} \left[ \sum^N_n
+%   \frac{\Delta_n}{\mathbb{P}(N \ge n)} \right]$, although what we care in
+% practice about $\nabla_x \log p_t(x, y)$ where the $\log$ would bias the
+% estimator.
+
+
+
+%%% Local Variables:
+%%% mode: latex
+%%% TeX-master: "main"
+%%% End:

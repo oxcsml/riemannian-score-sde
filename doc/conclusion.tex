@@ -1,0 +1,27 @@
+\section{Discussion and limitations}
+\label{sec:conclusion}
+
+In this paper we introduced Riemannian Score-Based Generative Models (RSGMs), a class of deep generative models that represent target densities supported on compact manifolds, as the reverse diffusion process of a Brownian motion.
+The main benefits of our method stems from its scalability to high dimensions, its applicability to a broad class of manifolds due to the diversity of available loss functions and its capacity to model complex datasets.
+We proved that RSGMs are universal generative models for densities supported on compact manifolds. \valentin{universal ?}
+Empirically, we demonstrated that our method outperforms previous work on density estimation tasks with spherical geoscience datasets.
+
+
+% \paragraph{Limitation}
+% contrary to NF we cannot estimate using the KL
+% ie we need to have access to data and not just the unnormalized density
+One current limitation---similarly to other score-based generative models---is the requirement of samples from the targeted distribution, as such models cannot directly fit an unnormalized density.
+% Limitation to compact manifold, extension to hyperbolic
+% Proof of convergence similar to Theorem 1 in our paper
+An important future work direction, and a current limitation, is the manifold compactness assumption.
+Several important manifolds do not fit into this category, such as the special linear group, symmetric positive definite matrices or the hyperbolic space which underlies special relativity \citep{ungar2005Einstein}.
+\emile{Should write a paragraph in the app on the conditional extension}
+Another extension of interest is conditional sampling. By amortizing SGMs with respect to an observation it is possible to approximately sample from a given posterior distribution \citep[see for instance][]{kawar2021snips,kawar2021stochastic,lee2021priorgrad,sinha2021d2c,batzolis2021conditional,chung2021come}.
+% Conditional Riemannian SGM (CRSGM).
+% Indeed, by amortizing SGM with respect to an observation it is possible to approximately sample from a given posterior distribution, and therefore solve inverse problems, provided that we know how to sample from the corruption model \citep[see for instance][]{kawar2021snips,kawar2021stochastic,lee2021priorgrad,sinha2021d2c,batzolis2021conditional,chung2021come}.
+
+
+%%% Local Variables:
+%%% mode: latex
+%%% TeX-master: "main"
+%%% End:

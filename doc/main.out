@@ -1,0 +1,19 @@
+\BOOKMARK [1][-]{section.1}{Introduction}{}% 1
+\BOOKMARK [1][-]{section.2}{Notation}{}% 2
+\BOOKMARK [1][-]{section.3}{Euclidean Score-based Generative Modeling}{}% 3
+\BOOKMARK [1][-]{section.4}{Riemannian Score-based Generative Modeling}{}% 4
+\BOOKMARK [2][-]{subsection.4.1}{Brownian motion on compact Riemannian manifolds}{section.4}% 5
+\BOOKMARK [2][-]{subsection.4.2}{A manifold time-reversal formula}{section.4}% 6
+\BOOKMARK [2][-]{subsection.4.3}{Score approximation on Riemannian manifolds}{section.4}% 7
+\BOOKMARK [2][-]{subsection.4.4}{Likelihood computation}{section.4}% 8
+\BOOKMARK [1][-]{section.5}{Related work}{}% 9
+\BOOKMARK [1][-]{section.6}{Experiments}{}% 10
+\BOOKMARK [1][-]{section.7}{Discussion and limitations}{}% 11
+\BOOKMARK [1][-]{appendix.A}{Organization of the supplementary}{}% 12
+\BOOKMARK [1][-]{appendix.B}{Preliminaries on stochastic Riemannian geometry}{}% 13
+\BOOKMARK [1][-]{appendix.C}{Difference between ODE and SDE likelihood computations}{}% 14
+\BOOKMARK [1][-]{appendix.D}{Eigenfunctions, eigenvalues of the Laplace-Beltrami operator}{}% 15
+\BOOKMARK [1][-]{appendix.E}{Time-reversal formula: extension to compact Riemannian manifolds}{}% 16
+\BOOKMARK [1][-]{appendix.F}{Schr\366dinger Bridges on Manifolds}{}% 17
+\BOOKMARK [1][-]{appendix.G}{Proof of prop:implicitder}{}% 18
+\BOOKMARK [1][-]{appendix.H}{Experimental detail}{}% 19

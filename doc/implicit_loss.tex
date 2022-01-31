@@ -1,0 +1,27 @@
+\section{Proof of \cref{prop:implicit_der}}
+\label{sec:implicit-losses}
+
+
+
+\begin{proof}
+      Let $t \in \ocint{0,T}$ and $s_t \in \rmc^\infty(\M)$. Using the
+      divergence theorem \cite[see][p.51]{lee2018introduction}, we have
+      \begin{align}
+        \ell_{t|s}(s_t) &\textstyle{= \int_{\M \times \M} \normLigne{\nabla \log p_{t|s}(x_t|x_s)}^2 \rmd \Pbb_{s,t}(x_s,x_t) + \int_\M \normLigne{s_t(x_t)}^2 \rmd \Pbb_{t}(x_t)} \\
+        & \qquad \qquad \textstyle{- 2 \int_{\M \times \M} \langle \nabla \log p_{t|s}(x_t|x_s), s_t(x_t) \rangle \rmd \Pbb_{s,t}(x_s,x_t)} \\
+                    &=\textstyle{\int_{\M \times \M} \normLigne{\nabla \log p_{t|s}(x_t|x_s)}^2 \rmd \Pbb_{s,t}(x_s,x_t) + \int_\M \normLigne{s_t(x_t)}^2 \rmd \Pbb_{t}(x_t)} \\
+                    & \qquad \qquad \textstyle{- 2 \int_{\M \times \M}  \langle \nabla \log p_{t|s}(x_t|x_s), s_t(x_t) \rangle p_{t|s}(x_t|x_s)p_s(x_s) \rmd (\piinv \otimes \piinv) (x_s, x_t)  } \\
+        &=\textstyle{\int_{\M \times \M} \normLigne{\nabla \log p_{t|s}(x_t|x_s)}^2 \rmd \Pbb_{s,t}(x_s,x_t) + \int_\M \normLigne{s_t(x_t)}^2 \rmd \Pbb_{t}(x_t)} \\
+                    & \qquad \qquad \textstyle{- 2 \int_{\M } \{\int_\M  \langle \nabla p_{t|s}(x_t|x_s), s_t(x_t) \rangle \rmd \piinv(x_t)\} p_s(x_s) \rmd \piinv(x_s)  } \\
+        &=\textstyle{\int_{\M \times \M} \normLigne{\nabla \log p_{t|s}(x_t|x_s)}^2 \rmd \Pbb_{s,t}(x_s,x_t) + \int_\M \normLigne{s_t(x_t)}^2 \rmd \Pbb_{t}(x_t)} \\
+                    & \qquad \qquad \textstyle{ +2 \int_{\M } \{\int_\M   \dive(s_t)(x_t)p_{t|s}(x_t|x_s)  \rmd \piinv(x_t)\} p_s(x_s) \rmd \piinv(x_s)  }  ,
+      \end{align}
+
+
+      which concludes the proof.
+    \end{proof}
+
+%%% Local Variables:
+%%% mode: latex
+%%% TeX-master: "main"
+%%% End:

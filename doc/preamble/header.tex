@@ -1,0 +1,226 @@
+\usepackage[utf8]{inputenc}   % LaTeX, comprends les accents !
+\usepackage[T1]{fontenc}      % Police contenant les caractÃ¨res franÃ§ais
+%\usepackage[french]{babel}  % Placez ici une liste de langues
+%\usepackage{multicol}
+
+%%%%%%%%%%%%%%
+%% comment uncomment
+%\usepackage[notref,notcite]{showkeys}
+%%%%
+
+
+ % \usepackage[notref,notcite]{showkeys}  %  comment out for final version
+ % \renewcommand*\showkeyslabelformat[1]{\fbox{\normalfont\scriptsize\sffamily#1}}   % for showkeys
+
+\usepackage{comment}
+\usepackage{geometry}
+\geometry{a4paper,margin=1in}
+\usepackage{natbib}
+% \usepackage[bibstyle=trad-abbrv, natbib=true, citestyle=numeric-comp, backref=true, useprefix, uniquename=false,maxcitenames=2]{biblatex}
+% \newcommand{\citep}[]{}
+%\setcitestyle{square}
+
+\usepackage[tbtags]{amsmath}
+\usepackage{amsthm}
+\allowdisplaybreaks
+\usepackage{amssymb,mathrsfs}
+\usepackage{nccmath}
+\usepackage{amsfonts}
+\usepackage{upgreek}
+\usepackage{xspace}
+
+% \usepackage{nicefrac}
+
+%\usepackage[numbers]{natbib}
+\usepackage{graphicx}
+% \usepackage{subfig}
+%\usepackage[caption = false]{subfig} %package pour faire sous-figures
+\usepackage{color}
+%\usepackage[ruled,vlined]{algorithm2e}
+%\usepackage{algpseudocode,algorithm,algorithmicx}
+\usepackage{algorithm, algpseudocode}
+\begin{comment}
+
+\algnewcommand{\Inputs}[1]{%
+  \State \textbf{Inputs:}
+  \Statex \hspace*{\algorithmicindent}\parbox[t]{.8\linewidth}{\raggedright #1}
+}
+\algnewcommand{\Initialize}[1]{%
+  \State \textbf{Initialize:}
+  \Statex \hspace*{\algorithmicindent}\parbox[t]{.8\linewidth}{\raggedright #1}
+}
+\algnewcommand{\Outputs}[1]{%
+  \State \textbf{Outputs:}
+  \Statex \hspace*{\algorithmicindent}\parbox[t]{.8\linewidth}{\raggedright #1}
+}
+\end{comment}
+
+%###########
+%\usepackage{manuColor}
+\usepackage{stmaryrd}
+\usepackage[inline]{enumitem}
+%[wide, labelwidth=!, labelindent=0pt]
+\usepackage{url}
+\def\UrlBreaks{\do\/\do-}
+\usepackage{tikz}
+\usetikzlibrary{calc}
+\newcommand\yBlock{1}
+\newcommand\yNode{0.75}
+
+\newcommand\xNodemoinstiny{-1}
+\newcommand\xNodemoins{-1.5}
+\newcommand\xNodemoinsint{-2.}
+\newcommand\xNodeMoins{-3}
+\newcommand\xNodeMOINS{-4.5}
+
+\newcommand\xNodeplustiny{1}
+\newcommand\xNodeplus{1.5}
+\newcommand\xNodeplusint{2}
+\newcommand\xNodePlus{3}
+\newcommand\xNodePLUS{4.5}
+
+\usepackage{pgfplots}
+\usepackage{xcolor}
+\usepackage{bbm}
+\usepackage{ifthen}
+\usepackage{xargs}
+\usepackage[textwidth=1.8cm]{todonotes}
+
+\usepackage{aliascnt}
+% \usepackage{cleveref}
+\usepackage[capitalise,noabbrev]{cleveref}
+\usepackage{autonum}
+\makeatletter
+\newtheorem{theorem}{Theorem}
+% \crefname{theorem}{theorem}{Theorems}
+% \Crefname{Theorem}{Theorem}{Theorems}
+
+
+\newtheorem*{lemma_nonumber*}{Lemma}
+
+
+\newaliascnt{lemma}{theorem}
+\newtheorem{lemma}[lemma]{Lemma}
+\aliascntresetthe{lemma}
+% \crefname{lemma}{lemma}{lemmas}
+% \Crefname{Lemma}{Lemma}{Lemmas}
+
+
+
+\newaliascnt{corollary}{theorem}
+\newtheorem{corollary}[corollary]{Corollary}
+\aliascntresetthe{corollary}
+% \crefname{corollary}{corollary}{corollaries}
+% \Crefname{Corollary}{Corollary}{Corollaries}
+
+\newaliascnt{proposition}{theorem}
+\newtheorem{proposition}[proposition]{Proposition}
+\aliascntresetthe{proposition}
+% \crefname{proposition}{proposition}{propositions}
+% \Crefname{Proposition}{Proposition}{Propositions}
+
+\newaliascnt{definition}{theorem}
+\newtheorem{definition}[definition]{Definition}
+\aliascntresetthe{definition}
+% \crefname{definition}{definition}{definitions}
+% \Crefname{Definition}{Definition}{Definitions}
+
+\newaliascnt{remark}{theorem}
+\newtheorem{remark}[remark]{Remark}
+\aliascntresetthe{remark}
+% \crefname{remark}{remark}{remarks}
+% \Crefname{Remark}{Remark}{Remarks}
+
+
+\newtheorem{example}[theorem]{Example}
+% \crefname{example}{example}{examples}
+% \Crefname{Example}{Example}{Examples}
+
+\newtheorem{technique}{Technique}
+% \crefname{technique}{technique}{techniques}
+% \Crefname{Technique}{Technique}{Techniques}
+
+
+% \crefname{figure}{figure}{figures}
+% \Crefname{Figure}{Figure}{Figures}
+
+
+%\newtheorem{assumption}{\textbf{A}\hspace{-3pt}}
+%\Crefname{assumption}{\textbf{A}\hspace{-3pt}}{\textbf{A}\hspace{-3pt}}
+%\crefname{assumption}{\textbf{A}}{\textbf{A}}
+\newtheorem{assumption}{\textbf{A}\hspace{-3pt}}
+\crefformat{assumption}{{\textbf{A}}#2#1#3}
+
+\newtheorem{assumptionF}{\textbf{F}\hspace{-3pt}}
+\crefformat{assumptionF}{{\textbf{F}}#2#1#3}
+
+\newenvironment{assumptionbis}[1]
+  {\renewcommand{\theassumptionF}{\ref*{#1}$\mathbf{b}$}%
+   \addtocounter{assumptionF}{-1}%
+   \begin{assumptionF}}
+  {\end{assumptionF}}
+
+
+
+\newtheorem{assumptionB}{\textbf{B}\hspace{-3pt}}
+\Crefname{assumptionB}{\textbf{B}\hspace{-3pt}}{\textbf{B}\hspace{-3pt}}
+\crefname{assumptionB}{\textbf{B}}{\textbf{B}}
+
+\newtheorem{assumptionC}{\textbf{C}\hspace{-3pt}}
+\Crefname{assumptionC}{\textbf{C}\hspace{-3pt}}{\textbf{C}\hspace{-3pt}}
+\crefname{assumptionC}{\textbf{C}}{\textbf{C}}
+
+
+\newtheorem{assumptionH}{\textbf{H}\hspace{-3pt}}
+\Crefname{assumptionH}{\textbf{H}\hspace{-3pt}}{\textbf{H}\hspace{-3pt}}
+\crefname{assumptionH}{\textbf{H}}{\textbf{H}}
+
+\newtheorem{assumptionT}{\textbf{T}\hspace{-3pt}}
+\Crefname{assumptionT}{\textbf{T}\hspace{-3pt}}{\textbf{T}\hspace{-3pt}}
+\crefname{assumptionT}{\textbf{T}}{\textbf{T}}
+
+\newtheorem{assumptionD}{\textbf{D}\hspace{-3pt}}
+\Crefname{assumptionT}{\textbf{T}\hspace{-3pt}}{\textbf{T}\hspace{-3pt}}
+\crefname{assumptionT}{\textbf{T}}{\textbf{T}}
+
+
+\newtheorem{assumptionL}{\textbf{L}\hspace{-3pt}}
+\Crefname{assumptionL}{\textbf{L}\hspace{-3pt}}{\textbf{L}\hspace{-3pt}}
+\crefname{assumptionL}{\textbf{L}}{\textbf{L}}
+
+\newtheorem{assumptionQ}{\textbf{Q}\hspace{-3pt}}
+\Crefname{assumptionQ}{\textbf{Q}\hspace{-3pt}}{\textbf{Q}\hspace{-3pt}}
+\crefname{assumptionQ}{\textbf{Q}}{\textbf{Q}}
+
+% \newtheorem{assumptionD*}{\textbf{D}\hspace{-3pt}}
+% \Crefname{assumptionD}{\textbf{D}\hspace{-3pt}}{\textbf{D}\hspace{-3pt}}
+% \crefname{assumptionD}{\textbf{D}}{\textbf{D}}
+
+\newtheorem{assumptionAR}{\textbf{AR}\hspace{-3pt}}
+\Crefname{assumptionAR}{\textbf{AR}\hspace{-3pt}}{\textbf{AR}\hspace{-3pt}}
+\crefname{assumptionAR}{\textbf{AR}}{\textbf{AR}}
+
+
+
+\newcommand\diaW{11}
+\newcommand\diaH{5}
+\newcommand\diaJump{2.75}
+\newcommand\nextRow{1.25}
+\newcommand\imW{0.08}
+\newcommand\imWB{0.1}
+\newcommand\imOp{0.6}
+\newcommand\bend{5}
+
+\newcommand\offset{2}
+\newcommand\offsety{2.3}
+\newcommand\h{2.25}
+\newcommand\hsmall{1.75}
+\newcommand\ww{3.25}
+\newcommand\www{1.8}
+\newcommand\wwww{3.5}
+\newcommand\wwwww{4.8}
+\newcommand{\offsetsmall}{1.5}
+
+
+\usepackage{bm}
+\usepackage{wrapfig}

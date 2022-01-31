@@ -1,0 +1,1254 @@
+\documentclass[11pt,a4paper]{article}
+%DIF LATEXDIFF DIFFERENCE FILE
+%DIF DEL main_arxiv.tex   Mon Oct 18 09:48:07 2021
+%DIF ADD main_aap.tex     Mon Oct 18 09:47:45 2021
+
+\usepackage[utf8]{inputenc} % allow utf-8 input
+\usepackage[T1]{fontenc}    % use 8-bit T1 fonts
+\usepackage{hyperref}       % hyperlinks
+\usepackage{url}            % simple URL typesetting
+\usepackage{booktabs}       % professional-quality tables
+\usepackage{amsfonts}       % blackboard math symbols
+\usepackage{nicefrac}       % compact symbols for 1/2, etc.
+\usepackage{microtype}      % microtypography
+\usepackage{xcolor}         % colors
+\usepackage{tikz}
+\usepackage{caption}
+\usepackage{float}
+\usetikzlibrary{arrows.meta}
+\usetikzlibrary{calc}
+ \input{header}
+ \input{def}
+ \usepackage{comment}
+ \usepackage{authblk}
+%DIF 21d21
+%DIF <  \usepackage{cancel}
+%DIF -------
+\makeatletter
+\renewcommand\AB@affilsepx{, \protect\Affilfont}
+\makeatother
+%  \usepackage{showlabels}
+
+\hypersetup{colorlinks,citecolor=blue}
+
+
+
+\title{Quantitative Uniform Stability of the Iterative Proportional Fitting Procedure}
+
+% The \author macro works with any number of authors. There are two commands
+% used to separate the names and addresses of multiple authors: \And and \AND.
+%
+% Using \And between authors leaves it to LaTeX to determine where to break the
+% lines. Using \AND forces a line break at that point. So, if LaTeX puts 3 of 4
+% authors names on the first line, and the last on the second line, try using
+% \AND instead of \And before the third author name.
+
+% \author{George, Valentin and Arnaud}
+
+\author{George Deligiannidis\thanks{corresponding author: deligian@stats.ox.ac.uk}~, Valentin De Bortoli\thanks{valentin.debortoli@gmail.com}~, Arnaud Doucet\thanks{doucet@stats.ox.ac.uk}}
+\affil{Department of Statistics, University of Oxford, UK}
+% \affil[1]{deligian@stats.ox.ac.uk}
+% \affil[2]{valentin.debortoli@gmail.com}
+% \affil[3]{doucet@stats.ox.ac.uk}
+%DIF PREAMBLE EXTENSION ADDED BY LATEXDIFF
+%DIF UNDERLINE PREAMBLE %DIF PREAMBLE
+\RequirePackage[normalem]{ulem} %DIF PREAMBLE
+\RequirePackage{color}\definecolor{RED}{rgb}{1,0,0}\definecolor{BLUE}{rgb}{0,0,1} %DIF PREAMBLE
+\providecommand{\DIFaddtex}[1]{{\protect\color{blue}\uwave{#1}}} %DIF PREAMBLE
+\providecommand{\DIFdeltex}[1]{{\protect\color{red}\sout{#1}}}                      %DIF PREAMBLE
+%DIF SAFE PREAMBLE %DIF PREAMBLE
+\providecommand{\DIFaddbegin}{} %DIF PREAMBLE
+\providecommand{\DIFaddend}{} %DIF PREAMBLE
+\providecommand{\DIFdelbegin}{} %DIF PREAMBLE
+\providecommand{\DIFdelend}{} %DIF PREAMBLE
+\providecommand{\DIFmodbegin}{} %DIF PREAMBLE
+\providecommand{\DIFmodend}{} %DIF PREAMBLE
+%DIF FLOATSAFE PREAMBLE %DIF PREAMBLE
+\providecommand{\DIFaddFL}[1]{\DIFadd{#1}} %DIF PREAMBLE
+\providecommand{\DIFdelFL}[1]{\DIFdel{#1}} %DIF PREAMBLE
+\providecommand{\DIFaddbeginFL}{} %DIF PREAMBLE
+\providecommand{\DIFaddendFL}{} %DIF PREAMBLE
+\providecommand{\DIFdelbeginFL}{} %DIF PREAMBLE
+\providecommand{\DIFdelendFL}{} %DIF PREAMBLE
+%DIF HYPERREF PREAMBLE %DIF PREAMBLE
+\providecommand{\DIFadd}[1]{\texorpdfstring{\DIFaddtex{#1}}{#1}} %DIF PREAMBLE
+\providecommand{\DIFdel}[1]{\texorpdfstring{\DIFdeltex{#1}}{}} %DIF PREAMBLE
+%DIF LISTINGS PREAMBLE %DIF PREAMBLE
+\RequirePackage{listings} %DIF PREAMBLE
+\RequirePackage{color} %DIF PREAMBLE
+\lstdefinelanguage{DIFcode}{ %DIF PREAMBLE
+%DIF DIFCODE_UNDERLINE %DIF PREAMBLE
+  moredelim=[il][\color{red}\sout]{\%DIF\ <\ }, %DIF PREAMBLE
+  moredelim=[il][\color{blue}\uwave]{\%DIF\ >\ } %DIF PREAMBLE
+} %DIF PREAMBLE
+\lstdefinestyle{DIFverbatimstyle}{ %DIF PREAMBLE
+	language=DIFcode, %DIF PREAMBLE
+	basicstyle=\ttfamily, %DIF PREAMBLE
+	columns=fullflexible, %DIF PREAMBLE
+	keepspaces=true %DIF PREAMBLE
+} %DIF PREAMBLE
+\lstnewenvironment{DIFverbatim}{\lstset{style=DIFverbatimstyle}}{} %DIF PREAMBLE
+\lstnewenvironment{DIFverbatim*}{\lstset{style=DIFverbatimstyle,showspaces=true}}{} %DIF PREAMBLE
+%DIF END PREAMBLE EXTENSION ADDED BY LATEXDIFF
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+  We establish \DIFdelbegin \DIFdel{the uniform in time stability, w.r.t.\ the marginals, }\DIFdelend \DIFaddbegin \DIFadd{that the iterates }\DIFaddend of the Iterative Proportional Fitting Procedure, also known as  Sinkhorn\DIFdelbegin \DIFdel{algorithm, }\DIFdelend \DIFaddbegin \DIFadd{'s algorithm and commonly }\DIFaddend used to solve entropy-regularised Optimal Transport problems\DIFdelbegin \DIFdel{. }\DIFdelend \DIFaddbegin \DIFadd{, are stable w.r.t.\ perturbations of the marginals, uniformly in time. }\DIFaddend Our result is quantitative and stated in terms of the 1-Wasserstein metric. As a corollary we establish a quantitative stability result for Schr\"odinger bridges. 
+\end{abstract}
+
+\section{Introduction}
+\label{sec:introduction}
+
+The basic problem of Optimal Transport (OT) (see \cite{villani2009optimal} for a broad overview),
+in its modern formulation introduced by \cite{kantorovich1942transfer}, 
+is to find a \emph{coupling} of two distributions $\mu, \nu$ that minimises
+\begin{equation}
+    \label{eq:OTproblem}%\tag{$\mathsf{OT}(\mu, \nu)}$}
+    \tag*{\textsf{OT}$(\mu,\nu)$}
+    \inf_{\pi \in \mathcal{C}(\mu, \nu)} \int \DIFdelbegin %DIFDELCMD < \rmd %%%
+\DIFdelend \pi(\DIFaddbegin \rmd \DIFaddend x, \DIFaddbegin \rmd \DIFaddend y) \|x-y\|^2,
+\end{equation}
+where \DIFdelbegin \DIFdel{$\mathcal{C}(\mu,\nu)$ denotes the collection of probability measures with marginals $\mu, \nu$ and the }\DIFdelend \DIFaddbegin \DIFadd{the }\DIFaddend Euclidean distance $\|x-y\|^2$ may be replaced by any other metric or cost function $c(x,y)$. 
+OT provides a theoretical framework for analysis in the space of probability measures and has deep connections with many branches of mathematics including partial differential equations and probability. Beyond its intrinsic interest, OT has recently become an extremely important tool for data science and machine learning, finding numerous applications in fields as diverse as imaging, computer vision, natural language processing \citep{peyre2019computational}.
+
+This ubiquity of OT in modern applications is largely due to the computational tractability of the \emph{Entropy-Regularised} Optimal Transport problem
+\begin{equation}
+    \label{eq:RegOTproblem}\tag*{\textsf{OT}$_\epsilon(\mu,\nu)$}
+    \inf_{\pi \in \mathcal{C}(\mu, \nu)} \int \DIFdelbegin %DIFDELCMD < \rmd %%%
+\DIFdelend \pi(\DIFaddbegin \rmd \DIFaddend x, \DIFaddbegin \rmd \DIFaddend y) \|x-y\|^2 +\epsilon \KL{\pi}{\mu\otimes \nu};
+\end{equation}
+this is closely related to the \emph{static Sch\"odinger bridge},
+a problem going back to \cite{schrodinger1931umkehrung}, see \Cref{eq:schrodinger_bridge} in Section \ref{sec:main-results}.   
+Here $\KL{\pi}{\rho}$ denotes the \emph{Kullback--Leibler divergence} between the probability measures $\pi$ and $\rho$, defined as 
+\begin{equation}
+\KL{\pi}{\rho} := \DIFdelbegin %DIFDELCMD < \begin{cases}
+%DIFDELCMD <                         \int \rmd\pi \log \frac{\rmd \pi}{\rmd \rho}, & \pi \ll \rho,\\
+%DIFDELCMD <                         +\infty, & \text{otherwise}.
+%DIFDELCMD <                         \end{cases}%%%
+\DIFdelend \DIFaddbegin \begin{cases}
+                        \int \pi \log \frac{\rmd \pi}{\rmd \rho}, & \pi \ll \rho\\
+                        +\infty, & \text{otherwise}.
+                        \end{cases}\DIFaddend 
+ \end{equation}
+In particular, as explained in the seminal paper of \cite{cuturi2013sinkhorn}, \textsf{OT}$_\epsilon(\mu,\nu)$
+is amenable to \emph{Iterative Proportional Fitting Procedure} (IPFP), also known as the Sinkhorn algorithm when applied to discrete measures. The theoretical properties of IPFP and Sinkhorn algorithm have been the subject of intense investigation, and are therefore fairly well understood. In particular, under technical conditions, that are generally satisfied in compact spaces, it is known that IPFP converges at an exponential rate; see e.g.\ \cite{ruschendorf1995convergence} and for results on discrete measures, see e.g. \cite{altschuler2017near}.
+
+Due to its computational tractability, \textsf{OT}$_\epsilon(\mu,\nu)$ has been used in applications as an approximation to \textsf{OT}$(\mu,\nu)$. Rigorous justification of this approximation has been the subject of intense research recently. Indeed it has been established, see e.g.\  \cite{cominetti1994asymptotic,leonard2012schrodinger,carlier2017convergence}, that as the regularisation parameter $\epsilon \to 0$, the solution of \textsf{OT}$_\epsilon(\mu,\nu)$ converges to that of \textsf{OT}$(\mu,\nu)$.
+
+More recently however \DIFdelbegin \DIFdel{, }\DIFdelend Sch\"odinger bridges and entropy-regularised OT are being studied for their own sake, finding applications in control, computational statistics and machine learning, see e.g.\
+\cite{bernton2019schr,chen2021optimal,corenflos2021differentiable,de2021diffusion, huang2021schrodinger, vargas2021solving}. In these applications, the entropy regularisation may be a desirable feature rather than an approximation, and the main source of error is the fact that the marginal distributions are typically intractable and often approximated by empirical versions. It is then  desirable that as the number of samples increases, this error vanishes. \DIFdelbegin \DIFdel{\textcolor{orange}{A quantitative version of this statement, can then be used to establish for example that the differentiable particle filter proposed in \cite{corenflos2021differentiable}, based on regularised optimal transport, converges as the sample size increases, for any $\epsilon>0$.}
+}%DIFDELCMD < 
+
+%DIFDELCMD < %%%
+\DIFdelend This is the question we study in this paper, in particular we study the stability of the IPFP and of the solution of the corresponding Schr\"odinger bridge problem, with respect to perturbations of the marginals. 
+% One particular motivation for studying this problem is the fact that in typical applications, one only has access to samples from the marginal distributions therefore solving the corresponding OT problem for the result empirical distributions. It is therefore important to know that the resulting transport plan is close to the solution of corresponding problem for the true marginal distributions.\arnaud{repetitive}
+
+For standard OT, a classical argument 
+using compactness  and cyclical monotonicity guarantees a qualitative version of this result, see e.g.\cite[Theorem~5.23, Corollary~5.23]{villani2009optimal}. Quantitative versions of this result appeared much more recently, at least in the case of quadratic costs, in \cite{merigot2020quantitative}, \cite{li2020quantitative}, \cite{delalande2021quantitative}. In particular it is established that the optimal transport plans, or maps in the case of absolutely continuous measures, is H\"older continuous in the marginals, with exponent $1/2$ w.r.t.\ the marginals. 
+It is also known that the exponent $1/2$ is the best possible, see \cite{gigli2011holder}.
+
+For entropy-regularised OT and the static Schr\"odinger bridge problem, the first qualitative result appeared very recently in \cite{ghosal2021stability}, based on a version of cyclical monotonicity for entropy-regularised OT introduced by \cite{bernton2021entropic}. \DIFdelbegin \DIFdel{\textcolor{orange}{In the quantitative direction, \cite{luise2019sinkhorn} establish Lipschitz continuity of the potentials w.r.t.\ the marginals, measured in the total variation metric, which is too strong to capture the situation where the marginals are being approximated by empirical versions. For \emph{smooth} cost functions, \cite{luise2019sinkhorn} also establish that the sample complexity of learning the potentials is of order $n^2$, leveraging results from \cite{genevay2019sample} on the regularity of potentials and the duality between MMD type metrics and Sobolev spaces. However, if one is interested in learning the Sch\"odinger bridge the situation is more complicated; 
+the Wasserstein-1 distance between two couplings is lower bounded by the distance of the marginals and so the results by \cite{fournier2015rate} imply that the sample complexity of learning the Schr\"odinger bridge must scale at least as $n^{d}$.}
+}%DIFDELCMD < 
+
+%DIFDELCMD < %%%
+\DIFdelend We present here the first, to the best of our knowledge, quantitative stability result for entropy-regularised OT. In particular, this follows from a stronger result, namely the uniform in time stability of IPFP, that is the Sinkhorn iterates, with respect to the marginal distributions. One interesting fact is that in contrast to the standard OT problem, the solution of the entropy-regularised problem is Lipschitz continuous, in the Wasserstein metric, w.r.t.\ the marginals. However, as the regularisation parameter $\epsilon$ vanishes, the Lipschitz constant blows up as expected by the H\"older continuity of the OT plan. 
+
+
+% Qualitative for Schr\"odinger bridge \cite{ghosal2021stability}
+
+% Non quantitative -- \cite{ghosal2021stability}
+
+% Theorem 28.9 non quantitative + OT and not regularised OT \cite{villani2009optimal}\george{I think this refers to stability wrt perturbations of the metric space, rather than of the marginals. Theorem 5.23 is for perturbations of marginals}
+
+% Holder OT \cite{gigli2011holder}
+
+
+\section{Notation}
+\label{sec:notation}
+For a metric space $(\msz, d_\msz)$, we write \DIFdelbegin \DIFdel{$\diam_\msz$ }\DIFdelend \DIFaddbegin \DIFadd{$\mathfrak{d}_\msz$ }\DIFaddend for the diameter of $\msz$, that is \DIFdelbegin \DIFdel{$\diam_\msz:= \sup\{d_\msz(z,z'): z,z' \in \msz\}$}\DIFdelend \DIFaddbegin \DIFadd{$d_\msz:= \sup\{d_\msz(z,z'): z,z' \in \msz\}$}\DIFaddend . We also write $\Mens(\msz)$ to denote the space of Borel probability measures on $\msz$, $\Pens(\msz)$ for the subspace of Borel probability measures, and $\Pens_p(\msz)$ the collection of Borel probability measures with finite $p$-th moments.
+For $\pi \in \Pens(\msx)$, we define the \DIFdelbegin \DIFdel{support }\DIFdelend \DIFaddbegin \DIFadd{suport }\DIFaddend of $\pi$ as  $$\mathsf{supp}(\pi):= \left\{A\in \mathcal{B}(\msx): \text{$A$ is closed, $\pi(A^\textsf{c})=0$} \right\}.$$
+For two metric spaces $(\msx, d_\msx)$, $(\msy, d_\msy)$,  $\Mens(\msx\times \msy)$ and $\Pens(\msx\times\msy)$ are always defined with respect to the product $\sigma$-algebra. For a measure $\Pbb\in \Mens(\msx\times\msy)$, we will write $\Pbb_0$, $\Pbb_1$ to denote the first and second marginals respectively. 
+\DIFdelbegin \DIFdel{For $\mu\in \Pens(\msx), \nu \in \Pens(\msy)$, we let 
+}\begin{displaymath}\DIFdel{\mathcal{C}(\mu, \nu) := \{\mathbb{P}\in \Pens(\msx \times \msy): \mathbb{P}_0=\mu,\, \mathbb{P}_1=\nu\}.}\end{displaymath}%DIFAUXCMD
+\DIFdelend 
+
+For a function $f:\msx \mapsto \mathbb{R}^d$, we write $\|f\|_\infty:= \sup_{x\in \msx} \| f(x)\|$,
+where $\|\cdot\|$ denotes the usual Euclidean norm. For a function $f:\msx \mapsto \msy$, we write $\Lip(f)$ for the Lipschitz constant of $f$, that is the best constant $C$ such that 
+$$\ddy(f(x), f(x')) \leq C \ddx(x,x'), \qquad x, x' \in \msx.$$
+Let  
+\begin{align}
+    &\Lip(\msx, \msy) := \{f: \msx \mapsto \msy: \Lip(f)<\infty\},\\
+    &\Lip_1(\msx, \msy) := \{f: \msx \mapsto \msy: \Lip(f)\leq 1\}.
+\end{align}
+We also write $\rmc(\msx, \msy)$ for the class of continuous functions from $\msx$ to $\msy$.
+
+\section{Main results}
+\label{sec:main-results}
+Let $(\msx, \ddx)$ , $(\msy, \ddy)$ be two compact metric spaces and write $\mcx, \mcy$ for their respective Borel $\sigma$-algebras. We will use $d$ to denote the metric for both $\msx, \msy$ when the context allows. 
+Let
+%DIF <  $\diam_\msx = \sup \ensembleLigne{\ddx(x_0, x_1)}{x_0, x_1 \in \msx}$,
+%DIF <  $\diam_\msy = \sup \ensembleLigne{\ddy(y_0, y_1)}{y_0, y_1 \in \msy}$ and let
+\DIFaddbegin \DIFadd{$\diam_\msx = \sup \ensembleLigne{\ddx(x_0, x_1)}{x_0, x_1 \in \msx}$,
+$\diam_\msy = \sup \ensembleLigne{\ddy(y_0, y_1)}{y_0, y_1 \in \msy}$ and let
+}\DIFaddend $\pi_0 \in \Pens(\msx), \pi_1 \in \Pens(\msy)$.  We begin by recalling the
+Iterative Proportional Fitting Procedure (IPFP) solving the following \schro
+bridge problem
+\begin{equation}
+  \label{eq:schrodinger_bridge}
+\Pbb^\star = \argmin \ensembleLigne{\KLLigne{\Pbb}{\Qbb}}{\Pbb \in \Pens(\msx \times \msy) \eqsp , \Pbb_0 = \pi_0 \eqsp , \Pbb_1 = \pi_1} \eqsp ,
+\end{equation}
+where $\Qbb \in \Pens(\msx \times \msy)$ is a reference measure
+admitting a density w.r.t.\ $\rho_0 \otimes \rho_1$, with $\rho_0 \in \Pens(\msx)$ equivalent to $\pi_0$, and $\rho_1\in\Pens(\msy)$, equivalent to $\pi_1$; that is for any
+$(x,y) \in \msx \times \msy$
+\begin{equation}
+  \label{eq:ref_measure}
+  \rmd \Qbb / \rmd (\rho_0 \otimes \rho_1)(x,y) = K(x,y) = \exp[-c(x,y)] \eqsp ,
+\end{equation}
+where we assume that $c \in \Lip(\mcx\times\mcy, \mathbb{R})$\DIFdelbegin \DIFdel{. It }\DIFdelend \DIFaddbegin \DIFadd{;
+it }\DIFaddend is easy to see that \Cref{eq:schrodinger_bridge} with the choice $c(x,y):= \|x-y\|^2/\epsilon$ is equivalent to \ref{eq:RegOTproblem}. The following proposition ensures
+that we can assume without loss of generality that $\rho_0 = \pi_0$ and
+$\rho_1 = \pi_1$.
+\begin{proposition}
+  Let $\Pbb^\star$ solution of \eqref{eq:schrodinger_bridge}
+  with $\Qbb$ given by \eqref{eq:ref_measure} and $\hat{\Pbb}^\star$ the solution of \eqref{eq:schrodinger_bridge}
+  with $\Qbb$ such that for any
+$(x,y) \in \msx \times \msy$
+\begin{equation}
+  \label{eq:ref_measure_duo}
+  \rmd \Qbb / \rmd (\pi_0 \otimes \pi_1)(x,y) = K(x,y) \DIFaddbegin \eqsp \DIFaddend .
+\end{equation}
+Then $\Pbb^\star = \hat{\Pbb}^\star$
+\end{proposition}
+As a consequence, for the rest of this paper, we assume that $\rho_0 = \pi_0$
+and $\rho_1 = \pi_1$.  In order to solve \eqref{eq:schrodinger_bridge} we
+consider the IPFP sequence which iteratively solves each half-bridge problem,
+\ie \ we define $(\Pbb^n)_{n \in \nset}$ such that for any $n \in \nset$
+\begin{align}
+  \label{eq:ipfp}
+  &\Pbb^{2n+1} = \argmin \DIFdelbegin %DIFDELCMD < \ensembleLigne{\KL{\Pbb}{\Pbb^{2n}}}{\Pbb \in \Pens(\msx \times \msy), \Pbb_0 = \pi_0}  %%%
+\DIFdelend \DIFaddbegin \ensembleLigne{\KL{\Pbb}{\Pbb^{2n}}}{\Pbb \in \Pens(\msx \times \msy) \eqsp , \Pbb_0 = \pi_0}  \DIFaddend \eqsp , \\
+  &\Pbb^{2n+2} = \argmin \ensembleLigne{\KL{\Pbb}{\Pbb^{2n+1}}}{\Pbb \in \Pens(\msx \times \msy) \eqsp , \Pbb_1 = \pi_1} \DIFaddbegin \eqsp \DIFaddend ,
+\end{align}
+with $\Pbb^0 = \Qbb$, where recall that $\Pbb_0, \Pbb_1$ denote the marginals of the joint distribution $\Pbb$. Our main result is a quantitative 
+uniform stability estimate for the IPFP.
+
+\begin{theorem}
+  \label{thm:stability_ipfp}
+  For any $\pi_0, \hat{\pi}_0 \in \Pens(\msx)$,
+  $\pi_1, \hat{\pi}_1 \in \Pens(\msy)$ let $(\Pbb^{n})_{n\in \nset}$ and
+  $(\hat{\Pbb}^{n})_{n\in \nset}$ the IPFP sequence with marginals
+  $(\pi_0, \pi_1)$ respectively $(\hat{\pi}_0, \hat{\pi}_1)$. Then \DIFdelbegin \DIFdel{for }\DIFdelend any $n \in \nset$ we have
+  \begin{equation}
+    \wassersteinD[1](\Pbb^n, \hat{\Pbb}^n) \leq C \defEns{\wassersteinD[1](\pi_0, \hat{\pi}_0) + \wassersteinD[1](\pi_1, \hat{\pi}_1)},
+  \end{equation}
+  with
+  \begin{equation}
+    C = \rme^{10 \normLigne{c}_\infty} \{1 + (2\Lip(c)+10) (\diam_\msx + \diam_\msy) \}.
+  \end{equation}
+\end{theorem}
+
+As an immediate consequence of \Cref{thm:stability_ipfp} and the fact that
+the IPFP sequence converges, we obtain the quantitative stability of \schro bridge.
+
+\begin{corollary}
+  \label{thm:stability_schro}
+  For any $\pi_0, \hat{\pi}_0 \in \Pens(\msx)$,
+  $\pi_1, \hat{\pi}_1 \in \Pens(\msy)$ let $\Pbb^\star$, respectively $\hat{\Pbb}^\star$, be
+  the \schro bridge with marginals $(\pi_0, \pi_1)$, respectively
+  $(\hat{\pi}_0, \hat{\pi}_1)$. Then  for any
+  $n \in \nset$ we have
+  \begin{equation}
+    \wassersteinD[1](\Pbb^\star, \hat{\Pbb}^\star) \leq C \defEns{\wassersteinD[1](\pi_0, \hat{\pi}_0) + \wassersteinD[1](\pi_1, \hat{\pi}_1)},
+  \end{equation}
+  with $C$ as in \Cref{thm:stability_ipfp}.
+%   \begin{equation}
+%     C = \rme^{10 \normLigne{c}_\infty} \{1 + (2\Lip(c)+10) (\diam_\msx + \diam_\msy) \}.
+%   \end{equation}
+\end{corollary}
+
+
+\DIFdelbegin %DIFDELCMD < \begin{remark}
+%DIFDELCMD < %%%
+\DIFdel{Although the constants are far from sharp, Lipschitz continuity in the marginals is the best one can hope. In particular this implies a sample complexity of $n^{d}$ for learning the Schr\"odinger bridge, see \mbox{%DIFAUXCMD
+\cite{fournier2015rate}}\hspace{0pt}%DIFAUXCMD
+. 
+}%DIFDELCMD < 
+
+%DIFDELCMD < %%%
+\DIFdel{For any $\mathbb{P}\in \mathcal{C}(\pi_0, \hat{\pi}_0)$, $\mathbb{P}'\in \mathcal{C}(\pi_1, \hat{\pi}_1)$ we have that 
+}\begin{eqnarray*}
+\DIFdel{\wassersteinD[1](\mathbb{P}, \mathbb{P}')
+}&\DIFdel{= \sup_{f \in Lip(\msx\times \msy)} \int f \left[ \rmd \mathbb{P}-\rmd \mathbb{P}' \right]\geq \sup_{f \in Lip(\msx)} \int f \left[ \rmd \mathbb{P}-\rmd \mathbb{P}' \right] = \wassersteinD[1](\pi_0, \hat{\pi}_0),
+}\end{eqnarray*}%DIFAUXCMD
+\DIFdel{and a similar calculation shows that $\wassersteinD[1](\mathbb{P}, \mathbb{P}')\geq \min\{\wassersteinD[1](\pi_0, \hat{\pi}_0), \wassersteinD[1](\pi_1, \hat{\pi}_1)\}$.
+ Therefore the sample complexity for learning the Schr\"odinger bridge cannot be better than $n^{d}$. 
+}%DIFDELCMD < \end{remark}
+%DIFDELCMD < 
+
+%DIFDELCMD < %%%
+\DIFdelend % Note that solving
+% \eqref{eq:schrodinger_bridge} is equivalent to solving
+% \begin{equation}
+%   \textstyle{\Pbb^\star = \argmin \ensembleLigne{\int_{\msx \times \msy} c(x,y) \rmd \Pbb(x,y) + \KL{\Pbb}{\pi_0 \otimes \pi_1}}{\Pbb \in \Pens(\msx \times \msy) \eqsp , \Pbb_0 = \pi_0 \eqsp , \Pbb_1 = \pi_1} \eqsp . }
+% \end{equation}
+
+
+\section{Proof}
+\label{sec:proof}
+% \subsection{Sketch of proof}
+% We first give a sketch of the proof to explain the main ideas. The first result we obtained was \Cref{thm:stability_schro} through the following argument: 
+% the solution to \Cref{eq:schrodinger_bridge} will take the form
+% $\Pbb^\ast(\rmd x, \rmd y)= f(x) g(y) K(x,y)\rmd x \rmd y$, where $F=(f,g)$ are fixed points of the IPFP scheme. Abusing notation, let us write $\mathfrak{S}_{\mu,\nu}$  for the map generated by the IPFP iterations with respect to the measures $\mu,\nu$. For two measures $\mu,\nu$ let  $F_{\mu,\nu}$ be the fixed of the map $\mathfrak{S}_{\mu,\nu}$. 
+% Let $\hat\mu, \hat\nu$ be approximations of $\mu,\nu$.
+% We then have 
+% \begin{align}
+%     d_H( F_{\mu,\nu}, F_{\hat \mu, \hat\nu})
+% &=d_H( \mathfrak{S}_{\mu,\nu}F_{\mu,\nu}, \mathfrak{S}_{\hat \mu, \hat\nu}F_{\hat \mu, \hat\nu})\\
+% &\leq d_H( S_{\mu,\nu}F_{\mu,\nu}, \mathfrak{S}_{\hat \mu, \hat\nu}F_{\mu,\nu}) 
+% + d_H( \mathfrak{S}_{\hat \mu, \hat\nu}F_{\mu,\nu}, \mathfrak{S}_{\hat \mu, \hat\nu}F_{\hat \mu, \hat\nu}).
+% \end{align}
+% We know that $\mathfrak{S}_{\mu,\nu}$ is a contraction w.r.t.\ the Hilbert metric, for all $\mu,\nu$ so we have for $\kappa<1$
+% \begin{align}
+%     d_H( F_{\mu,\nu}, F_{\hat \mu, \hat\nu})
+% &\leq d_H( S_{\mu,\nu}F_{\mu,\nu}, \mathfrak{S}_{\hat \mu, \hat\nu}F_{\mu,\nu}) 
+% +\kappa d_H( F_{\mu,\nu}, F_{\hat \mu, \hat\nu})\\
+%  d_H( F_{\mu,\nu}, F_{\hat \mu, \hat\nu}) & \leq \frac{1}{1-\kappa}d_H( S_{\mu,\nu}F_{\mu,\nu}, \mathfrak{S}_{\hat \mu, \hat\nu}F_{\mu,\nu}).
+% \end{align}
+% If we can now show that 
+% $$d_H( \mathfrak{S}_{\mu,\nu} F, \mathfrak{S}_{\hat\mu, \hat\nu} F)\leq C \left[\wassersteinD[1](\mu, \hat\mu)+\wassersteinD[1](\nu, \hat\nu)\right],$$
+% we can conclude that 
+% \begin{align}
+% d_H( F_{\mu,\nu}, F_{\hat \mu, \hat\nu}) & \leq \frac{1}{1-\kappa}
+% C \left[\wassersteinD[1](\mu, \hat\mu)+\wassersteinD[1](\nu, \hat\nu)\right].
+% \end{align}
+
+The proof is divided into four parts. First, we recall that the IPFP \DIFdelbegin \DIFdel{sequence
+}\DIFdelend \DIFaddbegin \DIFadd{sequences
+}\DIFaddend is associated with a sequence of potentials. In \Cref{sec:prop-extens-potent} we
+show quantitative regularity and boundedness properties for these
+potentials. The boundedness is due to a reparameterization by
+\cite{carlier2020differential}. Then, in \Cref{sec:hilb-birkh-metr} we show a
+contraction property as well as useful Lipschitz properties with respect to the
+Hilbert--Birkhoff metric. We then show the uniform quantitative stability of the
+potentials w.r.t.\ \DIFdelbegin \DIFdel{this }\DIFdelend \DIFaddbegin \DIFadd{the Hilbert--Birkhoff }\DIFaddend metric in
+\Cref{sec:quant-unif-bounds}. Finally, in \Cref{sec:from-potent-prob} we show
+how uniform quantitative bounds on the potentials translate into bounds onto
+probability measures which concludes the proof.
+
+\subsection{Regularity properties of the potentials}
+\label{sec:prop-extens-potent}
+
+In this section, we fix $\pi_0 \in \Pens(\msx)$ and $\pi_1 \in \Pens(\msy)$ and
+let $(\Pbb^n)_{n \in \nset}$ the IPFP sequence given by \eqref{eq:ipfp}. The
+IPFP sequence can be described by a corresponding sequence of (measurable)
+potentials $(\tilde f_n, \tilde g_n)_{n \in \nset}$ such that for any $n \in \nset$, 
+$\tilde{f}_n: \ \msx \to \ooint{0,+\infty}$,
+$\tilde{g}_n: \ \msy \to \ooint{0,+\infty}$ and $\tilde{f}_0 = \tilde{g}_0 = 1$.
+
+\begin{proposition}
+  For any $n \in \nset$ and $(x, y) \in \msx \times \msy$ we have
+  \begin{align}
+    &(\rmd \Pbb^{2n} / \rmd \pi_0 \otimes \pi_1)(x,y) = \tilde{f}_n(x) K(x,y) \tilde{g}_n(y) \DIFaddbegin \eqsp \DIFaddend , \\
+    &(\rmd \Pbb^{2n+1} / \rmd \pi_0 \otimes \pi_1)(x,y) = \tilde{f}_{n+1}(x) K(x,y) \tilde{g}_n(y) \DIFaddbegin \eqsp \DIFaddend , \\
+    &\DIFdelbegin \DIFdel{\textstyle{\tilde{f}_{n+1}(x) = \parenthese{\int_{\msy} K(x,y) \tilde{g}_n(y) \rmd \pi_1(y)}^{-1},} }\DIFdelend \DIFaddbegin \DIFadd{\textstyle{\tilde{f}_{n+1}(x) = \parenthese{\int_{\msy} K(x,y) \tilde{g}_n(y) \rmd \pi_1(y)}^{-1} \eqsp ,} }\DIFaddend \\
+    &\DIFdelbegin \DIFdel{\textstyle{\tilde{g}_{n+1}(y) = \parenthese{\int_{\msx} K(x,y) \tilde{f}_{n+1}(x) \rmd \pi_0(x)}^{-1}.} 
+  }\DIFdelend \DIFaddbegin \DIFadd{\textstyle{\tilde{g}_{n+1}(y) = \parenthese{\int_{\msx} K(x,y) \tilde{f}_{n+1}(x) \rmd \pi_0(x)}^{-1} \eqsp .} 
+  }\DIFaddend \end{align}
+\end{proposition}
+For any $n \in \nset$, $a_n > 0$ and $(x,y) \in \msx \times \msy$ we have also
+\begin{equation}
+  (\rmd \Pbb^{2n} / \rmd \pi_0 \otimes \pi_1)(x,y) = (a_n \tilde{f}_n(x)) K(x,y) (\tilde{g}_n(y)/a_n) \DIFaddbegin \eqsp \DIFaddend .
+\end{equation}
+In other words, we can rescale the potentials $\tilde{f}_n$ and $\tilde{g}_n$ and
+still preserve the measure $\Pbb^{2n}$. This observation is at the core of the
+work of \cite{carlier2020differential} which proves the geometric convergence of
+the IPFP w.r.t.\ the $\mathrm{L}^p$ metric.  For any $n \in \nset$, let
+$\tilde{\varphi}_n = \log(f_n)$ and $\tilde{\Psi}_n = \log(g_n)$ and let
+$a_n = \exp[-\int_{\msx} \tilde{\varphi}_n(x) \rmd \pi_0(x)]$. Finally, for any
+$n \in \nset$, let $\varphi_n = \tilde{\varphi}_n + a_n$ and
+$\Psi_n = \tilde{\Psi}_n - a_n$. In particular we have the following proposition.
+
+\begin{proposition}
+  \label{prop:potential_rescale}
+  For any $n \in \nset$ and $(x,y) \in \msx \times \msy$ we have
+  \begin{align}
+    &\textstyle{\varphi_{n+1}(x) = -\log \left\{\int_{\msy} K(x,y) \exp[\Psi_n(y)] \rmd \pi_1(y)\right\} } \\
+     &\qquad \qquad \qquad   \DIFdelbegin \DIFdel{\textstyle{+ \int_{\msx} \log \{ \int_{\msy} K(x,y) \exp[\Psi_n(y)] \rmd \pi_1(y) \} \rmd \pi_0(x), }  }\DIFdelend \DIFaddbegin \DIFadd{\textstyle{+ \int_{\msx} \log \{ \int_{\msy} K(x,y) \exp[\Psi_n(y)] \rmd \pi_1(y) \} \rmd \pi_0(x) \eqsp , }  }\DIFaddend \\
+    &\DIFdelbegin \DIFdel{\textstyle{\Psi_{n+1}(y) = -\log \left\{\int_{\msx} K(x,y) \exp[\varphi_{n+1}(y)] \rmd \pi_0(x)\right\},} }\DIFdelend \DIFaddbegin \DIFadd{\textstyle{\Psi_{n+1}(y) = -\log \left\{\int_{\msx} K(x,y) \exp[\varphi_{n+1}(y)] \rmd \pi_0(x)\right\} \eqsp ,} }\DIFaddend \\
+    &(\rmd \Pbb^{2n}/ \rmd \DIFdelbegin \DIFdel{(}\DIFdelend \pi_0 \otimes \pi_1)\DIFdelbegin \DIFdel{)}\DIFdelend (x,y) = \exp[\varphi_n(x) + \Psi_n(y)] K(x,y) \DIFaddbegin \eqsp \DIFaddend . 
+  \end{align}
+\end{proposition}
+
+Recall that for any $x, y \in \msx \times \msy$ we have $K(x,y) = \exp[-c(x,y)]$.
+Using \cite[Lemma 3.1]{carlier2020differential} we have the following result.
+
+\begin{proposition}
+  \label{prop:bound_0}
+  For any $n \in \nset$ we have
+  $\max(\normLigne{\varphi_n}_{\infty}, \normLigne{\Psi_n}_{\infty}) \leq 3
+  \normLigne{c}_{\infty}$. 
+\end{proposition}
+
+We now establish the Lipschitz property of these potentials under the assumption that the cost function $c$ is Lipschitz; this is automatically satisfied in the case where $c(x,y)=|x-y|^2/\epsilon$ and $\msx,\msy$ are compact, or when $c$ is a metric by the triangle inequality.
+
+
+% % $c \in\Lip(\mcx\times\mcy, \mathbb{R})$
+% \begin{proposition}
+%   \label{prop:bound_1}
+%   Assume that $c \in \rmc^1(\msx \times \msy, \rset)$. Then, for any
+%   $n \in \nset$,
+%   \begin{equation}
+%     \max(\normLigne{\nabla \varphi_n}_\infty, \normLigne{\nabla \Psi_n}_\infty) \leq \norm{\nabla c}_\infty \exp[8
+% \normLigne{c}_\infty] \eqsp . 
+%   \end{equation}
+% \end{proposition}
+
+% \begin{proof}
+%   Using \Cref{prop:potential_rescale}, that
+%   $c \in \rmc^1(\msx \times \msy, \rset)$, $\msx$ and $\msy$ are compact spaces
+%   and the Lebesgue dominated convergence theorem we get that for any
+%   $n \in \nset$, $\varphi_n \in \rmc^1(\msx, \rset)$ and
+%   $\Psi_n \in \rmc^1(\msx, \rset)$. In addition, for any $x \in \msx$ and $n \in \nset$ we have
+%   \begin{equation}
+%     \textstyle{
+%     \nabla \varphi_{n+1}(x) = \int_{\msy} \nabla_x c(x,y) K(x,y) \exp[\Psi_n(y)] \rmd \pi_1(y)  / \int_{\msy}  K(x,y) \exp[\Psi_n(y)] \rmd \pi_1(y) \eqsp .} 
+% \end{equation}
+% For any $(x,y) \in \msx \times \msy$ and $n \in \nset$ we have
+% \begin{align}
+%   K(x,y) \exp[\Psi_n(y)] &\geq \exp[-4 \normLigne{c}_\infty] \eqsp ,\\
+%   \norm{\nabla_x c(x,y) K(x,y) \exp[\Psi_n(y)]} &\leq \norm{\nabla c}_\infty \exp[4 \normLigne{c}_\infty] \eqsp . 
+% \end{align}
+% Therefore, we get that for any $x \in \msx$ and $n \in \nset$ we have
+% $\normLigne{\nabla \varphi_{n+1}(x)} \leq \norm{\nabla c}_\infty \exp[8
+% \normLigne{c}_\infty]$. The proof that for any $y \in \msy$ and $n \in \nset$ we have
+% $\normLigne{\nabla \Psi_{n+1}(y)} \leq \norm{\nabla c}_\infty \exp[8
+% \normLigne{c}_\infty]$, is similar.
+% \end{proof}
+
+\begin{proposition}
+  \label{prop:bound_1}
+  Assume that $c \in\Lip(\mcx\times\mcy, \mathbb{R})$. Then, for any
+  $n \in \nset$,
+  \begin{equation}
+    \max\{ \Lip( \varphi_{n+1}), \Lip(\Psi_{n+1}) \} \leq \Lip( c). 
+  \end{equation}
+\end{proposition}
+
+\begin{proof}
+  Using \Cref{prop:potential_rescale} and the fact that 
+  $c \in \Lip(\msx \times \msy, \rset)$, 
+  we have that 
+  %
+  \begin{align}
+  \lefteqn{\phi_{n+1}(x)-\phi_{n+1}(x')}\\
+  &=\log\left\{  \int_{\msy} K(x',y) \exp[\Psi_n(y)] \rmd \pi_1(y)/ \int_{\msy} K(x,y) \exp[\Psi_n(y)] \rmd \pi_1(y) \right\}\\
+  &= \log \left\{ 
+  \int_{\msy} \exp[-c(x,y) + c(x,y)-c(x',y)+\Psi_n(y)] \rmd \pi_1(y)/ \int_{\msy} \exp[-c(x,y+\Psi_n(y)] \rmd \pi_1(y)\right\} \\
+  &\leq \log \left\{ 
+  \int_{\msy} \exp[-c(x,y) + \Lip(c)\ddx(x,x')+\Psi_n(y)] \rmd \pi_1(y)/ \int_{\msy} \exp[-c(x,y)+\Psi_n(y)] \rmd \pi_1(y)\right\} \\ 
+  &\leq \Lip(c)\ddx (x,x').
+  \end{align}
+  %
+  Similarly we obtain that $\phi_{n+1}(x')-\phi_{n+1}(x)\leq \Lip(c)\ddx (x,x')$, whence it follows that $\Lip(\phi_{n+1})\leq \Lip(c)$.
+  %
+  Similarly we have that 
+  \begin{align}
+     \lefteqn{\Psi_{n+1}(y')-\Psi_{n+1}(y)}\\
+     &= \log \left \{ \int_{\msx} K(x,y) \exp[\varphi_{n+1}(y)] \rmd \pi_0(x) /
+     \int_{\msx} K(x,y') \exp[\varphi_{n+1}(y)] \rmd \pi_0(x)
+     \right\}\\
+     &= \log \left \{ \int_{\msx}  \exp[-c(x,y')+c(x,y')-c(x,y)+\varphi_{n+1}(y)] \rmd \pi_0(x) /
+     \int_{\msx} \exp[-c(x,y')+\varphi_{n+1}(y)] \rmd \pi_0(x)
+     \right\}\\
+     &\leq \log \left \{ \int_{\msx}  \exp[-c(x,y')+\Lip(c)\ddy(y,y')+\varphi_{n+1}(y)] \rmd \pi_0(x) /
+     \int_{\msx} \exp[-c(x,y')+\varphi_{n+1}(y)] \rmd \pi_0(x)
+     \right\}\\
+     &\leq \Lip(c) \ddy(y,y').\qedhere
+  \end{align}
+\end{proof}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\begin{remark}\label{rem:lipconstant}
+Notice that $\Lip(\phi_{n+1}), \Lip(\Psi_{n+1})$ \DIFdelbegin \DIFdel{are }\DIFdelend \DIFaddbegin \DIFadd{is }\DIFaddend independent of the functions $\phi_n, \Psi_n$ and only \DIFdelbegin \DIFdel{depend }\DIFdelend \DIFaddbegin \DIFadd{depends }\DIFaddend on the properties of the kernel $K(\cdot, \cdot)$. This fact will be useful when we will study the regularity properties of the potentials associated with the solution of \eqref{eq:schrodinger_bridge}. 
+\end{remark}
+In this section the potentials $(\varphi_n)_{n \in \nset}$ and
+$(\Psi_n)_{n \in \nset}$ are defined over $\msx$ and $\msy$
+respectively. However, they only need to be defined on the support of $\pi_0$
+and $\pi_1$ respectively. In what follows we derive similar regularity bounds
+for the potentials associated with the \schro bridge, which as explained may only be defined on the supports of $\pi_0, \pi_1$.
+\begin{proposition}\label{prop:extensions}
+  Suppose that $\phi, \psi$ are the potentials associated with the solution of \eqref{eq:schrodinger_bridge}, that is 
+  $$\Pbb^\star(\rmd x, \rmd y) = \exp[\phi(x)+\psi(y)] K(x,y) \DIFdelbegin %DIFDELCMD < \rmd %%%
+\DIFdelend \pi_0(\DIFaddbegin \rmd \DIFaddend x) \DIFdelbegin %DIFDELCMD < \rmd %%%
+\DIFdelend \pi_1(\DIFaddbegin \rmd \DIFaddend y).$$
+  Then there exist $\tilde{\phi}\in \Lip(\mcx,\rset)$, $\tilde{\psi}\in \Lip(\mcy, \rset)$, such that
+  $(\tilde\phi, \tilde\psi)$ also solve \eqref{eq:schrodinger_bridge}. In particular \DIFdelbegin \DIFdel{$\tilde{\phi}|_{\supp(\pi_0)} = \phi+a$,
+  $\tilde{\psi}|_{\supp(\pi_1)} = \psi-a$,  
+  for some $a\in \mathbb{R}$,   
+  }\DIFdelend \DIFaddbegin \DIFadd{$\tilde{\phi}|_{\supp(\pi_0)} = \phi+c$,
+  $\tilde{\psi}|_{\supp(\pi_1)} = \psi-c$,  
+  }\DIFaddend $\|\tilde{\psi}\|_\infty, \|\tilde\phi\|_\infty\leq 3 \|c\|_\infty$, and 
+  $$\Lip(\tilde{\phi}), \Lip(\tilde{\psi}) \leq \Lip(c).$$
+\end{proposition}
+\begin{proof}
+ The potentials $(\phi, \psi)$ corresponding to the solution $\Pbb^\star$ of \Cref{eq:schrodinger_bridge} satisfy the Schr\"odinger equations 
+ \begin{equation}
+     \DIFdelbegin %DIFDELCMD < \begin{split}\label{eq:schrodingersystem}
+%DIFDELCMD <          \exp[\phi(x)] \int_\mcy \exp[\psi(x)] K(x,y) \rmd \pi_1( y) &=1, \quad \text{for $\pi_0$-a.e. $x$}, \\
+%DIFDELCMD <          \exp[\psi(x)] \int_\mcy  \exp[\phi(x)] K(x,y) \rmd\pi_0( y) &=1, \quad \text{for $\pi_1$-a.e. $y$}.
+%DIFDELCMD <      \end{split}%%%
+\DIFdelend \DIFaddbegin \begin{split}\label{eq:schrodingersystem}
+         \exp[\phi(x)] \int_\mcy \exp[\psi(x)] K(x,y) \pi_1(\rmd y) &=1, \quad \text{for $\pi_0$-a.e. $x$}, \\
+         \exp[\psi(x)] \int_\mcy  \exp[\phi(x)] K(x,y) \pi_0(\rmd y) &=1, \quad \text{for $\pi_1$-a.e. $y$}.
+     \end{split}\DIFaddend 
+ \end{equation}
+ First notice that \eqref{eq:schrodingersystem} characterizes the potentials solving \Cref{eq:schrodinger_bridge} up to an additive constant, in the sense that \DIFdelbegin \DIFdel{$(\phi+a, \psi-a)$ }\DIFdelend \DIFaddbegin \DIFadd{$(\phi+c, \psi-c)$ }\DIFaddend is also a solution for any \DIFdelbegin \DIFdel{$a\in \rset$}\DIFdelend \DIFaddbegin \DIFadd{$c\in \rset$}\DIFaddend . 
+ Second, notice that a pair of potentials $(\phi, \psi)$ that solves \Cref{eq:schrodinger_bridge} is a fixed point of the IPFP. Indeed, given a solution $(\phi, \psi)$ and letting
+ \begin{align}
+    &\textstyle{\tilde\phi(x) := -\log \left\{\int_{\msy} K(x,y) \exp[\psi(y)] \rmd \pi_1(y)\right\} } \\
+     &\qquad \qquad \qquad   \textstyle{+ \int_{\msx} \log \{ \int_{\msy} K(x,y) \exp[\psi(y)] \rmd \pi_1(y) \} \rmd \pi_0(x) \eqsp ,  \quad x\in \mcx} \\
+    &\textstyle{\tilde\psi(y) := -\log \left\{\int_{\msx} K(x,y) \exp[\tilde\phi(y)] \rmd \pi_0(x)\right\} \eqsp , \quad y\in \mcy,} 
+  \end{align}
+  from \Cref{eq:schrodingersystem}, 
+ one can easily see that for $x\in \supp(\pi_0)$, \DIFdelbegin \DIFdel{$\phi'(x)=\phi(x)+a$, where 
+ }\DIFdelend \DIFaddbegin \DIFadd{$\phi'(x)=\phi(x)+c$, where 
+ }\DIFaddend $$\DIFdelbegin \DIFdel{as}\DIFdelend \DIFaddbegin \DIFadd{c}\DIFaddend =\int_{\msx} \log \{ \int_{\msy} K(x,y) \exp[\Psi_n(y)] \rmd \pi_1(y) \} \rmd \pi_0(x) \eqsp ,  \quad x\in \supp(\pi_0),$$
+ and therefore also that \DIFdelbegin \DIFdel{$\psi'(y)=\psi(y)-a$ }\DIFdelend \DIFaddbegin \DIFadd{$\psi'(y)=\psi(y)-c$ }\DIFaddend for all $y\in \supp(\pi_1)$. 
+
+ Notice however that $\tilde\phi, \tilde\psi$ are well-defined for all $x\in \mcx, y\in \mcy$ respectively. In addition, following \cite[Lemma~3.1]{carlier2021linear} it is easy to verify that $\|\tilde\phi\|_\infty, \|\tilde\psi\|_\infty\leq 3\|c\|_\infty$, where recall that in our context $\|c\|_\infty := \sup_{x\in \mcx, y\in \mcy} |c(x,y)|$. 
+
+ The proof of the Lipschitz property is identical to that of \Cref{prop:bound_1}; see \Cref{rem:lipconstant}.
+\end{proof}
+
+
+\subsection{The Hilbert--Birkhoff metric, contraction and Lipschitz properties}
+\label{sec:hilb-birkh-metr}
+
+We now recall basic properties of the Hilbert--Birkhoff metric. We refer to
+\cite{lemmens2013birkhoff,kohlberg1982contraction,bushell1973hilbert} for a
+review of the Hilbert--Birkhoff metric. Let $\mse$ be a real vector space and
+$\msk$ a cone in this vector space, \ie \ \DIFdelbegin \DIFdel{$\msk$ is convex, }\DIFdelend $\msk \cap (-\msk) = \{0\}$\DIFdelbegin \DIFdel{and $\lambda \msk \subset \msk$ }\DIFdelend \DIFaddbegin \DIFadd{, }\DIFaddend for any
+$\lambda \geq 0$ \DIFaddbegin \DIFadd{$\lambda \msk \subset \msk$ and $\msk$ is convex}\DIFaddend . In what
+follows, we let $\msc$ be a part of the cone \ie \ for any $x, y \in \msc$ there
+exist $\alpha, \beta \geq 0$ such that $\alpha x - y \in \msk$ and
+$\beta y -\alpha \in \msk$. In addition, assume that $\msc$ is convex and that
+for any $\lambda > 0$ $\lambda \msk \subset \msk$. In this case we have for
+any $x, y \in \msc$ that
+\begin{equation}
+  M(x,y) = \inf \ensembleLigne{\beta \geq 0}{\beta y - x \in \msk} > \DIFdelbegin \DIFdel{0. 
+}\DIFdelend \DIFaddbegin \DIFadd{0 }\eqsp \DIFadd{. 
+}\DIFaddend \end{equation}
+Similarly we define for any $x, y \in \msc$
+\begin{equation}
+  m(x,y) = \sup \ensembleLigne{\alpha \geq 0}{x - \alpha \in \msk} \DIFaddbegin \eqsp \DIFaddend . 
+\end{equation}
+Note that $m(x,y) = M(y,x)^{-1} > 0$. Finally, the Hilbert--Birkhoff metric is
+defined for any $x, y \in \msc$ by
+\begin{equation}
+  d_H(x,y) = \log(M(x,y) / m(x,y)) \DIFaddbegin \eqsp \DIFaddend . 
+\end{equation}
+By \cite[Lemma 2.1]{lemmens2013birkhoff}, $d_H$ is a metric on $\msc/\sim$ the
+space $\msc$ quotiented by the equivalence relation: $x \sim y$ if there exists
+$\lambda > 0$ such that $y = \lambda x$. In particular, if $\normLigne{\cdot}$
+is a norm on $\msv$ then letting
+$\tilde{\msc} = \ensembleLigne{x \in \msc}{\normLigne{x}=1}$, we have that
+$(\tmsc,d_H)$ is a metric space.
+
+Let $(\msv, \normLigne{\cdot})$ and $(\msv', \normLigne{\cdot}')$ be two normed
+real vector space and $\msk \subset \msv$, $\msk' \subset \msv'$ two cones. In
+addition, let $\msc$ and $\msc'$ be convex parts of $\msk$ and 
+$\msk'$ respectively, such that for any $\lambda > 0$, $\lambda \msc \subset \msc$ and
+$\lambda \msc' \subset \msc'$. Let $u: \ \msv \to \msv'$ be a linear mapping
+such that $u(\msc) \subset \msc'$. The projective diameter of $u$ is given by
+\begin{equation}
+  \Delta(u) = \sup \ensembleLigne{d_H(u(x), u(y))}{x, y \in \tilde{\msc}} \DIFaddbegin \eqsp \DIFaddend . 
+\end{equation}
+Similarly, we also define the Birkhoff contraction ratio of $u$
+\begin{equation}
+  \kappa(u) = \sup \ensembleLigne{\kappa}{d_H(u(x), u(y)) \leq \kappa d_H(x,y), \eqsp x,y \in \tmsc} \DIFaddbegin \eqsp \DIFaddend . 
+\end{equation}
+Using the Birkhoff contraction theorem \citep{birkhoff1957extensions,bauer1965elementary,hopf1963inequality} we have that
+\begin{equation}
+  \label{eq:uno}
+  \kappa(u) \leq \tanh(\Delta(u)/4) \DIFaddbegin \eqsp \DIFaddend . 
+\end{equation}
+
+In order to use the Birkhoff contraction theorem, we collect the following basic
+facts on cones in function spaces.
+\begin{proposition}
+  \label{prop:hilbert_birkhoff}
+  Let $\msx$ be a compact space. $\msf = \coint{0,+\infty}^\msx$ is a cone and
+  $\tmsf = \rmc(\msx, \ooint{0,+\infty})$ is a convex part of $\msf$ such that
+  for any $\lambda > 0$, $\lambda \tmsf \subset \tmsf$. In addition, we have
+  that for any $f, g \in \tmsf$
+  \begin{equation}
+    d_H(f,g) = \log(\normLigne{f/g}_{\infty}) + \log(\normLigne{g/f}_{\infty}) \DIFaddbegin \eqsp \DIFaddend . 
+  \end{equation}
+\end{proposition}
+
+In what follows, we introduce key mappings which allow us to compute the IPFP
+potential $(f_n)_{n \in \nset}$ and $(g_n)_{n \in \nset}$, similarly to
+\cite{chen2016entropic}. Recall that for any $n \in \nset$ we have 
+\begin{align}
+  \label{eq:potentials_rescale_form}
+  &\DIFdelbegin \DIFdel{\textstyle{f_{n+1}(x) = a_n \parenthese{\int_{\msy} K(x,y) g_n(y) \rmd \nu_1(y)}^{-1},} }\DIFdelend \DIFaddbegin \DIFadd{\textstyle{f_{n+1}(x) = a_n \parenthese{\int_{\msy} K(x,y) g_n(y) \rmd \nu_1(y)}^{-1}  \eqsp ,} }\DIFaddend \\
+  &\textstyle{a_n = \exp[\int_{\msx} \log \parenthese{\int_{\msy} K(x,y) g_n(y) \rmd \nu_1(y)} \rmd \pi_0(x)]} \DIFaddbegin \eqsp \DIFaddend , \\
+    &\DIFdelbegin \DIFdel{\textstyle{g_{n+1}(y) = \parenthese{\int_{\msx} K(x,y) f_{n+1}(x) \rmd \pi_0(x)}^{-1}.} 
+}\DIFdelend \DIFaddbegin \DIFadd{\textstyle{g_{n+1}(y) = \parenthese{\int_{\msx} K(x,y) f_{n+1}(x) \rmd \pi_0(x)}^{-1} \eqsp .} 
+}\DIFaddend \end{align}
+Let $\pi_0 \in \Pens(\msx)$ and $\nu_1 \in \Pens(\msy)$. We define
+$\mce_{\pi_0}^x$ and $\mce_{\nu_1}^y$ such that for any
+$f: \ \msx \to \coint{0,+\infty}$ and $g: \ \msy \to \coint{0,+\infty}$ we have
+\begin{equation}
+  \DIFdelbegin \DIFdel{\textstyle{\mce_{\pi_0}^x(f)(y) = \int_{\msx} K(x,y) f(x) \rmd \pi_0(x) \eqsp , \quad \mce_{\nu_1}^y(g)(x) = \int_{\msy} K(x,y) g(y) \rmd \nu_1(y).}
+}\DIFdelend \DIFaddbegin \DIFadd{\textstyle{\mce_{\pi_0}^x(f)(y) = \int_{\msx} K(x,y) f(x) \rmd \pi_0(x) \eqsp , \quad \mce_{\nu_1}^y(g)(x) = \int_{\msy} K(x,y) g(y) \rmd \nu_1(y) \eqsp .}
+}\DIFaddend \end{equation}
+The following proposition is a consequence of the Birkhoff contraction theorem,
+see also \cite{chen2016entropic}.
+
+\begin{proposition}
+  \label{prop:birkhoff_contraction}
+  For any $\nu_0 \in \Pens(\msx)$ and $\nu_1 \in \Pens(\msy)$, $\mce_{\nu_0}^x(\rmc(\msx, \ooint{0,+\infty})) \subset \Lip(\msy, \ooint{0,+\infty})$ and $\mce_{\nu_1}^y(\rmc(\msy, \ooint{0,+\infty})) \subset \Lip(\msx, \ooint{0,+\infty})$. In addition, we have
+  \begin{equation}
+    \max(\kappa(\mce_{\nu_0}^x), \kappa(\mce_{\nu_1}^y)) \leq \tanh(\norm{c}_\infty) \DIFaddbegin \eqsp \DIFaddend . 
+  \end{equation}
+\end{proposition}
+
+\begin{proof}
+  Let $\nu_0 \in \Pens(\msx)$. Since
+  $K:\ \msx \times \msy \to \ooint{0,+\infty}$ is continuous and
+  $\msx \times \msy$ is compact we get that for any
+  $f \in \rmc(\msx, \ooint{0,+\infty})$,
+  $\mce_{\nu_0}^x(f) \in \rmc(\msy, \ooint{0,+\infty})$. In addition, let
+  $u \in \rmc(\msy, \ooint{0,+\infty})$ such that for any $y \in \msy$,
+  $u(y) = 1$. Then, we have that for any $f, g \in \rmc(\msx, \ooint{0,+\infty})$
+  \begin{equation}
+    \label{eq:dos}
+    \Delta(\mce_{\nu_0}^x) \leq 2 \sup \ensembleLigne{d_H(\mce_{\nu_0}^x(f), u)}{f \in \rmc(\msx, \ooint{0,+\infty})} \DIFaddbegin \eqsp \DIFaddend . 
+  \end{equation}
+  In addition, using \Cref{prop:hilbert_birkhoff}, we have for any $f \in \rmc(\msx, \ooint{0,+\infty})$ 
+  \begin{equation}
+    \label{eq:tres}
+    d_H(\mce_{\nu_0}^x(f), u) = \log(\sup \ensembleLigne{\mce_{\nu_0}^x(f)(y)}{y \in \msy}) - \log(\inf \ensembleLigne{\mce_{\nu_0}^x(f)(y)}{y \in \msy}) \DIFaddbegin \eqsp \DIFaddend . 
+  \end{equation}
+  For any $f \in \rmc(\msx, \ooint{0,+\infty})$ and $y \in \msy$ we have
+  \begin{equation}
+    \DIFdelbegin \DIFdel{\textstyle{\mce_{\nu_0}^x(f)(y) \geq \exp[-\norm{c}_\infty] \int_{\msx} f(x) \rmd \nu_0(x), \quad \mce_{\nu_0}^x(f)(y) \leq \exp[\norm{c}_\infty] \int_{\msx} f(x) \rmd \nu_0(x).}
+  }\DIFdelend \DIFaddbegin \DIFadd{\textstyle{\mce_{\nu_0}^x(f)(y) \geq \exp[-\norm{c}_\infty] \int_{\msx} f(x) \rmd \nu_0(x) \eqsp , \quad \mce_{\nu_0}^x(f)(y) \leq \exp[\norm{c}_\infty] \int_{\msx} f(x) \rmd \nu_0(x) \eqsp .}
+  }\DIFaddend \end{equation}
+  Combining this result \DIFdelbegin \DIFdel{, }\DIFdelend \eqref{eq:uno}, \eqref{eq:dos} and \eqref{eq:tres} we
+  get that $\Delta(\mce_{\nu_0}^x) \leq \tanh(\norm{c}_\infty)$. The proof that
+  $\Delta(\mce_{\nu_1}^y) \leq \tanh(\norm{c}_\infty)$ is similar.
+
+  Lipschitz continuity follows easily from the definitions of $\mce_{\nu_0}^x, \mce_{\nu_1}^y$ and the Lipschitz continuity of $K$. 
+  In fact, for any function $f$, resp.\ $g$, that does not vanish $\nu_0$ a.e., resp.\ $\nu_1$-a.e., $y\mapsto \mce_{\nu_0}^x(f)(y)$, resp. $x\mapsto \mce_{\nu_0}^x(g)(x)$, is Lipshitz continuous.
+\end{proof}
+
+\begin{proposition}
+  \label{prop:bound_wass_mce}
+  Let $\nu_0, \hat{\nu}_0 \in \Pens(\msx)$ and
+  $\nu_1, \hat{\nu}_1 \in \Pens(\msy)$. Then for any 
+  $f \in \Lip(\msx, \ooint{0,+\infty})$ and
+  $g \in \Lip(\msy, \ooint{0,+\infty})$ we have 
+  \begin{align}
+    &d_H(\mce^x_{\nu_0}(f), \mce^x_{\hat{\nu}_0}(f)) \leq 2 \DIFdelbegin \DIFdel{\textcolor{red}{\cancel{\norm{1/f}_\infty}} }\DIFdelend \norm{1/f}_\infty \DIFaddbegin \norm{1/f}\DIFadd{_\infty }\DIFaddend \left[\Lip(f)  + \Lip(c)  \norm{f}_\infty\right]\exp[2\norm{c}_\infty] \wassersteinD[1](\nu_0, \hat{\nu}_0) \DIFaddbegin \eqsp \DIFaddend , \\
+    &d_H(\mce^y_{\nu_1}(g), \mce^y_{\hat{\nu}_1}(g)) \leq 2 \norm{1/g}_\infty \DIFdelbegin \DIFdel{\textcolor{red}{\cancel{\norm{1/f}_\infty}} }\DIFdelend \DIFaddbegin \norm{1/f}\DIFadd{_\infty }\DIFaddend \left[\Lip(g)  + \Lip(c)  \norm{g}_\infty\right]\exp[2\norm{c}_\infty]\DIFdelbegin \DIFdel{\textcolor{red}{\cancel{\exp[\norm{c}_\infty]}} }\DIFdelend \DIFaddbegin \DIFadd{\exp[\norm{c}_\infty] }\DIFaddend \wassersteinD[1](\nu_1, \hat{\nu}_1) 
+    \DIFaddbegin \eqsp \DIFaddend . 
+  \end{align}
+\end{proposition}
+
+\begin{proof}
+  Let $f \in \Lip(\msx, \ooint{0,+\infty})$. We have
+  \begin{equation}\DIFdelbegin %DIFDELCMD < \label{eq:decomporatio}
+%DIFDELCMD <     %%%
+\DIFdel{\textstyle{\mce_{\nu_0}^x(f)(y)/\mce_{\hat{\nu}_0}^x(f)(y) = 1 + \int_{\msx} K(x,y) f(x) \rmd (\nu_0 -  \hat{\nu}_0)(x) / \int_{\msx} K(x,y) f(x) \rmd \hat{\nu}_0(x). }
+  }\DIFdelend 
+    \DIFaddbegin \DIFadd{\textstyle{\mce_{\nu_0}^x(f)(y)/\mce_{\hat{\nu}_0}^x(f)(y) = 1 + \int_{\msx} K(x,y) f(x) \rmd (\nu_0 -  \hat{\nu}_0)(x) / \int_{\msx} K(x,y) f(x) \rmd \hat{\nu}_0(x) \eqsp . }
+  }\DIFaddend \end{equation}
+In addition, we have for any $x, x' \in \msx, , y \in \msy$
+\begin{align}
+    |K(x,y)f(x) - K(x',y) f(x')|
+    &\leq |K(x,y) f(x)- K(x',y)f(x)| + |K(x',y) f(x) - K(x',y) f(x')|\\
+    &\leq \|f\|_\infty \Lip(K(y,\cdot)) \ddx(x,x')  
+    + \|K(\cdot, \cdot)\|_\infty \Lip(f) \ddx(x,x').
+\end{align}
+Since $K(x,y)=\exp[-c(x,y)]$, using the fact that for $|s|,|t|<M$ we have $|\exp(s)-\exp(t)|\leq \exp(M)|t-s|$, we have that 
+$$|K(x',y)-K(x,y)| \leq \exp(\|c\|_\infty) |c(x',y)-c(x,y)| \leq
+ \exp(\|c\|_\infty) \Lip(c)\ddx(x,x').$$
+ Therefore we have that for all $y\in\mcy$
+ $$\Lip[ K(\cdot, y) f(\cdot)]\leq \|f\|_\infty \exp(\|c\|_\infty) \Lip(c) + \exp(\|c\|_\infty) \Lip(f).$$
+%
+Using this result we get that
+\begin{equation}
+  \label{eq:numerator}
+  \DIFdelbegin \DIFdel{\textstyle{\abs{\int_{\msx} K(x,y) f(x) \rmd (\nu_0 -  \hat{\nu}_0)(x)} \leq \left[\Lip(f)  + \Lip(c)  \norm{f}_\infty\right]\exp[\norm{c}_\infty] \wassersteinD[1](\nu_0, \hat{\nu}_0).}
+}\DIFdelend \DIFaddbegin \DIFadd{\textstyle{\abs{\int_{\msx} K(x,y) f(x) \rmd (\nu_0 -  \hat{\nu}_0)(x)} \leq \left[\Lip(f)  + \Lip(c)  \norm{f}_\infty\right]\exp[\norm{c}_\infty] \wassersteinD[1](\nu_0, \hat{\nu}_0) \eqsp .}
+}\DIFaddend \end{equation}
+In addition, we have that for any $y \in \msy$
+\begin{equation}
+  \label{eq:denominator}
+  \DIFdelbegin \DIFdel{\textstyle{\int_{\msx} K(x,y) f(x) \rmd x \geq \exp[-\norm{c}_\infty] / \norm{1/f}_\infty. }
+}\DIFdelend \DIFaddbegin \DIFadd{\textstyle{\int_{\msx} K(x,y) f(x) \rmd x \geq \exp[-\norm{c}_\infty] / \norm{1/f}_\infty \eqsp . }
+}\DIFaddend \end{equation}
+Combining \DIFdelbegin %DIFDELCMD < \eqref {%%%
+\DIFdel{eq:decomporatio}%DIFDELCMD < }%%%
+\DIFdel{, }\DIFdelend \eqref{eq:numerator} and \eqref{eq:denominator} we get that for any $y \in \msy$
+\begin{align}
+  \label{eq:upper_bound_left}
+  &\textstyle{\mce_{\nu_0}^x(f)(y)/\mce_{\hat{\nu}_0}^x(f)(y)  }\\
+  & \qquad \DIFdelbegin \DIFdel{\textstyle{\leq 1 + \norm{1/f}_\infty \left[\Lip(f)  + \Lip(c)  \norm{f}_\infty\right]\exp[2\norm{c}_\infty]\wassersteinD[1](\nu_0, \hat{\nu}_0). } 
+}\DIFdelend \DIFaddbegin \DIFadd{\textstyle{\leq 1 + \norm{1/f}_\infty \left[\Lip(f)  + \Lip(c)  \norm{f}_\infty\right]\exp[2\norm{c}_\infty]\wassersteinD[1](\nu_0, \hat{\nu}_0) \eqsp . } 
+}\DIFaddend \end{align}
+Similarly, we have
+\begin{align}
+  \label{eq:upper_bound_right}
+  &\textstyle{\mce_{\hat{\nu_0}}^x(f)(y)/\mce_{\nu_0}^x(f)(y)  }\\
+  & \qquad \DIFdelbegin \DIFdel{\textstyle{\leq 1 + \norm{1/f}_\infty \left[\Lip(f)  + \Lip(c)  \norm{f}_\infty\right]\exp[2\norm{c}_\infty] \wassersteinD[1](\nu_0, \hat{\nu}_0). } 
+}\DIFdelend \DIFaddbegin \DIFadd{\textstyle{\leq 1 + \norm{1/f}_\infty \left[\Lip(f)  + \Lip(c)  \norm{f}_\infty\right]\exp[2\norm{c}_\infty] \wassersteinD[1](\nu_0, \hat{\nu}_0) \eqsp . } 
+}\DIFaddend \end{align}
+Combining \Cref{prop:hilbert_birkhoff}, \eqref{eq:upper_bound_left},
+\eqref{eq:upper_bound_right} and the fact that for any $t \geq 0$,
+$\log(1 + t) \leq t$ we get that
+\begin{equation}
+  d_H(\mce_{\nu_0}^x(f), \mce_{\hat{\nu}_0}^x(f)) \leq 2 \norm{1/f}_\infty \left[\Lip(f)  + \Lip(c)  \norm{f}_\infty\right]\exp[2\norm{c}_\infty]\wassersteinD[1](\nu_0, \hat{\nu}_0) \DIFaddbegin \eqsp \DIFaddend .
+\end{equation}
+The proof for $d_H(\mce^y_{\nu_1}(g), \mce^y_{\hat{\nu}_1}(g))$ is similar.
+\end{proof}
+
+% \begin{proposition}
+%   \label{prop:bound_wass_mce}
+%   Let $\nu_0, \hat{\nu}_0 \in \Pens(\msx)$ and
+%   $\nu_1, \hat{\nu}_1 \in \Pens(\msy)$. Then for any 
+%   $f \in \rmc^1(\msx, \ooint{0,+\infty})$ and
+%   $g \in \rmc^1(\msy, \ooint{0,+\infty})$ we have 
+%   \begin{align}
+%     &d_H(\mce^x_{\nu_0}(f), \mce^x_{\hat{\nu}_0}(f)) \leq 2 \norm{1/f}_\infty (\norm{\nabla f}_\infty  + \norm{\nabla c}_\infty  \norm{f}_\infty)\exp[\norm{c}_\infty] \wassersteinD[1](\nu_0, \hat{\nu}_0) \eqsp , \\
+%     &d_H(\mce^y_{\nu_1}(g), \mce^y_{\hat{\nu}_1}(g)) \leq 2 \norm{1/g}_\infty (\norm{\nabla g}_\infty  + \norm{\nabla c}_\infty  \norm{g}_\infty)\exp[\norm{c}_\infty] \wassersteinD[1](\nu_1, \hat{\nu}_1) 
+%     \eqsp . 
+%   \end{align}
+% \end{proposition}
+
+% \begin{proof}
+%   Let $f \in \rmc^1(\msx, \ooint{0,+\infty})$. We have
+%   \begin{equation}
+%     \textstyle{\mce_{\nu_0}^x(f)(y)/\mce_{\hat{\nu}_0}^x(f)(y) = 1 + \int_{\msx} K(x,y) f(x) \rmd (\nu_0 -  \hat{\nu}_0)(x) / \int_{\msx} K(x,y) f(x) \rmd \hat{\nu}_0(x) \eqsp . }
+%   \end{equation}
+% In addition, we have for any $x, y \in \msx \times \msy$
+% \begin{equation}
+%   \norm{\nabla_x K(x,y) f(x) } \leq (\norm{\nabla f}_\infty  + \norm{\nabla c}_\infty  \norm{f}_\infty)\exp[\norm{c}_\infty] \eqsp . 
+% \end{equation}
+% Using this result we get that
+% \begin{equation}
+%   \label{eq:numerator}
+%   \textstyle{\abs{\int_{\msx} K(x,y) f(x) \rmd (\nu_0 -  \hat{\nu}_0)(x)} \leq (\norm{\nabla f}_\infty  + \norm{\nabla c}_\infty  \norm{f}_\infty)\exp[\norm{c}_\infty] \wassersteinD[1](\nu_0, \hat{\nu}_0) \eqsp .}
+% \end{equation}
+% In addition, we have that for any $y \in \msy$
+% \begin{equation}
+%   \label{eq:denominator}
+%   \textstyle{\int_{\msx} K(x,y) f(x) \rmd x \geq \exp[-\norm{c}_\infty] / \norm{1/f}_\infty \eqsp . }
+% \end{equation}
+% Combining \eqref{eq:numerator} and \eqref{eq:denominator} we get that for any $y \in \msy$
+% \begin{align}
+%   \label{eq:upper_bound_left}
+%   &\textstyle{\mce_{\nu_0}^x(f)(y)/\mce_{\hat{\nu}_0}^x(f)(y)  }\\
+%   & \qquad \textstyle{\leq 1 + \norm{1/f}_\infty (\norm{\nabla f}_\infty  + \norm{\nabla c}_\infty  \norm{f}_\infty)\exp[\norm{c}_\infty] \wassersteinD[1](\nu_0, \hat{\nu}_0) \eqsp . } 
+% \end{align}
+% Similarly, we have
+% \begin{align}
+%   \label{eq:upper_bound_right}
+%   &\textstyle{\mce_{\hat{\nu_0}}^x(f)(y)/\mce_{\nu_0}^x(f)(y)  }\\
+%   & \qquad \textstyle{\leq 1 + \norm{1/f}_\infty (\norm{\nabla f}_\infty  + \norm{\nabla c}_\infty  \norm{f}_\infty)\exp[\norm{c}_\infty] \wassersteinD[1](\nu_0, \hat{\nu}_0) \eqsp . } 
+% \end{align}
+% Combining \Cref{prop:hilbert_birkhoff}, \eqref{eq:upper_bound_left},
+% \eqref{eq:upper_bound_right} and the fact that for any $t \geq 0$,
+% $\log(1 + t) \leq t$ we get that
+% \begin{equation}
+%   d_H(\mce_{\nu_0}^x(f), \mce_{\hat{\nu}_0}^x(f)) \leq 2 \norm{1/f}_\infty (\norm{\nabla f}_\infty  + \norm{\nabla c}_\infty  \norm{f}_\infty)\exp[\norm{c}_\infty] \wassersteinD[1](\nu_0, \hat{\nu}_0) \eqsp .
+% \end{equation}
+% The proof for $d_H(\mce^y_{\nu_1}(g), \mce^y_{\hat{\nu}_1}(g))$ is similar.
+% \end{proof}
+
+
+% DOES NOT SEEM TO BE NECESSARY
+% Let $\rmD^x: \ \rmc(\msx, \ooint{0,+\infty}) \to \rmc(\msx, \ooint{0,+\infty})$
+% and $\rmD^y: \ \rmc(\msy, \ooint{0,+\infty}) \to \rmc(\msy, \ooint{0,+\infty})$
+% such that for any $f \in \rmc(\msx, \ooint{0,+\infty})$ and
+% $g \in \rmc(\msy, \ooint{0,+\infty})$ we have $\rmD^x(f) = 1/f$ and
+% $\rmD^y(g) = 1/g$. We finish this section with the following technical lemma.
+
+% \begin{lemma}
+%   Let $f \in \rmc(\msx, \ooint{0,+\infty})$ and
+%   $g \in \rmc(\msy, \ooint{0,+\infty})$.  Let
+%   $\tilde{f} : \ \msy \to \ooint{0,+\infty}$ and
+%   $\tilde{g} : \ \msx \to \ooint{0,+\infty}$ such that
+%   \begin{equation}
+%     \tilde{f} = \rmD^y \circ \mce_{\nu_0}^x(f) \eqsp , \qquad \tilde{g} = \rmD^x \circ \mce_{\nu_1}^y(g) \eqsp .
+%   \end{equation}
+%   Then, $\tilde{f} \in \rmc^1(\msy, \ooint{0,+\infty})$ and
+%   $\tilde{g} \in \rmc^1(\msx, \ooint{0,+\infty})$. In addition, we have
+%   \begin{align}
+%     &\textstyle{\normLigne{\tilde{f}}_\infty \leq \normLigne{1/f}_\infty \rme^{\normLigne{c}_\infty} \eqsp , \quad \normLigne{\tilde{f}}_\infty \geq  \rme^{-\normLigne{c}_\infty} / \normLigne{1/f}_\infty \eqsp ,} \\
+%     &\textstyle{\normLigne{\nabla \tilde{f}}_\infty \leq \normLigne{\nabla c}_\infty \normLigne{f}_\infty \normLigne{1/f}_\infty \rme^{3 \normLigne{c}_\infty} \eqsp ,} \\
+%     &\textstyle{\normLigne{\tilde{g}}_\infty \leq \normLigne{1/g}_\infty \rme^{\normLigne{c}_\infty} \eqsp , \quad \normLigne{\tilde{g}}_\infty \geq  \rme^{-\normLigne{c}_\infty} / \normLigne{1/g}_\infty\eqsp ,} \\
+%     &\textstyle{\normLigne{\nabla \tilde{g}}_\infty \leq \normLigne{\nabla c}_\infty \normLigne{g}_\infty \normLigne{1/g}_\infty \rme^{3 \normLigne{c}_\infty} \eqsp .}     
+%   \end{align}
+% \end{lemma}
+
+% \begin{proof}
+%   For any $y \in \msy$ we have
+%   \begin{equation}
+%     \label{eq:tilde_f}
+%     \textstyle{\tilde{f}(y) = ( \int_{\msx} K(x,y) f(x) \rmd \nu_0(x))^{-1} \eqsp . }
+%   \end{equation}
+%   Using this result, the dominated convergence theorem that
+%   $K \in \rmc^1(\msx \times \msy, \ooint{0,+\infty})$ we get that
+%   $\tilde{f} \in \rmc^1(\msy, \ooint{0,+\infty})$ and that for any $y \in \msy$
+%   we have
+%   \begin{equation}
+%     \label{eq:grad_tilde_f}
+%     \textstyle{\nabla \tilde{f}(y) = -\int_{\msx} \nabla_y K(x,y) f(x) \rmd \nu_0(x) / (\int_{\msx} K(x,y) f(x) \rmd \nu_0(x))^2 \eqsp . }
+%   \end{equation}
+%   Using \eqref{eq:tilde_f} we have that
+%   \begin{equation}
+%     \textstyle{\normLigne{\tilde{f}}_\infty \leq \normLigne{1/f}_\infty \rme^{\normLigne{c}_\infty} \eqsp , \qquad \normLigne{1/\tilde{f}}_\infty \geq 1/\normLigne{f}_\infty \rme^{-\normLigne{c}_\infty} \eqsp ,}
+%   \end{equation}
+%   Similarly, using \eqref{eq:grad_tilde_f} we have
+%   \begin{equation}
+%     \textstyle{\normLigne{\nabla \tilde{f}}_\infty \leq \normLigne{\nabla c}_\infty \normLigne{f}_\infty \normLigne{1/f}_\infty \rme^{3 \normLigne{c}_\infty} \eqsp .}
+%   \end{equation}
+%   The proof for $\tilde{g}$ is similar.
+% \end{proof}
+
+\subsection{Quantitative uniform bounds on the potentials}
+\label{sec:quant-unif-bounds}
+
+In this section, we derive quantitative uniform bounds on the potentials w.r.t.\ 
+the Hilbert--Birkhoff metric. More precisely, we show the following theorem.
+
+\begin{theorem}
+  \label{thm:contract_hilbert}
+  Let $(f_n)_{n \in \nset}$ and $(\hat{f}_n)_{n \in \nset}$ be given by
+  \eqref{eq:potentials_rescale_form} w.r.t.\  $\pi_0, \pi_1$ and
+  $\hat{\pi}_0, \hat{\pi}_1$ respectively. Then, for any $n \in \nset$ we have
+  \begin{equation}
+    d_H(f_ng_n, \hat{f}_n\hat{g}_n) \leq 8 \Lip(c) \rme^{10 \norm{c}_\infty} (\wassersteinD[1](\pi_0, \hat{\pi}_0) + \wassersteinD[1](\pi_1, \hat{\pi}_1)) \DIFaddbegin \eqsp \DIFaddend . 
+  \end{equation}
+\end{theorem}
+
+\begin{proof}
+  Let $n \in \nset$,
+  $\rmD^x: \ \rmc(\msx, \ooint{0,+\infty}) \to \rmc(\msx, \ooint{0,+\infty})$
+  and
+  $\rmD^y: \ \rmc(\msy, \ooint{0,+\infty}) \to \rmc(\msy, \ooint{0,+\infty})$
+  such that for any $f \in \rmc(\msx, \ooint{0,+\infty})$ and
+  $g \in \rmc(\msy, \ooint{0,+\infty})$ we have $\rmD^x(f) = 1/f$ and
+  $\rmD^y(g) = 1/g$. For any $\pi_0 \in \Pens(\msx)$ and $\pi_1 \in \Pens(\msy)$
+  we define
+  $\mce_{\pi_1, \pi_0}^y : \ \rmc(\msy, \ooint{0,+\infty}) \to \rmc(\msx,
+  \ooint{0,+\infty})$ such that for any $g \in \rmc(\msy, \ooint{0,+\infty})$ we have
+  \begin{equation}
+    \DIFdelbegin \DIFdel{\textstyle{\mce_{\pi_1, \pi_0}^y(g) = \mce_{\pi_1}^y(g) \exp[-\int_{\msx}\log(\mce_{\pi_1}^y(g)(x)) \rmd \pi_0(x)]. }
+  }\DIFdelend \DIFaddbegin \DIFadd{\textstyle{\mce_{\pi_1, \pi_0}^y(g) = \mce_{\pi_1}^y(g) \exp[-\int_{\msx}\log(\mce_{\pi_1}^y(g)(x)) \rmd \pi_0(x)] \eqsp . }
+  }\DIFaddend \end{equation}
+  For any $n \in \nset$ we have
+  \begin{align}
+    \label{eq:iteation_brikhoff}
+    &f_{n+1} = \rmD^x \circ \mce_{\pi_1, \pi_0}^y \circ \rmD^y \circ \mce_{\pi_0}^x(f_n) \DIFaddbegin \eqsp \DIFaddend , \\
+    &\hat{f}_{n+1} = \rmD^x \circ \mce_{\hat{\pi}_1, \hat{\pi}_0}^y \circ \rmD^y \circ \mce_{\hat{\pi}_0}^x(\hat{f}_n) \DIFaddbegin \eqsp \DIFaddend .
+  \end{align}
+  Using \DIFaddbegin \Cref{prop:hilbert_birkhoff} \DIFadd{and }\DIFaddend the triangle inequality \DIFdelbegin \DIFdel{and }%DIFDELCMD < \Cref{prop:hilbert_birkhoff} %%%
+\DIFdelend we have for any $n \in \nset$ 
+  \begin{equation}
+    \label{eq:hilbert_birkhoff_prod}
+    d_H(f_n g_n, \hat{f}_n \hat{g}_n) \leq d_H(f_n g_n, f_n \hat{g}_n) + d_H(f_n \hat{g}_n, \hat{f}_n \hat{g}_n) \leq d_H(g_n, \hat{g}_n) + d_H(f_n, \hat{f}_n) \DIFaddbegin \eqsp \DIFaddend . 
+  \end{equation}
+  Recall that $f_0 = \hat{f}_0 = 1$ and therefore $d_H(f_0, \hat{f}_0) = 0$.
+  Using \Cref{prop:hilbert_birkhoff}, \Cref{prop:birkhoff_contraction},
+  \eqref{eq:iteation_brikhoff} and the fact that $\rmD^x, \rmD^y$ are isometries, we have for any $n \in \nset$
+  \begin{align}
+    &d_H(f_{n+1}, \hat{f}_{n+1}) = d_H(\rmD^x \circ \mce_{\pi_1, \pi_0}^y \circ \rmD^y \circ \mce_{\pi_0}^x(f_n), \rmD^x \circ \mce_{\hat{\pi}_1, \hat{\pi}_0}^y \circ \rmD^y \circ \mce_{\hat{\pi}_0}^x(\hat{f}_n)) \\
+                                & \quad = d_H(\mce_{\pi_1, \pi_0}^y \circ \rmD^y \circ \mce_{\pi_0}^x(f_n), \mce_{\hat{\pi}_1, \hat{\pi}_0}^y \circ \rmD^y \circ \mce_{\hat{\pi}_0}^x(\hat{f}_n)) \\
+                                & \quad = d_H(\mce_{\pi_1}^y \circ \rmD^y \circ \mce_{\pi_0}^x(f_n), \mce_{\hat{\pi}_1}^y \circ \rmD^y \circ \mce_{\hat{\pi}_0}^x(\hat{f}_n)) \\
+                                & \quad \leq d_H(\mce_{\pi_1}^y \circ \rmD^y \circ \mce_{\pi_0}^x(f_n), \mce_{\hat{\pi}_1}^y \circ \rmD^y \circ \mce_{\pi_0}^x(f_n)) \\
+                                & \quad  \qquad + d_H(\mce_{\hat{\pi}_1}^y \circ \rmD^y \circ \mce_{\pi_0}^x({f}_n), \mce_{\hat{\pi}_1}^y \circ \rmD^y \circ \mce_{\hat{\pi}_0}^x(\hat{f}_n)) \\
+    & \quad \leq d_H(\mce_{\pi_1}^y \circ \rmD^y \circ \mce_{\pi_0}^x(f_n), \mce_{\hat{\pi}_1}^y \circ \rmD^y \circ \mce_{\pi_0}^x(f_n)) + \kappa d_H(\mce_{\pi_0}^x(f_n), \mce_{\hat{\pi}_0}^x(\hat{f}_n)) \\
+    & \quad \leq d_H(\mce_{\pi_1}^y \circ \rmD^y \circ \mce_{\pi_0}^x(f_n), \mce_{\hat{\pi}_1}^y \circ \rmD^y \circ \mce_{\pi_0}^x(f_n)) \\
+    & \qquad \quad + \kappa d_H(\mce_{\hat{\pi}_0}^x(\hat{f}_n), \mce_{\pi_0}^x(\hat{f}_n)) + \kappa^2 d_H(f_n, \hat{f}_n)  \\
+    & \quad \leq d_H(\mce_{\pi_1}^y (g_n), \mce_{\hat{\pi}_1}^y (g_n))  +\kappa  d_H(\mce_{\hat{\pi}_0}^x(\hat{f}_n), \mce_{\pi_0}^x(\hat{f}_n)) + \kappa^2 d_H(f_n, \hat{f}_n)  \DIFaddbegin \eqsp \DIFaddend ,    \label{eq:ineq_fonda}
+  \end{align}
+  %
+with $\kappa = \tanh(\norm{c}_\infty)$. 
+Using \Cref{prop:bound_wass_mce} we have for any $n \in \nset$
+%
+\begin{align}
+  &d_H(\mce_{\hat{\pi}_0}^x(\hat{f}_n), \mce_{\pi_0}^x(\hat{f}_n)) \leq 2 \norm{1/\hat f_n}_\infty ( \Lip(\hat f_n)  + \Lip(c) \norm{\hat f_n}_\infty)\exp[2\norm{c}_\infty] \wassersteinD[1](\pi_0, \hat{\pi}_0) \DIFaddbegin \eqsp \DIFaddend , \\
+  &d_H(\mce_{\pi_1}^y (g_n), \mce_{\hat{\pi}_1}^y (g_n)) \leq 2 \norm{1/g_n}_\infty (\Lip(g_n)  + \Lip(c)  \norm{g_n}_\infty)\exp[2\norm{c}_\infty] \wassersteinD[1](\pi_1, \hat{\pi}_1) \DIFaddbegin \eqsp \DIFaddend .
+      \label{eq:n_step_bound}
+\end{align}
+%
+We recall that for any $n \in \nset$, $x \in \msx$ and $y \in \msy$ we have
+\begin{equation}
+ \hat f_n(x) = \exp[\hat \varphi_n(x)] \eqsp , \qquad g_n(y) = \exp[\Psi_n(y)] \DIFaddbegin \eqsp \DIFaddend .
+\end{equation}
+From the above and \eqref{eq:n_step_bound}, \Cref{prop:bound_0} and
+\Cref{prop:bound_1} we obtain that 
+\begin{equation}\label{eq:lipfn}
+    \Lip(\hat f_n), \Lip(g_n) \leq \exp(3\|c\|_\infty) \Lip(c),
+\end{equation}
+% Combining this result, \eqref{eq:n_step_bound}, \Cref{prop:bound_0} and
+% \Cref{prop:bound_1} we get that
+and thus for any $n \in \nset$
+\begin{align}
+  &d_H(\mce_{\hat{\pi}_0}^x(\hat{f}_n), \mce_{\pi_0}^x(\hat{f}_n)) \leq 4 \Lip(c) \rme^{8 \norm{c}_\infty} \wassersteinD[1](\pi_0, \hat{\pi}_0) \DIFaddbegin \eqsp \DIFaddend , \\
+  &d_H(\mce_{\pi_1}^y (g_n), \mce_{\hat{\pi}_1}^y (g_n))  \leq 4 \Lip(c) \rme^{8 \norm{c}_\infty} \wassersteinD[1](\pi_1, \hat{\pi}_1) \DIFaddbegin \eqsp \DIFaddend .
+\end{align}
+Combining this result and \eqref{eq:ineq_fonda} we get that for any $n \in \nset$
+\begin{equation}
+  d_H(f_{n+1}, \hat{f}_{n+1}) \leq \tanh(\norm{c}_\infty) d_H(f_n, \hat{f}_n) + 4 \Lip(c) \rme^{8 \norm{c}_\infty} (\wassersteinD[1](\pi_0, \hat{\pi}_0) + \wassersteinD[1](\pi_1, \hat{\pi}_1)) \DIFaddbegin \eqsp \DIFaddend .
+\end{equation}
+Since $d_H(f_0, \hat{f}_0) = 0$ we have that for any $n \in \nset$
+\begin{align}
+  d_H(f_{n+1}, \hat{f}_{n+1}) & \textstyle{\leq 4 \Lip(c) \rme^{8 \norm{c}_\infty} \sum_{k=0}^n \tanh(\norm{c}_\infty)^k (\wassersteinD[1](\pi_0, \hat{\pi}_0) + \wassersteinD[1](\pi_1, \hat{\pi}_1)) }
+  \\
+  & \textstyle{\leq 4 \Lip(c) \rme^{8 \norm{c}_\infty} \frac{1}{1-\tanh(\|c\|_\infty)} (\wassersteinD[1](\pi_0, \hat{\pi}_0) + \wassersteinD[1](\pi_1, \hat{\pi}_1)) }
+  \\
+                              &\textstyle{ \leq 2  \Lip(c) \rme^{8 \norm{c}_\infty} (1 + \rme^{2\norm{c}_\infty}) (\wassersteinD[1](\pi_0, \hat{\pi}_0) + \wassersteinD[1](\pi_1, \hat{\pi}_1))} \\
+  & \DIFdelbegin \DIFdel{\textstyle{ \leq 4 \Lip(c) \rme^{10 \norm{c}_\infty} (\wassersteinD[1](\pi_0, \hat{\pi}_0) + \wassersteinD[1](\pi_1, \hat{\pi}_1)).
+    }   }\DIFdelend \DIFaddbegin \DIFadd{\textstyle{ \leq 4 \Lip(c) \rme^{10 \norm{c}_\infty} (\wassersteinD[1](\pi_0, \hat{\pi}_0) + \wassersteinD[1](\pi_1, \hat{\pi}_1)) \eqsp .
+    }   }\DIFaddend \label{eq:ineq_fn}  
+\end{align}
+Similarly, we get that for any $n \in \nset$
+\begin{equation}
+  \label{eq:ineq_gn}
+  \textstyle{d_H(g_n, \hat{g}_n}) \leq 4 \Lip(c) \rme^{10 \norm{c}_\infty} (\wassersteinD[1](\pi_0, \hat{\pi}_0) + \wassersteinD[1](\pi_1, \hat{\pi}_1)) \DIFaddbegin \eqsp \DIFaddend .
+\end{equation}
+Combining \eqref{eq:hilbert_birkhoff_prod}, \eqref{eq:ineq_fn} and  \eqref{eq:ineq_gn} concludes the proof.
+\end{proof}
+
+Unfortunately controlling $d_H$ is not enough to control the distance between
+$\Pbb^{n}$ and $\hat{\Pbb}^n$ for any $n \in \nset$. Indeed, using the
+\DIFdelbegin \DIFdel{Hilbert--Birkhoff }\DIFdelend \DIFaddbegin \DIFadd{Hilbert-Birkhoff }\DIFaddend metric we control the oscillations of
+$f_n g_n / (\hat{f}_n \hat{g}_n)$ but in order to control probability distances
+between $\Pbb^{n}$ and $\hat{\Pbb}^n$ for any $n \in \nset$ we need to derive
+an upper-bound for $\normLigne{f_n g_n - \hat{f}_n \hat{g}_n}_\infty$. The
+next lemma is key in order to obtain such bounds.
+
+\begin{lemma}
+  \label{lemma:attain}
+  Let $(f_n)_{n \in \nset}$ and $(\hat{f}_n)_{n \in \nset}$ be given by
+  \eqref{eq:potentials_rescale_form} w.r.t.\  $\pi_0, \pi_1$ and
+  $\hat{\pi}_0, \hat{\pi}_1$ respectively.
+  Then, for any $n \in \nset$ there exist $x_n^\dagger \in \msx$ and
+  $y_n^\dagger \in \msy$ such that
+  \begin{align}
+    &|f_n(x_n^\dagger) g_n(y_n^\dagger)/ (\hat{f}_n(x_n^\dagger) \hat{g}_n(y_n^\dagger)) - 1| \leq  2 \Lip(c) \exp[6 \normLigne{c}_\infty] (\wassersteinD[1](\pi_0, \hat{\pi}_0) + \wassersteinD[1](\pi_1, \hat{\pi}_1) ) \eqsp .
+    % , \\
+    % &1 - f_n(x_n^-) g_n(y_n^-)/ (\hat{f}_n(x_n^-) \hat{g}_n(y_n^-))  \leq  2 \Lip(c) \exp[6 \normLigne{c}_\infty] (\wassersteinD[1](\pi_0, \hat{\pi}_0) + \wassersteinD[1](\pi_1, \hat{\pi}_1) ) \eqsp .
+  \end{align}
+\end{lemma}
+
+\begin{proof}
+  Let $n \in \nset$. 
+  Suppose, aiming for a contradiction, that the conclusion of the Lemma is false; that is assume that for all $(x,y)$  
+\begin{equation}\label{eq:contradition}
+    |f_n(x) g_n(y) / (\hat{f}_n(x) \hat{g}_n(y)) - 1| >  2 \Lip(c) \exp[6 \normLigne{c}_\infty] (\wassersteinD[1](\pi_0, \hat{\pi}_0) + \wassersteinD[1](\pi_1, \hat{\pi}_1) ).
+\end{equation} 
+  Using that $\Pbb^{2n}(\msx \times \msy) =\hat{\Pbb}^{2n}(\msx \times \msy) =1$, we have
+  \begin{align}
+    \label{eq:diff_up}
+    &\textstyle{ \int_{\msx \times \msy} \{f_n(x) g_n(y) / (\hat{f}_n(x) \hat{g}_n(y)) - 1\}\hat{f}_n(x) \hat{g}_n(y)\rmd \hat{\pi}_0(x)\rmd \hat{\pi}_1(y) } \\
+    &\qquad \qquad \qquad = \textstyle{\int_{\msx \times \msy} f_n(x) g_n(y) \rmd \hat{\pi}_0(x)\rmd \hat{\pi}_1(y)} -1 \\
+      &\qquad \qquad \qquad = \textstyle{\int_{\msx \times \msy} f_n(x) g_n(y) \rmd \hat{\pi}_0(x)\rmd \hat{\pi}_1(y) - \int_{\msx \times \msy} f_n(x) g_n(y) \rmd \pi_0(x)\rmd \pi_1(y)} \eqsp . 
+  \end{align}
+  In addition, using \Cref{prop:bound_0}, \Cref{prop:bound_1} and \eqref{eq:lipfn} we have
+  \begin{equation}
+       \Lip (f_n g_n) \leq  \|f_n\|_\infty \Lip(g_n) + \|g_n\|_\infty \Lip(f_n) \leq 2 \Lip(c) \exp[6 \normLigne{c}_\infty] \eqsp . 
+  \end{equation}
+%   \begin{equation}
+%     \norm{\nabla (f_n g_n)(x,y)} \leq \norm{\nabla f_n(x) g_n(y)} + \norm{f_n(x) \nabla g_n(y)} \leq 2 \norm{\nabla c}_\infty \exp[14 \normLigne{c}_\infty] \eqsp . 
+%   \end{equation}
+Combining this result and \eqref{eq:diff_up} we get that
+\begin{align}
+  &\abs{\textstyle{ \int_{\msx \times \msy} \{f_n(x) g_n(y) / (\hat{f}_n(x) \hat{g}_n(y)) - 1\}\rmd \hat{\Pbb}^{2n}(x,y) }}\\
+  & \qquad \leq 2 \Lip(c) \exp[6 \normLigne{c}_\infty] \wassersteinD[1](\pi_0 \otimes \pi_1, \hat{\pi}_0 \otimes \hat{\pi}_1) \eqsp . 
+\end{align}
+In addition, we have that 
+$\wassersteinD[1](\pi_0 \otimes \pi_1, \hat{\pi}_0 \otimes \hat{\pi}_1)\leq
+\wassersteinD[1](\pi_0, \hat{\pi}_0) + \wassersteinD[1](\pi_1, \hat{\pi}_1)$.
+Hence, we get that
+\begin{align}
+  &\abs{\textstyle{ \int_{\msx \times \msy} \{f_n(x) g_n(y) / (\hat{f}_n(x) \hat{g}_n(y)) - 1\}\rmd \hat{\Pbb}^{2n}(x,y) }}\\
+  & \qquad \leq 2 \Lip(c) \exp[6 \normLigne{c}_\infty] (\wassersteinD[1](\pi_0, \hat{\pi}_0) + \wassersteinD[1](\pi_1, \hat{\pi}_1) ).
+\end{align}
+The above, combined with \eqref{eq:contradition} implies that  there must exist values $x_n^+, x_n^- \in \mcx$ and $y_n^+, y_n^-\in \mcy$ such that 
+\begin{align}
+    f_n(x_n^+) g_n(y_n^+) / (\hat{f}_n(x_n^+) \hat{g}_n(y_n^+)) - 1 &>  2 \Lip(c) \exp[6 \normLigne{c}_\infty] (\wassersteinD[1](\pi_0, \hat{\pi}_0) + \wassersteinD[1](\pi_1, \hat{\pi}_1) )\\
+    f_n(x_n^-) g_n(y_n^-) / (\hat{f}_n(x_n^-) \hat{g}_n(y_n^-)) - 1 &<  2 \Lip(c) \exp[6 \normLigne{c}_\infty] (\wassersteinD[1](\pi_0, \hat{\pi}_0) + \wassersteinD[1](\pi_1, \hat{\pi}_1) ).
+\end{align}
+Since by \Cref{prop:bound_1}, $(x,y)\mapsto f_n(x) g_n(y) / (\hat{f}_n(x) \hat{g}_n(y)) - 1$ is continuous, by the intermediate value theorem, there will be a pair $(x_n^\dagger, y_n^\dagger)$, a convex combination of $(x_n^+, y_n^+)$ and $(x_n^-, y_n^-)$ such that the conclusion of the Lemma is true, arriving at the desired contradiction.
+\end{proof}
+
+% \begin{lemma}
+%   \label{lemma:attain}
+%   Let $(f_n)_{n \in \nset}$ and $(\hat{f}_n)_{n \in \nset}$ be given by
+%   \eqref{eq:potentials_rescale_form} w.r.t.\  $\pi_0, \pi_1$ and
+%   $\hat{\pi}_0, \hat{\pi}_1$ respectively.
+%   Then, for any $n \in \nset$ there exist $x_n^+, x_n^- \in \msx$ and
+%   $y_n^+, y_n^- \in \msy$ such that
+%   \begin{align}
+%     &f_n(x_n^+) g_n(y_n^+)/ (\hat{f}_n(x_n^+) \hat{g}_n(y_n^+)) - 1 \leq  2 \norm{\nabla c}_\infty \rme^{14 \normLigne{c}_\infty} (\wassersteinD[1](\pi_0, \hat{\pi}_0) + \wassersteinD[1](\pi_1, \hat{\pi}_1) ) \eqsp , \\
+%     &1 - f_n(x_n^-) g_n(y_n^-)/ (\hat{f}_n(x_n^-) \hat{g}_n(y_n^-))  \leq  2 \norm{\nabla c}_\infty \rme^{14 \normLigne{c}_\infty} (\wassersteinD[1](\pi_0, \hat{\pi}_0) + \wassersteinD[1](\pi_1, \hat{\pi}_1) ) \eqsp .
+%   \end{align}
+% \end{lemma}
+
+% \begin{proof}
+%   Let $n \in \nset$. Using that $\Pbb^{2n}(\msx \times \msy) =\hat{\Pbb}^{2n}(\msx \times \msy) =1$, we have
+%   \begin{align}
+%     \label{eq:diff_up}
+%     &\textstyle{ \int_{\msx \times \msy} \{f_n(x) g_n(y) / (\hat{f}_n(x) \hat{g}_n(y)) - 1\}\hat{f}_n(x) \hat{g}_n(y)\rmd \hat{\pi}_0(x)\rmd \hat{\pi}_1(y) } \\
+%     &\qquad \qquad \qquad = \textstyle{\int_{\msx \times \msy} f_n(x) g_n(y) \rmd \hat{\pi}_0(x)\rmd \hat{\pi}_1(y)} -1 \\
+%       &\qquad \qquad \qquad = \textstyle{\int_{\msx \times \msy} f_n(x) g_n(y) \rmd \hat{\pi}_0(x)\rmd \hat{\pi}_1(y) - \int_{\msx \times \msy} f_n(x) g_n(y) \rmd \pi_0(x)\rmd \pi_1(y)} \eqsp . 
+%   \end{align}
+%   In addition, using \Cref{prop:bound_0} and \Cref{prop:bound_1} we have for any
+%   $x \in \msx$ and $y \in \msy$
+%   \begin{equation}
+%     \norm{\nabla (f_n g_n)(x,y)} \leq \norm{\nabla f_n(x) g_n(y)} + \norm{f_n(x) \nabla g_n(y)} \leq 2 \norm{\nabla c}_\infty \exp[14 \normLigne{c}_\infty] \eqsp . 
+%   \end{equation}
+% Combining this result and \eqref{eq:diff_up} we get that
+% \begin{align}
+%   &\abs{\textstyle{ \int_{\msx \times \msy} \{f_n(x) g_n(y) / (\hat{f}_n(x) \hat{g}_n(y)) - 1\}\rmd \hat{\Pbb}^{2n}(x,y) }}\\
+%   & \qquad \leq 2 \norm{\nabla c}_\infty \exp[14 \normLigne{c}_\infty] \wassersteinD[1](\pi_0 \otimes \pi_1, \hat{\pi}_0 \otimes \hat{\pi}_1) \eqsp . 
+% \end{align}
+% In addition, we have that 
+% $\wassersteinD[1](\pi_0 \otimes \pi_1, \hat{\pi}_0 \otimes \hat{\pi}_1)\leq
+% \wassersteinD[1](\pi_0, \hat{\pi}_0) + \wassersteinD[1](\pi_1, \hat{\pi}_1)$.
+% Hence, we get that
+% \begin{align}
+%   &\abs{\textstyle{ \int_{\msx \times \msy} \{f_n(x) g_n(y) / (\hat{f}_n(x) \hat{g}_n(y)) - 1\}\rmd \hat{\Pbb}^{2n}(x,y) }}\\
+%   & \qquad \leq 2 \norm{\nabla c}_\infty \exp[14 \normLigne{c}_\infty] (\wassersteinD[1](\pi_0, \hat{\pi}_0) + \wassersteinD[1](\pi_1, \hat{\pi}_1) ) \eqsp ,
+% \end{align}
+% which concludes the proof.
+% \end{proof}
+
+
+Finally, as promised, we conclude this section by deriving bounds on
+$\normLigne{f_n g_n  - \hat{f}_n\hat{g}_n}_\infty$ combining
+\Cref{thm:contract_hilbert} with \Cref{lemma:attain}.
+
+\begin{theorem}
+  \label{thm:contrat_infty}
+  Let $(f_n, g_n)_{n \in \nset}$ and $(\hat{f}_n, \hat g_n)_{n \in \nset}$ be given by
+  \eqref{eq:potentials_rescale_form} w.r.t.\  $\pi_0, \pi_1$ and
+  $\hat{\pi}_0, \hat{\pi}_1$ respectively. Then, for any $n \in \nset$ we have
+  \begin{equation}
+    \normLigne{f_ng_n -\hat{f}_n \hat{g}_n}_\infty \leq 10 \Lip(c) \rme^{10 \normLigne{c}_\infty} (\wassersteinD[1](\pi_0, \hat{\pi}_0) + \wassersteinD[1](\pi_1, \hat{\pi}_1) ) \eqsp . 
+  \end{equation}
+\end{theorem}
+
+\begin{proof}
+  Let $n \in \nset$, $x \in \msx$ and $y \in \msy$. Using \Cref{prop:bound_0}
+  and the fact that for any $s,t \in \cball{0}{M}$ with $M \geq 0$ we have
+  $\abs{\rme^s - \rme^t} \leq \rme^M \abs{s-t}$ we get 
+  \begin{equation}
+    \label{eq:bound_u}
+  \absLigne{f_n(x)g_n(y) - \hat{f}_n(x) \hat{g}_n(y)} \leq \rme^{6 \normLigne{c}_\infty} \absLigne{\log(f_n(x)g_n(y)/(\hat{f}_n(x)\hat{g}_n(y)))}
+\end{equation}
+Assume that $f_n(x)g_n(y)/(\hat{f}_n(x)\hat{g}_n(y)) \geq 1$. Then using that
+for any $t > 0$, $\log(t) \leq t - 1$, \Cref{thm:contract_hilbert} and
+\Cref{lemma:attain} we have, with $(x_n^\dagger, y_n^\dagger)$ from \Cref{lemma:attain},
+\begin{align}
+  &\absLigne{\log(f_n(x)g_n(y)/(\hat{f}_n(x)\hat{g}_n(y)))} = \log(f_n(x)g_n(y)/(\hat{f}_n(x)\hat{g}_n(y))) \\
+  & \qquad \quad + \log(\hat{f}_n(x_n^\dagger)\hat{g}_n(y_n^\dagger)/(f_n(x_n^\dagger)g_n(y_n^\dagger))) + \log(f_n(x_n^\dagger)g_n(y_n^\dagger)/(\hat{f}_n(x_n^\dagger)\hat{g}_n(y_n^\dagger))) \\
+  &\qquad \leq d_H(f_n g_n, \hat{f}_n \hat{g}_n) + \log(f_n(x_n^\dagger)g_n(y_n^\dagger)/(\hat{f}_n(x_n^\dagger)\hat{g}_n(y_n^\dagger))) \\
+  &\qquad \leq d_H(f_ng_n, \hat{f}_n \hat{g}_n) + f_n(x_n^\dagger)g_n(y_n^\dagger)/(\hat{f}_n(x_n^\dagger)\hat{g}_n(y_n^\dagger)) - 1 \\
+  & \qquad \leq 10 \Lip(c)\rme^{10 \normLigne{c}_\infty} (\wassersteinD[1](\pi_0, \hat{\pi}_0) + \wassersteinD[1](\pi_1, \hat{\pi}_1) ) \eqsp . 
+\end{align}
+
+% \begin{align}
+%   &\absLigne{\log(f_n(x)g_n(y)/(\hat{f}_n(x)\hat{g}_n(y)))} = \log(f_n(x)g_n(y)/(\hat{f}_n(x)\hat{g}_n(y))) \\
+%   & \qquad \quad + \log(\hat{f}_n(x_n^+)\hat{g}_n(y_n^+)/(f_n(x_n^+)g_n(y_n^+))) + \log(f_n(x_n^+)g_n(y_n^+)/(\hat{f}_n(x_n^+)\hat{g}_n(y_n^+))) \\
+%   &\qquad \leq d_H(f_ng_n, \hat{f}_n \hat{g}_n) + \log(f_n(x_n^+)g_n(y_n^+)/(\hat{f}_n(x_n^+)\hat{g}_n(y_n^+))) \\
+%   &\qquad \leq d_H(f_ng_n, \hat{f}_n \hat{g}_n) + f_n(x_n^+)g_n(y_n^+)/(\hat{f}_n(x_n^+)\hat{g}_n(y_n^+)) - 1 \\
+%   & \qquad \leq 10 \normLigne{\nabla c}_\infty \rme^{16 \normLigne{c}_\infty} (\wassersteinD[1](\pi_0, \hat{\pi}_0) + \wassersteinD[1](\pi_1, \hat{\pi}_1) ) \eqsp . 
+% \end{align}
+Combining this result and \eqref{eq:bound_u} we get that
+\begin{equation}
+  \absLigne{f_n(x)g_n(y) - \hat{f}_n(x) \hat{g}_n(y)} \leq 10 \Lip(c) \rme^{10 \normLigne{c}_\infty} (\wassersteinD[1](\pi_0, \hat{\pi}_0) + \wassersteinD[1](\pi_1, \hat{\pi}_1) ) \eqsp .
+\end{equation}
+The proof in the case where $f_n(x)g_n(y)/(\hat{f}_n(x)\hat{g}_n(y)) \leq 1$ is similar.
+\end{proof}
+\subsection{From potentials to probability metrics}
+\label{sec:from-potent-prob}
+
+Using \Cref{thm:contrat_infty} we are now ready to prove the following theorem.
+
+\begin{theorem}
+  \label{thm:stability_ipfp2}
+  For any $\pi_0, \hat{\pi}_0 \in \Pens(\msx)$,
+  $\pi_1, \hat{\pi}_1 \in \Pens(\msy)$ let $(\Pbb^{n})_{n\in \nset}$ and
+  $(\hat{\Pbb}^{n})_{n\in \nset}$ the IPFP sequence with marginals
+  $(\pi_0, \pi_1)$ respectively $(\hat{\pi}_0, \hat{\pi}_1)$. Then there exists
+  $C \geq 0$ such that for any $n \in \nset$ we have
+  \begin{equation}
+    \wassersteinD[1](\Pbb^n, \hat{\Pbb}^n) \leq C \defEns{\wassersteinD[1](\pi_0, \hat{\pi}_0) + \wassersteinD[1](\pi_1, \hat{\pi}_1)},
+  \end{equation}
+  with
+  \begin{equation}
+    C = \rme^{10 \normLigne{c}_\infty} \{1 + (2\Lip(c)+10) (\diam_\msx + \diam_\msy) \}.
+  \end{equation}
+\end{theorem}
+
+\begin{proof}
+  Let $n \in \nset$ and $\Psi\in \Lip(\mcx\times\mcy, \rset)$, that is $\Psi: \ \msx \times \msy \to \rset$ such that for any
+  $x_0,x_1 \in \msx$ and $y_0, y_1 \in \msy$ we have
+  \begin{equation}
+    |\Psi(x_0,y_0) - \Psi(x_1,y_1)| \leq \ddx(x_0,x_1)+\ddy(y_0,y_1). 
+  \end{equation}
+  Without loss of generality, we may assume that there \DIFdelbegin \DIFdel{exist }\DIFdelend \DIFaddbegin \DIFadd{exists }\DIFaddend $\bar{x} \in \msx$ and
+  $\bar{y} \in \msy$ such that $\Psi(\bar{x}, \bar{y}) = 0$. Therefore, we have
+  that for any $x \in \msx$ and $y \in \msy$
+  \begin{equation}
+    \label{eq:inf_Psi}
+    \normLigne{\Psi}_\infty = \sup \ensembleLigne{\abs{\Psi(x,y) - \Psi(\bar{x},\bar{y})}}{x \in \msx, \ y \in \msy} \leq \diam_\msx +  \diam_\msy.
+  \end{equation}
+  %with $\diam_\msx = \sup \ensembleLigne{\ddx(x_0,x_1)}{x_0,x_1 \in \msx}$,
+ % $\diam_\msy = \sup \ensembleLigne{\ddx(y_0,y_1)}{y_0,y_1 \in \msy}$. 
+ Using
+  this result, \Cref{prop:bound_0} and \Cref{prop:bound_1}, we get that for any
+  $x_0, x_1 \in \msx$ and $y_0, y_1 \in \msy$ we have
+  \begin{align}
+      \Lip(\Psi f_n g_n)
+      &\leq \Lip(\Psi) \|f_n\|_\infty \|g_n\|_\infty + 
+      \Lip(f_n) \|\Psi\|_\infty \|g_n\|_\infty + \Lip(g_n) 
+      \|\Psi \|_\infty \|f_n\|_\infty\\
+      &\leq \exp[6\|c\|_\infty] + 2\Lip(c)(\diam_\msx+\diam_\msy)\exp[3\|c\|_\infty].
+  \end{align}
+
+%   \begin{align}
+%     &\abs{\Psi(x_0,y_0) f_n(x_0)g_n(y_0) - \Psi(x_1,y_1) f_n(x_1)g_n(y_1)} \\
+%     & \qquad \qquad  \leq 2 (\diam_\msx + \diam_\msy) \normLigne{\nabla c}_\infty \rme^{14 \normLigne{c}_\infty} + \rme^{6\normLigne{c}_\infty} \eqsp . 
+%   \end{align}
+Combining this result with \Cref{thm:contrat_infty} and the fact that $\wassersteinD[1](\pi_0 \otimes \pi_1, \hat{\pi}_0 \otimes \hat{\pi}_1)\leq
+\wassersteinD[1](\pi_0, \hat{\pi}_0) + \wassersteinD[1](\pi_1, \hat{\pi}_1)$ we get that
+\begin{align}
+\label{eq:bound_wass_uno}
+&\textstyle{\int_{\msx \times \msy} \Psi(x,y) f_n(x) g_n(y) \rmd \pi_0(x) \rmd \pi_1(y) - \int_{\msx \times \msy}\Psi(x,y) \hat f_n(x) \hat g_n(y) \rmd \hat{\pi}_0(x) \rmd \hat{\pi}_1(y) }  \\
+&\leq \textstyle{\int_{\msx \times \msy} \Psi(x,y) f_n(x) g_n(y) \rmd \pi_0(x) \rmd \pi_1(y) - \int_{\msx \times \msy}\Psi(x,y) f_n(x) g_n(y) \rmd \hat{\pi}_0(x) \rmd \hat{\pi}_1(y) }  \\
+&\qquad\qquad  + \textstyle{\int_{\msx \times \msy} \Psi(x,y) \sup\|f_n g_n- \hat f_n \hat g_n\|_\infty \rmd \hat\pi_0(x) \rmd \hat\pi_1(y) }\\
+&\leq \Lip(\Psi f_n g_n) [\wassersteinD[1](\pi_0, \hat{\pi}_0) + \wassersteinD[1](\pi_1, \hat{\pi}_1) ]
++ 10(\diam_\msx +\diam_\msy) \rme^{10 \normLigne{c}_\infty} (\wassersteinD[1](\pi_0, \hat{\pi}_0) + \wassersteinD[1](\pi_1, \hat{\pi}_1) )  \\
+&\leq \left(\exp[6\|c\|_\infty] + 2\Lip(c)(\diam_\msx+\diam_\msy)\exp[3\|c\|_\infty]\right) [\wassersteinD[1](\pi_0, \hat{\pi}_0) + \wassersteinD[1](\pi_1, \hat{\pi}_1) ]\\
+&\qquad + 10(\diam_\msx +\diam_\msy) \rme^{10 \normLigne{c}_\infty} [\wassersteinD[1](\pi_0, \hat{\pi}_0) + \wassersteinD[1](\pi_1, \hat{\pi}_1) ]  \\
+& \leq \rme^{10 \normLigne{c}_\infty} \{1 + (2\Lip(c)+10) (\diam_\msx + \diam_\msy) \} (\wassersteinD[1](\pi_0, \hat{\pi}_0) + \wassersteinD[1](\pi_1, \hat{\pi}_1)). 
+\end{align}
+% In addition, using \eqref{eq:inf_Psi} and \Cref{thm:contrat_infty} we get that
+% \begin{align}
+% \label{eq:bound_wass_duo}
+% &\textstyle{\int_{\msx \times \msy} \Psi(x,y) f_n(x) g_n(y) \rmd \hat{\pi}_0(x) \rmd \hat{\pi}_1(y) - \int_{\msx \times \msy}\Psi(x,y) \hat{f}_n(x) \hat{g}_n(y) \rmd \hat{\pi}_0(x) \rmd \hat{\pi}_1(y) }  \\
+% &\qquad \leq 10 (\diam_\msx + \diam_\msy)\normLigne{\nabla c}_\infty \rme^{19 \normLigne{c}_\infty} (\wassersteinD[1](\pi_0, \hat{\pi}_0) + \wassersteinD[1](\pi_1, \hat{\pi}_1))  \eqsp . 
+% \end{align}
+% Combining \eqref{eq:bound_wass_uno} and \eqref{eq:bound_wass_duo} we get that
+% \begin{align}
+%   &\textstyle{\int_{\msx \times \msy} \Psi(x,y) \rmd \Pbb^{2n}(x,y) - \int_{\msx \times \msy} \Psi(x,y) \rmd \hat{\Pbb}^{2n}(x,y)} \\ & \qquad \leq \rme^{8 \normLigne{c}_\infty} \{1 + 12 (\diam_\msx + \diam_\msy) \normLigne{\nabla c}_\infty \rme^{11 \normLigne{c}_\infty}\} (\wassersteinD[1](\pi_0, \hat{\pi}_0) + \wassersteinD[1](\pi_1, \hat{\pi}_1)) \eqsp . 
+% \end{align}
+% Let $\Lipset$ the subset of functions from $\msx \times \msy$ to $\rset$ such
+% that for any $\Psi \in \Lipset$, $x_0, x_1 \in \msx$ and $y_0, y_1 \in \msy$ we
+% have
+% \begin{equation}
+%   \abs{\Psi(x_0, y_0) - \Psi(x_1, y_1)} \leq \norm{(x_0,y_0) - (x_1,y_1)} \eqsp . 
+% \end{equation}
+Letting
+$\Lipset^\star = \ensembleLigne{\Psi \in \Lipset}{\Psi(\bar{x}, \bar{y}) =0}$,
+we have that
+\begin{align}
+  \wassersteinD[1](\Pbb^{2n}, \hat{\Pbb}^{2n}) &= \sup \ensembleLigne{\textstyle{\int_{\msx \times \msy} \Psi(x,y) \rmd \Pbb^{2n}(x,y) - \int_{\msx \times \msy} \Psi(x,y) \rmd \hat{\Pbb}^{2n}(x,y)}}{\Psi \in \Lipset} \\
+                                               &= \sup \ensembleLigne{\textstyle{\int_{\msx \times \msy} \Psi(x,y) \rmd \Pbb^{2n}(x,y) - \int_{\msx \times \msy} \Psi(x,y) \rmd \hat{\Pbb}^{2n}(x,y)}}{\Psi \in \Lipset^\star} \\
+  &\leq \rme^{10 \normLigne{c}_\infty} \{1 + (2\Lip(c)+10) (\diam_\msx + \diam_\msy) \}  (\wassersteinD[1](\pi_0, \hat{\pi}_0) + \wassersteinD[1](\pi_1, \hat{\pi}_1)).
+\end{align}
+The proof that for any $n \in \nset$ we have
+\begin{equation}
+  \wassersteinD[1](\Pbb^{2n+1}, \hat{\Pbb}^{2n+1}) \leq  \rme^{10 \normLigne{c}_\infty} \{1 + (2\Lip(c)+10) (\diam_\msx + \diam_\msy) \}  (\wassersteinD[1](\pi_0, \hat{\pi}_0) + \wassersteinD[1](\pi_1, \hat{\pi}_1)),
+\end{equation}
+is similar and left to the reader.
+\end{proof}
+
+\begin{proof}[Proof of \Cref{thm:stability_schro}]
+We know that $(f_n,g_n)$ converges in the Hilbert metric; we will now prove that the sequence of measures \DIFdelbegin \DIFdel{$\Pbb^n:=f_n g_n K \pi_0 \otimes \pi_1$ }\DIFdelend \DIFaddbegin \DIFadd{$\Pbb^n:=f_n g_n K \pi_0 \otimes \Pi_1$ }\DIFaddend converges in Wasserstein distance. 
+
+Let $(f_n, g_n)$ be an IPFP sequence. We know that $d_H(f_n, f_{n+1})\leq \kappa^n d_H(f_1,f_0)$ and $d_H(g_n, g_{n+1})\leq \kappa^n d_H(g_1,g_0)$.
+Thus 
+\begin{align}d_H(f_{n+1}g_{n+1}, f_n g_n) 
+&= \log \sup_{x,y}\frac{f_{n+1}(x)g_{n+1}(y)}{f_n(x)g_n(x)} - \log \sup_{x,y}\frac{f_n(x)g_n(x)}{f_{n}(x)g_{zn+1}(y)}\\
+&\leq \kappa^n \left[ d_H(f_1, f_0)+ d_H(g_1, g_0)\right].
+\end{align}
+As explained earlier this is not enough on its own to control 
+$\|f_{n+1}g_{n+1}-f_n g_n\|_\infty$. 
+However, we can use the same technique as earlier. Recall that by definition 
+$$\iint (f_{n+1}(x)g_{n+1}(y)-f_n(x) g_n(y)) K(x,y) \DIFdelbegin %DIFDELCMD < \rmd %%%
+\DIFdelend \pi_0(\DIFaddbegin \rmd \DIFaddend x) \DIFdelbegin %DIFDELCMD < \rmd %%%
+\DIFdelend \pi_1(\DIFaddbegin \rmd \DIFaddend y) =0, $$
+and therefore either 
+$$f_{n+1}(x)g_{n+1}(y)-f_n(x) g_n(y)\equiv 0,$$
+identically on the support of $\pi_0\otimes \pi_1$, or it must take both negative and positive values on the support of $\pi_0\otimes \pi_1$. In the first case we conclude there exists $(x^\ast, y^\ast)$ such that 
+$$f_{n+1}(x^\ast)g_{n+1}(y^\ast) = f_n(x^\ast) g_n(x^\ast).$$
+In the second case, the same conclusion follows from \Cref{prop:bound_1} and the intermediate value theorem.
+% , there will be 
+% $(x^\ast, y^\ast)$ such that 
+% $$f_{n+1}(x^\ast)g_{n+1}(y^\ast) = f_n(x^\ast) g_n(x^\ast).$$
+In either case, following the same reasoning as in the proof of \Cref{thm:contrat_infty} we have that
+\begin{align}
+| f_{n+1}(x)g_{n+1}(y) - f_n(x) g_n(y)|
+&\leq \rme^{6\|c\|_\infty} 
+\absLigne{\log[f_{n+1}(x)g_{n+1}(y)/({f}_n(x){g}_n(y))]}
+\end{align}
+In addition, we have 
+\begin{align}
+& \log\left(f_{n+1}(x)g_{n+1}(y)/ f_n(x) g_n(x)\right)\\ 
+&\leq \log\left(f_{n+1}(x^\ast)g_{n+1}(y^\ast)/f_{n}(x^\ast)g_{n}(y^\ast)
+\right) + d_H(f_{n+1}g_{n+1}, f_n g_n)\\
+&\leq \kappa^n \left[ d_H(f_1, f_0)+ d_H(g_1, g_0)\right],
+\end{align}
+and therefore 
+$$\|f_{n+1}g_{n+1}-f_n g_n\|_\infty \leq \kappa^n \left[ d_H(f_1, f_0)+ d_H(g_1, g_0)\right].$$
+Let $\Psi \in \Lip_1(\msx\times \msy, \rset)$, 
+and without loss of generality we may assume that $\Psi(\bar x, \bar y)=0$ for a fixed pair $(\bar x, \bar y)\in \msx\times \msy$. 
+We then have 
+\begin{align}
+&\int \Psi(x,y) f_{n+1}(x) g_{n+1}(y) K(x,y) \DIFdelbegin %DIFDELCMD < \rmd %%%
+\DIFdelend \pi_0(\DIFaddbegin \rmd \DIFaddend x) \DIFdelbegin %DIFDELCMD < \rmd%%%
+\DIFdelend \pi_1(\DIFaddbegin \rmd \DIFaddend y)\\
+&\quad -   \int \Psi(x,y) f_{n}(x) g_{n}(y) K(x,y) \DIFdelbegin %DIFDELCMD < \rmd %%%
+\DIFdelend \pi_0(\DIFaddbegin \rmd \DIFaddend x) \DIFdelbegin %DIFDELCMD < \rmd%%%
+\DIFdelend \pi_1(\DIFaddbegin \rmd \DIFaddend y)\\
+&\quad \leq \int \|\Psi(x,y)\|_\infty \|f_{n+1} g_{n+1} - f_n g_n\|_\infty \|K\|_\infty \DIFdelbegin %DIFDELCMD < \rmd%%%
+\DIFdelend \pi_0(\DIFaddbegin \rmd \DIFaddend x) \DIFdelbegin %DIFDELCMD < \rmd%%%
+\DIFdelend \pi_1(\DIFaddbegin \rmd \DIFaddend y)\\
+&\quad \leq \kappa^n(\diam_\msx + \diam_\msy)\rme^{-\|c\|_\infty}\kappa^n \left[ d_H(f_1, f_0)+ d_H(g_1, g_0)\right].
+\end{align}
+Taking the supremum over $\{\Psi\in \Lip_1(\msx\times\msy, \rset): \Psi(\bar x, \bar y) =0\}$, we have that 
+$$\wassersteinD[1](\Pbb^{n+1}, \Pbb^{n}) \leq \kappa^n(\diam_\msx + \diam_\msy)\rme^{-\|c\|_\infty}\kappa^n \left[ d_H(f_1, f_0)+ d_H(g_1, g_0)\right].$$
+By completeness of $(\Pens_1(\msx\times\msy), \wassersteinD[1])$ we have that $\Pbb^n$ converges in \DIFdelbegin \DIFdel{$(\Pens_1(\msx\times\msy), \wassersteinD[1])$ }\DIFdelend \DIFaddbegin \DIFadd{$(\Pens{P}_1(\msx\times\msy), \wassersteinD[1])$ }\DIFaddend to $\Pbb^\ast\in \Pens_1(\msx\times\msy, \rset)$. 
+
+Similarly $\hat{\Pbb}^n \to \hat{\Pbb}^\ast\in\Pens_1(\msx\times\msy, \rset)$. Combining everything and applying \Cref{thm:stability_ipfp} we have 
+\begin{align}
+\wassersteinD[1](\Pbb^\ast, \hat \Pbb^\ast)
+   &\leq \wassersteinD[1](\Pbb^\ast, \Pbb^n)
+   + \wassersteinD[1](\Pbb^n, \hat\Pbb^n)+ 
+   \wassersteinD[1](\hat\Pbb^n, \hat\Pbb^\ast)\\
+   &\leq C \defEns{\wassersteinD[1](\pi_0, \hat{\pi}_0) + \wassersteinD[1](\pi_1, \hat{\pi}_1)} + \wassersteinD[1](\Pbb^\ast, \Pbb^n)+\wassersteinD[1](\hat\Pbb^n, \hat\Pbb^\ast).
+\end{align}
+Letting $n\to \infty$ the result follows. 
+\end{proof}
+
+\bibliographystyle{apalike}
+\bibliography{bibliography}
+
+\end{document}
+
+%%% Local Variables:
+%%% mode: latex
+%%% TeX-master: t
+%%% End:
