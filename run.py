@@ -17,7 +17,7 @@ from score_sde.utils import TrainState, save, restore
 from score_sde.utils.loggers_pl import LoggerCollection, Logger
 from score_sde.sampling import EulerMaruyamaManifoldPredictor, get_pc_sampler
 from score_sde.likelihood import get_likelihood_fn
-from score_sde.utils.vis import plot
+from score_sde.utils.vis import plot, earth_plot
 from score_sde.models import get_score_fn
 from score_sde.datasets import random_split, DataLoader, TensorDataset
 from score_sde.utils.tmp import compute_normalization
@@ -142,29 +142,39 @@ def run(cfg):
         z, _ = sampler(next_rng, sde.sample_limiting_distribution(rng, z0.shape))
         x = transform(z)
 
-        likelihood_fn = get_likelihood_fn(
-            sde,
-            get_score_fn(
+        def get_log_prob(train_state, sde, score_model, transform, cfg):
+            likelihood_fn = get_likelihood_fn(
                 sde,
-                score_model,
-                train_state.params_ema,
-                train_state.model_state,
-                continuous=True,
-            ),
-            hutchinson_type="None",
-            bits_per_dimension=False,
-            eps=cfg.eps,
-        )
+                get_score_fn(
+                    sde,
+                    score_model,
+                    train_state.params_ema,
+                    train_state.model_state,
+                    continuous=True,
+                ),
+                hutchinson_type="None",
+                bits_per_dimension=False,
+                eps=cfg.eps,
+            )
+            def log_prob(x):
+                z = transform.inv(x)
+                logp, _, _ = likelihood_fn(rng, z)
+                logp -= transform.log_abs_det_jacobian(z, x)
+                return logp
+            return log_prob
+        log_prob = get_log_prob(train_state, sde, score_model, transform, cfg)
         # x = x0
-        logp, z, nfe = likelihood_fn(rng, transform.inv(x))
-        print(nfe)
-        logp -= transform.log_abs_det_jacobian(z, x)
+        logp = log_prob(x)
         Path("logs/images").mkdir(parents=True, exist_ok=True)  # Create logs dir
-        plt = plot(None, x, jnp.exp(logp), None, out=f"logs/images/x0_backw.jpg")
+        plt = plot(None, x, jnp.exp(logp), None)
         logger.log_plot("x0_backw", plt, cfg.steps)
         prob = jnp.exp(dataset.log_prob(x0)) if hasattr(dataset, "log_prob") else None
-        plt = plot(None, x0, prob, None, out=f"logs/images/x0_true.jpg")
+        plt = plot(None, x0, prob, None)
         logger.log_plot("x0_true", plt, cfg.steps)
+
+        plt = earth_plot(cfg, log_prob, train_ds, test_ds, N=500)
+        if plt is not None:
+            logger.log_plot("pdf", plt, cfg.steps)
 
     ### Main
     log.info("Stage : Startup")

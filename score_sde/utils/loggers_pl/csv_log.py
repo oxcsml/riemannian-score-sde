@@ -206,17 +206,19 @@ class CSVLogger(LightningLoggerBase):
             self.save()
 
     def create_and_get_image_dir(self, name, step):
-        # from pathlib import Path
         root_dir = os.path.join(self.log_dir, "images")
-        # Path(root_dir).mkdir(parents=True, exist_ok=True)
         os.makedirs(root_dir, exist_ok=True)
-        path = os.path.join(os.getcwd(), root_dir, "{}_{:03d}.png".format(name, step))
+        path = os.path.join(os.getcwd(), root_dir, "{}_{:03d}".format(name, step))
         return path
 
     @rank_zero_only
     def log_plot(self, name, plt, step) -> None:
         path = self.create_and_get_image_dir(name, step)
-        plt.savefig(path, dpi=150, bbox_inches="tight")
+        if isinstance(plt, list):
+            for i, plot_i in enumerate(plt):
+                plot_i.savefig(path + f"_{i}.png", dpi=300, bbox_inches="tight")
+        else:
+            plt.savefig(path + ".png", dpi=300, bbox_inches="tight")
 
     @rank_zero_only
     def save(self) -> None:

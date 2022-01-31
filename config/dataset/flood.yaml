@@ -1,3 +1,4 @@
 _target_: riemannian_score_sde.datasets.earth.Flood
 _convert_: partial
 data_dir: ${data_dir}
+name: flood

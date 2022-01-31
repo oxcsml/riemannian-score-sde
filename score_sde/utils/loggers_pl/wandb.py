@@ -425,8 +425,12 @@ class WandbLogger(LightningLoggerBase):
         self.log_metrics(metrics, step)
 
     def log_plot(self, name, plt, step):
-        self.experiment.log({name: [wandb.Image(plt, caption=step)]}, commit=False)
-        self.experiment.log({name: [wandb.Image(plt, caption=step)]}, commit=True)
+        if isinstance(plt, list):
+            for i, plot_i in enumerate(plt):
+                self.experiment.log({f"{name}_{i}": [wandb.Image(plot_i, caption=step)]}, commit=True)
+        else:
+            self.experiment.log({name: [wandb.Image(plt, caption=step)]}, commit=True)
+
 
     @property
     def save_dir(self) -> Optional[str]:
