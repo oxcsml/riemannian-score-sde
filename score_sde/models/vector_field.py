@@ -9,16 +9,16 @@ from hydra.utils import instantiate
 from geomstats.geometry.hypersphere import Hypersphere
 from geomstats.geometry.base import VectorSpace, EmbeddedManifold
 
-def div_noise(rng: jax.random.KeyArray, shape: Sequence[int], hutchinson_type: str) -> jnp.ndarray:
+
+def div_noise(
+    rng: jax.random.KeyArray, shape: Sequence[int], hutchinson_type: str
+) -> jnp.ndarray:
     """Sample noise for the hutchinson estimator."""
     if hutchinson_type == "Gaussian":
         epsilon = jax.random.normal(rng, shape)
     elif hutchinson_type == "Rademacher":
         epsilon = (
-            jax.random.randint(rng, shape, minval=0, maxval=2).astype(
-                jnp.float32
-            )
-            * 2
+            jax.random.randint(rng, shape, minval=0, maxval=2).astype(jnp.float32) * 2
             - 1
         )
     elif hutchinson_type == "None":
@@ -45,12 +45,13 @@ def get_estimate_div_fn(fi_fn, Xi=None):
         def grad_fn(data):
             fi = fi_fn(data, t)
             return jnp.sum(fi * eps), fi
+
         (_, fi), grad_fn_eps = jax.value_and_grad(grad_fn, has_aux=True)(x)
         # out = grad_fn_eps * G(x) @ Xi * eps
         # G = manifold.metric.metric_matrix(x)
         # Xi = jnp.einsum('...ij,...jk->...ik', G, Xi)
         if Xi is not None:
-            grad_fn_eps = jnp.einsum('...d,...dn->...n', grad_fn_eps, Xi)
+            grad_fn_eps = jnp.einsum("...d,...dn->...n", grad_fn_eps, Xi)
         div = jnp.sum(grad_fn_eps * eps, axis=tuple(range(1, len(x.shape))))
         return div, fi
 
@@ -76,7 +77,7 @@ def get_exact_div_fn(fi_fn, Xi=None):
         # G = manifold.metric.metric_matrix(x)
         # Xi = jnp.einsum('...ij,...jk->...ik', G, Xi(x))
         if Xi is not None:
-            jac = jnp.einsum('...nd,...dm->...nm', jac, Xi)
+            jac = jnp.einsum("...nd,...dm->...nm", jac, Xi)
         div = jnp.trace(jac, axis1=-1, axis2=-2).reshape(x_shape[:-1])
         return div
 
@@ -84,10 +85,11 @@ def get_exact_div_fn(fi_fn, Xi=None):
 
 
 class VectorFieldGenerator(hk.Module, abc.ABC):
-    def __init__(self, architecture, output_shape, manifold):
+    def __init__(self, architecture, embedding, output_shape, manifold):
         """X = fi * Xi with fi weights and Xi generators"""
         super().__init__()
         self.net = instantiate(architecture, output_shape=output_shape)
+        self.embedding = instantiate(embedding, manifold=manifold)
         self.manifold = manifold
 
     @staticmethod
@@ -97,7 +99,7 @@ class VectorFieldGenerator(hk.Module, abc.ABC):
 
     def _weights(self, x, t):
         """shape=[..., card=n]"""
-        return self.net(x, t)
+        return self.net(*self.embedding(x, t))
 
     @abc.abstractmethod
     def _generators(self, x):
@@ -110,7 +112,7 @@ class VectorFieldGenerator(hk.Module, abc.ABC):
     def __call__(self, x, t):
         fi_fn, Xi_fn = self.decomposition
         fi, Xi = fi_fn(x, t), Xi_fn(x)
-        out = jnp.einsum('...n,...dn->...d', fi, Xi)
+        out = jnp.einsum("...n,...dn->...d", fi, Xi)
         # assert self.manifold.is_tangent(out, x, atol=1e-6).all()
         return out
 
@@ -130,7 +132,7 @@ class VectorFieldGenerator(hk.Module, abc.ABC):
             eps = div_noise(hk.next_rng_key(), shape, hutchinson_type)
             term_1, fi = get_estimate_div_fn(fi_fn, Xi)(x, t, eps)
             div_Xi = self.div_generators(x)
-            term_2 = jnp.einsum('...n,...n->...', fi, div_Xi)
+            term_2 = jnp.einsum("...n,...n->...", fi, div_Xi)
             out = term_1 + term_2
         return out
 
@@ -146,10 +148,10 @@ class VectorFieldGenerator(hk.Module, abc.ABC):
 
 
 class DivFreeGenerator(VectorFieldGenerator):
-    def __init__(self, architecture, output_shape, manifold):
-        super().__init__(architecture, output_shape, manifold)
+    def __init__(self, architecture, embedding, output_shape, manifold):
+        super().__init__(architecture, embedding, output_shape, manifold)
         self.div = self.div_split
-    
+
     @staticmethod
     def output_shape(manifold):
         return manifold.isom_group.dim
@@ -164,8 +166,9 @@ class DivFreeGenerator(VectorFieldGenerator):
 
 class EigenGenerator(VectorFieldGenerator):
     """Gradient of laplacien eigenfunctions with eigenvalue=1"""
-    def __init__(self, architecture, output_shape, manifold):
-        super().__init__(architecture, output_shape, manifold)
+
+    def __init__(self, architecture, embedding, output_shape, manifold):
+        super().__init__(architecture, embedding, output_shape, manifold)
         assert isinstance(manifold, Hypersphere)
         self.div = self.div_split
 
@@ -178,15 +181,16 @@ class EigenGenerator(VectorFieldGenerator):
 
     def div_generators(self, x):
         # NOTE: Empirically need this factor 2 to match AmbientGenerator but why??
-        return - self.manifold.dim * 2 * x
+        return -self.manifold.dim * 2 * x
 
 
 class AmbientGenerator(VectorFieldGenerator):
     """Equivalent to EigenGenerator"""
-    def __init__(self, architecture, output_shape, manifold):
-        super().__init__(architecture, output_shape, manifold)
+
+    def __init__(self, architecture, embedding, output_shape, manifold):
+        super().__init__(architecture, embedding, output_shape, manifold)
         self.div = self.divE
-    
+
     @staticmethod
     def output_shape(manifold):
         if isinstance(manifold, EmbeddedManifold):
@@ -194,10 +198,10 @@ class AmbientGenerator(VectorFieldGenerator):
         else:
             output_shape = manifold.dim
         return output_shape
-    
+
     def _generators(self, x):
         return self.manifold.eigen_generators(x)
 
     # def __call__(self, x, t):
     #     # `to_tangent`` have an 1/sq_norm(x) term that wrongs the div
-        # return self.manifold.to_tangent(self.net(x, t), x)
+    # return self.manifold.to_tangent(self.net(x, t), x)

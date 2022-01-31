@@ -85,7 +85,9 @@ def validate_shuffle_split(n_samples, test_size, train_size, default_test_size=N
 
 
 def random_split(dataset, lengths, rng):
-    if sum(lengths) == len(dataset):
+    if lengths is None:
+        return dataset, dataset, dataset
+    elif sum(lengths) == len(dataset):
         pass
     elif sum(lengths) == 1:
         lengths = [int(l * len(dataset)) for l in lengths]

@@ -7,6 +7,7 @@ defaults:
   - /manifold: nsphere
   - /model: dsm
   - /architecture: concat
+  - /embedding: none
 
 data_dir: /data/ziz/not-backed-up/scratch/score-sde/data
 # log_dir: /data/ziz/not-backed-up/scratch/score-sde/results
@@ -16,10 +17,12 @@ manifold:
 sde:
   t0: 0
   tf: 1
+  beta_0: 0.0001
+  beta_f: 2
 
 splits: [0.8, 0.1, 0.1]
 batch_size: 512
-warmup_steps: 100
+warmup_steps: 1000
 steps: 300000
 val_freq: 10000
 ema_rate: 0.999
