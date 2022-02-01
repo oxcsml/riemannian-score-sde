@@ -32,7 +32,6 @@ class Brownian(SDE):
         )
         # mean = batch_mul(jnp.exp(log_mean_coeff), x)
         std = jnp.sqrt(1 - jnp.exp(2.0 * log_mean_coeff))
-        # return mean, std
         return jnp.zeros_like(x), std
 
     def marginal_sample(self, rng, x, t):
@@ -53,11 +52,16 @@ class Brownian(SDE):
             perturbed_x, _ = sampler(rng, x, tf=t)
         return perturbed_x
 
-    def marginal_log_prob(self, x0, x, t, **kwargs):
-        # TODO: Should indeed vmap?
-        # NOTE: reshape: https://github.com/google/jax/issues/2303
+    # def marginal_log_prob(self, x0, x, t, **kwargs):
+    #     # TODO: Should indeed vmap?
+    #     # NOTE: reshape: https://github.com/google/jax/issues/2303
+    #     s = 2 * (0.25 * t ** 2 * (self.beta_f - self.beta_0) + 0.5 * t * self.beta_0)
+    #     return jnp.reshape(self.manifold.log_heat_kernel(x0, x, s, **kwargs), ())
+
+    def grad_marginal_log_prob(self, x0, x, t, **kwargs):
         s = 2 * (0.25 * t ** 2 * (self.beta_f - self.beta_0) + 0.5 * t * self.beta_0)
-        return jnp.reshape(self.manifold.log_heat_kernel(x0, x, s, **kwargs), ())
+        logp_grad = self.manifold.grad_marginal_log_prob(x0, x, s, **kwargs)
+        return None, logp_grad
 
     def sample_limiting_distribution(self, rng, shape):
         return self.manifold.random_uniform(state=rng, n_samples=shape[0])

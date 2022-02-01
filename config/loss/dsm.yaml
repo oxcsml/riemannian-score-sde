@@ -1,9 +1,6 @@
-_target_: score_sde.losses.get_ema_loss_step_fn
-loss_fn:
-  _target_: riemannian_score_sde.losses.get_dsm_loss_fn
-  reduce_mean: true
-  likelihood_weighting: true
-  eps: ${eps}
-  rescale: false
-  thresh: 0.1
-  n_max: 10
+_target_: riemannian_score_sde.losses.get_dsm_loss_fn
+reduce_mean: true
+like_w: true
+eps: ${eps}
+thresh: 0.1
+n_max: 10

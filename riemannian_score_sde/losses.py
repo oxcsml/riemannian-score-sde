@@ -23,7 +23,7 @@ def get_dsm_loss_fn(
     model: ParametrisedScoreFunction,
     train: bool = True,
     reduce_mean: bool = True,
-    likelihood_weighting: bool = True,
+    like_w: bool = True,
     eps: float = 1e-3,
     rescale = False,
     **kwargs
@@ -61,17 +61,17 @@ def get_dsm_loss_fn(
         score, new_model_state = score_fn(x_t, t, rng=step_rng)
         # compute $\nabla \log p(x_t | x_0)$
         logp_grad = sde.grad_marginal_log_prob(x_0, x_t, t, **kwargs)[1]
-        if rescale:
+
+        if not like_w:
             std = jnp.expand_dims(sde.marginal_prob(jnp.zeros_like(x_t), t)[1], -1)
-            score, logp_grad = batch_mul(std, score), batch_mul(std, logp_grad)
+            losses = jnp.square(batch_mul(std, score) - batch_mul(std, logp_grad))
+            losses = reduce_op(losses.reshape((losses.shape[0], -1)), axis=-1)
 
-        # compute $E_{p{x_0}}[|| s_\theta(x_t, t) - \nabla \log p(x_t | x_0)||^2]$
-        losses = jnp.square(score - logp_grad)
-        losses = reduce_op(losses.reshape((losses.shape[0], -1)), axis=-1)
-
-        if likelihood_weighting:
+        else:
+            # compute $E_{p{x_0}}[|| s_\theta(x_t, t) - \nabla \log p(x_t | x_0)||^2]$
             g2 = sde.coefficients(jnp.zeros_like(x_0), t)[1] ** 2
-            losses = losses * g2
+            losses = jnp.square(score - logp_grad)
+            losses = reduce_op(losses.reshape((losses.shape[0], -1)), axis=-1)  * g2
 
         loss = jnp.mean(losses)
         return loss, new_model_state
@@ -84,7 +84,7 @@ def get_ism_loss_fn(
     model: ParametrisedScoreFunction,
     train: bool,
     reduce_mean: bool = True,
-    likelihood_weighting: bool = True,
+    like_w: bool = True,
     hutchinson_type="Rademacher",
     eps: float = 1e-3,
 ):
@@ -126,7 +126,7 @@ def get_ism_loss_fn(
         sq_norm_score = sde.manifold.metric.squared_norm(score, x_t)
         losses = 0.5 * sq_norm_score + div_score
 
-        if likelihood_weighting:
+        if like_w:
             g2 = sde.coefficients(jnp.zeros_like(x_0), t)[1] ** 2
             losses = losses * g2
 
