@@ -32,7 +32,13 @@ def main(cfg):
 
     def score_model(x, t, div=False, hutchinson_type='None'):
         output_shape = get_class(cfg.generator._target_).output_shape(model_manifold)
-        score = instantiate(cfg.generator, cfg.architecture, output_shape, manifold=model_manifold)
+        score = instantiate(
+            cfg.generator,
+            cfg.architecture,
+            cfg.embedding,
+            output_shape,
+            manifold=model_manifold,
+        )
         if not div:
             return score(x, t)
         else:
@@ -57,7 +63,7 @@ def main(cfg):
         eps=cfg.eps,
     )
 
-    Z = compute_normalization(likelihood_fn, transform, model_manifold)
+    Z = compute_normalization(likelihood_fn, transform, model_manifold, N=200)
     print("Z", Z)
 
 

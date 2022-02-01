@@ -320,7 +320,7 @@ def get_likelihood_fn(
     eps: str = 1e-5,
     bits_per_dimension=True,
 ):
-    def likelihood_fn(rng: jax.random.KeyArray, data: jnp.ndarray):
+    def likelihood_fn(rng: jax.random.KeyArray, data: jnp.ndarray, tf : float = None):
         """Compute an unbiased estimate to the log-likelihood in bits/dim.
 
         Args:
@@ -334,7 +334,6 @@ def get_likelihood_fn(
             probability flow ODE.
           nfe: An integer. The number of function evaluations used for running the black-box ODE solver.
         """
-
         pode = ProbabilityFlowODE(sde, score_fn)
         drift_fn = lambda x, t: pode.coefficients(x, t)[0]
         div_fn = get_div_fn(drift_fn, hutchinson_type)
@@ -354,8 +353,9 @@ def get_likelihood_fn(
         init = jnp.concatenate(
             [to_flattened_numpy(data), np.zeros((shape[0],))], axis=0
         )
+        tf = sde.tf if tf is None else tf
         solution = integrate.solve_ivp(
-            ode_func, (sde.t0 + eps, sde.tf), init, rtol=rtol, atol=atol, method=method
+            ode_func, (sde.t0 + eps, tf), init, rtol=rtol, atol=atol, method=method
         )
 
         nfe = solution.nfev
