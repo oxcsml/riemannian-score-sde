@@ -25,7 +25,7 @@ def get_dsm_loss_fn(
     reduce_mean: bool = True,
     like_w: bool = True,
     eps: float = 1e-3,
-    rescale = False,
+    s_zero = True,
     **kwargs
 ):
     reduce_op = (
@@ -56,15 +56,25 @@ def get_dsm_loss_fn(
         rng, step_rng = random.split(rng)
 
         # sample p(x_t | x_0)
-        x_t = sde.marginal_sample(step_rng, x_0, t)
+        # compute $\nabla \log p(x_t | x_0)$
+        if s_zero:  # l_{t|0}
+            x_t = sde.marginal_sample(step_rng, x_0, t)
+            logp_grad = sde.grad_marginal_log_prob(x_0, x_t, t, **kwargs)[1]
+            std = jnp.expand_dims(sde.marginal_prob(jnp.zeros_like(x_t), t)[1], -1)
+        else:      # l_{t|s}
+            x_t, x_hist, timesteps = sde.marginal_sample(step_rng, x_0, t, return_hist=True)
+            x_s = x_hist[-2]
+            logp_grad, delta_t = sde.varhadan_exp(x_s, x_t, timesteps[-2], timesteps[-1])
+            delta_t = t  # NOTE: works better?
+            std = jnp.expand_dims(sde.marginal_prob(jnp.zeros_like(x_t), delta_t)[1], -1)
+
         # compute approximate score at x_t
         score, new_model_state = score_fn(x_t, t, rng=step_rng)
-        # compute $\nabla \log p(x_t | x_0)$
-        logp_grad = sde.grad_marginal_log_prob(x_0, x_t, t, **kwargs)[1]
 
         if not like_w:
-            std = jnp.expand_dims(sde.marginal_prob(jnp.zeros_like(x_t), t)[1], -1)
-            losses = jnp.square(batch_mul(std, score) - batch_mul(std, logp_grad))
+            score = batch_mul(std, score)
+            logp_grad = batch_mul(std, logp_grad)
+            losses = jnp.square(score - logp_grad)
             losses = reduce_op(losses.reshape((losses.shape[0], -1)), axis=-1)
 
         else:

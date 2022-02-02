@@ -135,7 +135,7 @@ def run(cfg):
             )
         )
         rng, next_rng = jax.random.split(rng)
-        z, _ = sampler(next_rng, sde.sample_limiting_distribution(rng, z0.shape))
+        z, _, _ = sampler(next_rng, sde.sample_limiting_distribution(rng, z0.shape))
         x = transform(z)
 
         def get_log_prob(train_state, sde, score_model, transform, cfg):

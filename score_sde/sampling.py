@@ -260,7 +260,7 @@ def get_pc_sampler(
     n_steps: int = 1,
     denoise: bool = True,
     eps: float = 1e-3,
-    return_t=False,
+    # return_t=False,
 ):
     """Create a Predictor-Corrector (PC) sampler.
 
@@ -338,13 +338,11 @@ def get_pc_sampler(
 
         _, x, x_mean, x_hist = jax.lax.fori_loop(0, N, loop_body, (rng, x, x, x_hist))
         # Denoising is equivalent to running one predictor step without adding noise.
-        if return_t:
-            return (
-                inverse_scaler(x_mean if denoise else x),
-                inverse_scaler(x_hist),
-                timesteps,
-            )
-        else:
-            return inverse_scaler(x_mean if denoise else x), inverse_scaler(x_hist)
+        return (
+            inverse_scaler(x_mean if denoise else x),
+            inverse_scaler(x_hist),
+            timesteps,
+        )
+
 
     return pc_sampler

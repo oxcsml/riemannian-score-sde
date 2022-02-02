@@ -73,12 +73,13 @@ def get_score_fn(
 
     if isinstance(sde, Brownian):
 
-        def score_fn(x, t, rng=None):
+        def score_fn(x, t, s=0, std_trick=True, rng=None):
             model_out, new_state = model.apply(params, state, rng, x=x, t=t)
             # NOTE: scaling the output with 1.0 / std helps cf 'Improved Techniques for Training Score-Based Generative Model'
             score = model_out
-            std = sde.marginal_prob(jnp.zeros_like(x), t)[1]
-            score = batch_mul(model_out, 1.0 / std)
+            if std_trick:
+                std = sde.marginal_prob(jnp.zeros_like(x), t)[1]
+                score = batch_mul(model_out, 1.0 / std)
             if return_state:
                 return score, new_state
             else:
