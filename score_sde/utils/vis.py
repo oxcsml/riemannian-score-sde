@@ -44,19 +44,23 @@ def set_aspect_equal_3d(ax):
     ax.set_ylim3d([ymean - plot_radius, ymean + plot_radius])
     ax.set_zlim3d([zmean - plot_radius, zmean + plot_radius])
 
+    return ax
 
-def sphere_plot(ax):
+
+def sphere_plot(ax, color="grey"):
     # assert manifold.dim == 2
     radius = 1.
-    set_aspect_equal_3d(ax)
-
-    u = np.linspace(0, 2 * np.pi, 100)
-    v = np.linspace(0, np.pi, 100)
+    # set_aspect_equal_3d(ax)
+    n = 200
+    u = np.linspace(0, 2 * np.pi, n)
+    v = np.linspace(0, np.pi, n)
 
     x = 1 * np.outer(np.cos(u), np.sin(v))
     y = 1 * np.outer(np.sin(u), np.sin(v))
     z = 1 * np.outer(np.ones(np.size(u)), np.cos(v))
-    ax.plot_surface(x, y, z, rstride=4, cstride=4, color="grey", linewidth=0, alpha=0.2)
+    ax.plot_surface(x, y, z, rstride=4, cstride=4, color=color, linewidth=0, alpha=0.2)
+
+    return ax
 
     # ax.set_xlim3d(-radius, radius)
     # ax.set_ylim3d(-radius, radius)
@@ -165,7 +169,7 @@ def earth_plot(cfg, log_prob, train_ds, test_ds, N, azimuth=None):
     # projs = ["ortho"]
 
     xs, lat, lon = get_spherical_grid(N, eps=0.)
-    # ts = [0.01, 0.05, 1]
+    # ts = [0.01, 0.05, cfg.sde.tf]
     ts = [cfg.sde.tf]
     figs = []
   
