@@ -286,7 +286,7 @@ def main(train=False):
     ### Training ###
     if train:
 
-        # train_step_fn = get_pmap_step_fn(sde, score_model, optimiser, True, reduce_mean=False, continuous=True, likelihood_weighting=False, eps=1e-3)
+        # train_step_fn = get_pmap_step_fn(sde, score_model, optimiser, True, reduce_mean=False, continuous=True, like_w=False, eps=1e-3)
         train_step_fn = get_step_fn(
             sde,
             score_model,
@@ -294,7 +294,7 @@ def main(train=False):
             True,
             reduce_mean=False,
             continuous=True,
-            likelihood_weighting=False,
+            like_w=False,
             eps=1e-3,
         )
         # p_train_step = jax.pmap(partial(jax.lax.scan, train_step_fn), axis_name='batch', donate_argnums=1)

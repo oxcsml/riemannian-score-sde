@@ -21,22 +21,18 @@ from score_sde.utils.vis import plot, earth_plot
 from score_sde.models import get_score_fn
 from score_sde.datasets import random_split, DataLoader, TensorDataset
 from score_sde.utils.tmp import compute_normalization
+from score_sde.losses import get_ema_loss_step_fn
 
 log = logging.getLogger(__name__)
 
 
 def run(cfg):
     def train(train_state):
-        loss_cfg = dict(cfg.loss)
-        if ("loss_fn" in loss_cfg) and isinstance(
-            loss_cfg["loss_fn"], omegaconf.DictConfig
-        ):
-            loss_cfg["loss_fn"] = call(
-                cfg.loss.loss_fn, sde=sde, model=score_model, eps=cfg.eps, train=True
-            )
-
-        train_step_fn = instantiate(
-            loss_cfg,
+        loss = instantiate(
+            cfg.loss, sde=sde, model=score_model, eps=cfg.eps, train=True
+        )
+        train_step_fn = get_ema_loss_step_fn(
+            loss,
             optimizer=optimiser,
             train=True,
         )
@@ -139,7 +135,7 @@ def run(cfg):
             )
         )
         rng, next_rng = jax.random.split(rng)
-        z, _ = sampler(next_rng, sde.sample_limiting_distribution(rng, z0.shape))
+        z, _, _ = sampler(next_rng, sde.sample_limiting_distribution(rng, z0.shape))
         x = transform(z)
 
         def get_log_prob(train_state, sde, score_model, transform, cfg):

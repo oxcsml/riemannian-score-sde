@@ -44,19 +44,23 @@ def set_aspect_equal_3d(ax):
     ax.set_ylim3d([ymean - plot_radius, ymean + plot_radius])
     ax.set_zlim3d([zmean - plot_radius, zmean + plot_radius])
 
+    return ax
 
-def sphere_plot(ax):
+
+def sphere_plot(ax, color="grey"):
     # assert manifold.dim == 2
     radius = 1.
-    set_aspect_equal_3d(ax)
-
-    u = np.linspace(0, 2 * np.pi, 100)
-    v = np.linspace(0, np.pi, 100)
+    # set_aspect_equal_3d(ax)
+    n = 200
+    u = np.linspace(0, 2 * np.pi, n)
+    v = np.linspace(0, np.pi, n)
 
     x = 1 * np.outer(np.cos(u), np.sin(v))
     y = 1 * np.outer(np.sin(u), np.sin(v))
     z = 1 * np.outer(np.ones(np.size(u)), np.cos(v))
-    ax.plot_surface(x, y, z, rstride=4, cstride=4, color="grey", linewidth=0, alpha=0.2)
+    ax.plot_surface(x, y, z, rstride=4, cstride=4, color=color, linewidth=0, alpha=0.2)
+
+    return ax
 
     # ax.set_xlim3d(-radius, radius)
     # ax.set_ylim3d(-radius, radius)
@@ -162,66 +166,77 @@ def earth_plot(cfg, log_prob, train_ds, test_ds, N, azimuth=None):
     azimuth = azimuth_dict[str(cfg.dataset.name)] if azimuth is None else azimuth
     polar = 30
     projs = ["ortho", "robinson"]
+    # projs = ["ortho"]
 
     xs, lat, lon = get_spherical_grid(N, eps=0.)
-    fs = log_prob(xs).reshape((lat.shape[0], lon.shape[0]), order="F")
-    norm = mcolors.PowerNorm(3.)  # NOTE: tweak that value
-    fs = np.array(fs)
-    fs = norm(fs)
-
-    # create figure with earth features
+    # ts = [0.01, 0.05, cfg.sde.tf]
+    ts = [cfg.sde.tf]
     figs = []
-    for i, proj in enumerate(projs):
-        fig = plt.figure(figsize=(5, 5), dpi=300)
-        if proj == "ortho":
-            projection = ccrs.Orthographic(azimuth, polar)
-        elif proj == "robinson":
-            projection = ccrs.Robinson(central_longitude=0)
-        else:
-            raise Exception("Invalid proj {}".format(proj))
-        ax = fig.add_subplot(1, 1, 1, projection=projection, frameon=True)
-        ax.set_global()
+  
+    for t in ts:
+        print(t)
+        fs = log_prob(xs, t).reshape((lat.shape[0], lon.shape[0]), order="F")
+        fs = jnp.exp(fs)
+        # norm = mcolors.PowerNorm(3.)  # NOTE: tweak that value
+        norm = mcolors.PowerNorm(.2)  # N=500
+        fs = np.array(fs)
+        # print(np.min(fs).item(), jnp.quantile(fs, np.array([0.1, 0.5, 0.9])), np.max(fs).item())
+        fs = norm(fs)
+        # print(np.min(fs).item(), jnp.quantile(fs, np.array([0.1, 0.5, 0.9])), np.max(fs).item())
 
-        # earth features
-        ax.add_feature(cfeature.LAND, zorder=0, facecolor="#e0e0e0")
+        # create figure with earth features
+        for i, proj in enumerate(projs):
+            print(proj)
+            fig = plt.figure(figsize=(5, 5), dpi=300)
+            if proj == "ortho":
+                projection = ccrs.Orthographic(azimuth, polar)
+            elif proj == "robinson":
+                projection = ccrs.Robinson(central_longitude=0)
+            else:
+                raise Exception("Invalid proj {}".format(proj))
+            ax = fig.add_subplot(1, 1, 1, projection=projection, frameon=True)
+            ax.set_global()
 
-       
-        vmin, vmax = 0., 1.0
-        # n_levels = 900
-        n_levels = 200
-        levels = np.linspace(vmin, vmax, n_levels)
-        cmap = sns.cubehelix_palette(light=1.0, dark=0.0, start=0.5, rot=-0.75, reverse=False, as_cmap=True)
-        cs = ax.contourf(
-            lon,
-            lat,
-            fs,
-            levels=levels,
-            # alpha=0.8,
-            transform=ccrs.PlateCarree(),
-            antialiased=True,
-            # vmin=vmin,
-            # vmax=vmax,
-            cmap=cmap,
-            extend="both",
-        )
-      
-        alpha_gradient = np.linspace(0, 1, len(ax.collections))
-        for col, alpha in zip(ax.collections, alpha_gradient):
-            col.set_alpha(alpha)
-        # for col in ax.collections[0:1]:
-            # col.set_alpha(0)
+            # earth features
+            ax.add_feature(cfeature.LAND, zorder=0, facecolor="#e0e0e0")
 
-        # add scatter plots of the dataset
-        colors = sns.color_palette("hls", 8)
-        # colors = sns.color_palette()
-        train_idx = train_ds.dataset.indices
-        test_idx = test_ds.dataset.indices
-        samples = train_ds.dataset.dataset.data
-        samples = np.array(latlon_from_cartesian(samples)) * 180 / math.pi
-        points = projection.transform_points(ccrs.Geodetic(), samples[:, 1], samples[:, 0])
-        ax.scatter(points[train_idx, 0], points[train_idx, 1], s=0.2, c=[colors[5]], alpha=0.2)
-        ax.scatter(points[test_idx, 0], points[test_idx, 1], s=0.2, c=[colors[0]], alpha=0.2)
-        # plt.close(fig)
-        figs.append(fig)
+            vmin, vmax = 0., 1.0
+            # n_levels = 900
+            n_levels = 200
+            levels = np.linspace(vmin, vmax, n_levels)
+            cmap = sns.cubehelix_palette(light=1.0, dark=0.0, start=0.5, rot=-0.75, reverse=False, as_cmap=True)
+            # cmap = sns.cubehelix_palette(as_cmap=True)
+            cs = ax.contourf(
+                lon,
+                lat,
+                fs,
+                levels=levels,
+                # alpha=0.8,
+                transform=ccrs.PlateCarree(),
+                antialiased=True,
+                # vmin=vmin,
+                # vmax=vmax,
+                cmap=cmap,
+                extend="both",
+            )
+        
+            alpha_gradient = np.linspace(0, 1, len(ax.collections))
+            for col, alpha in zip(ax.collections, alpha_gradient):
+                col.set_alpha(alpha)
+            # for col in ax.collections[0:1]:
+                # col.set_alpha(0)
+
+            # add scatter plots of the dataset
+            colors = sns.color_palette("hls", 8)
+            # colors = sns.color_palette()
+            train_idx = train_ds.dataset.indices
+            test_idx = test_ds.dataset.indices
+            samples = train_ds.dataset.dataset.data
+            samples = np.array(latlon_from_cartesian(samples)) * 180 / math.pi
+            points = projection.transform_points(ccrs.Geodetic(), samples[:, 1], samples[:, 0])
+            ax.scatter(points[train_idx, 0], points[train_idx, 1], s=0.2, c=[colors[5]], alpha=0.2)
+            ax.scatter(points[test_idx, 0], points[test_idx, 1], s=0.2, c=[colors[0]], alpha=0.2)
+            # plt.close(fig)
+            figs.append(fig)
 
     return figs

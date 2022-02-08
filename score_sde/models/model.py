@@ -73,12 +73,13 @@ def get_score_fn(
 
     if isinstance(sde, Brownian):
 
-        def score_fn(x, t, rng=None):
+        def score_fn(x, t, s=0, std_trick=True, rng=None):
             model_out, new_state = model.apply(params, state, rng, x=x, t=t)
             # NOTE: scaling the output with 1.0 / std helps cf 'Improved Techniques for Training Score-Based Generative Model'
             score = model_out
-            std = sde.marginal_prob(jnp.zeros_like(x), t)[1]
-            score = batch_mul(model_out, 1.0 / std)
+            if std_trick:
+                std = sde.marginal_prob(jnp.zeros_like(x), t)[1]
+                score = batch_mul(model_out, 1.0 / std)
             if return_state:
                 return score, new_state
             else:
@@ -265,23 +266,23 @@ class ConcatEmbed(hk.Module):
     def __init__(
         self,
         output_shape,
-        encoder_layers=[16],
-        pos_dim=16,
-        decoder_layers=[128, 128],
-        act="lrelu",
+        enc_shapes,
+        t_dim,
+        dec_shapes,
+        act,
     ):
         super().__init__()
-        self.temb_dim = pos_dim
-        t_enc_dim = pos_dim * 2
+        self.temb_dim = t_dim
+        t_enc_dim = t_dim * 2
 
-        self.net = MLP(hidden_shapes=decoder_layers, output_shape=output_shape, act=act)
+        self.net = MLP(hidden_shapes=dec_shapes, output_shape=output_shape, act=act)
 
         self.t_encoder = MLP(
-            hidden_shapes=encoder_layers, output_shape=t_enc_dim, act=act
+            hidden_shapes=enc_shapes, output_shape=t_enc_dim, act=act
         )
 
         self.x_encoder = MLP(
-            hidden_shapes=encoder_layers, output_shape=t_enc_dim, act=act
+            hidden_shapes=enc_shapes, output_shape=t_enc_dim, act=act
         )
 
     def __call__(self, x, t):

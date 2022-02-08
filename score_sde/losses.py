@@ -39,7 +39,7 @@ def get_dsm_loss_fn(
     model: ParametrisedScoreFunction,
     train: bool = True,
     reduce_mean: bool = True,
-    likelihood_weighting: bool = True,
+    like_w: bool = True,
     eps: float = 1e-3,
 ):
     reduce_op = (
@@ -75,7 +75,7 @@ def get_dsm_loss_fn(
         score, new_model_state = score_fn(x_t, t, rng=step_rng)
         # grad log p(x_t|x_0) = - 1/std^2 (x_t - mean) = - z / std
 
-        if not likelihood_weighting:
+        if not like_w:
             losses = jnp.square(batch_mul(score, std) + z)
             # losses = 1/std^2 * DSM(x_t, x_0)
             losses = reduce_op(losses.reshape((losses.shape[0], -1)), axis=-1)
@@ -96,7 +96,7 @@ def get_ism_loss_fn(
     model: ParametrisedScoreFunction,
     train: bool,
     reduce_mean: bool = True,
-    likelihood_weighting: bool = True,
+    like_w: bool = True,
     hutchinson_type="Rademacher",
     eps: float = 1e-3,
 ):
@@ -138,7 +138,7 @@ def get_ism_loss_fn(
         sq_norm_score = jnp.power(score, 2).sum(axis=-1)
         losses = 0.5 * sq_norm_score + div_score
 
-        if likelihood_weighting:
+        if like_w:
             g2 = sde.coefficients(jnp.zeros_like(x_0), t)[1] ** 2
             losses = losses * g2
 
@@ -161,7 +161,7 @@ def get_ema_loss_step_fn(
       optimize_fn: An optimization function.
       reduce_mean: If `True`, average the loss across data dimensions. Otherwise sum the loss across data dimensions.
       continuous: `True` indicates that the model is defined to take continuous time steps.
-      likelihood_weighting: If `True`, weight the mixture of score matching losses according to
+      like_w: If `True`, weight the mixture of score matching losses according to
         https://arxiv.org/abs/2101.09258; otherwise use the weighting recommended by our paper.
 
     Returns:

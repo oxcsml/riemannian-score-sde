@@ -113,7 +113,9 @@ class VectorFieldGenerator(hk.Module, abc.ABC):
         fi_fn, Xi_fn = self.decomposition
         fi, Xi = fi_fn(x, t), Xi_fn(x)
         out = jnp.einsum("...n,...dn->...d", fi, Xi)
-        # assert self.manifold.is_tangent(out, x, atol=1e-6).all()
+        # seems that extra projection is required for generator=eigen
+        # during the ODE solve cf tests/test_lkelihood.py
+        out = self.manifold.to_tangent(out, x)
         return out
 
     def div_generators(self, x):
@@ -202,6 +204,6 @@ class AmbientGenerator(VectorFieldGenerator):
     def _generators(self, x):
         return self.manifold.eigen_generators(x)
 
-    # def __call__(self, x, t):
-    #     # `to_tangent`` have an 1/sq_norm(x) term that wrongs the div
-    # return self.manifold.to_tangent(self.net(x, t), x)
+    def __call__(self, x, t):
+        # `to_tangent`` have an 1/sq_norm(x) term that wrongs the div
+        return self.manifold.to_tangent(self.net(x, t), x)
