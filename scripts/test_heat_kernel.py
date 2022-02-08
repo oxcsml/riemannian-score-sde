@@ -26,6 +26,27 @@ from scripts.utils import (
     vMF_pdf,
 )
 
+import matplotlib
+
+# matplotlib.use("pgf")
+
+plt.rcParams["text.usetex"] = True
+# plt.rcParams["text.latex.preamble"] = [r"\usepackage{lmodern}"]
+# plt.rcParams["font.serif"] = ["Computer Modern Roman"]
+plt.rcParams["font.family"] = ["Computer Modern Roman"]
+# plt.rcParams["mathtext.fontset"] = "dejavuserif"
+plt.rcParams.update({"font.size": 10})
+
+# plt.rcParams["text.latex.preamble"] = [r"\usepackage{lmodern}"]
+# # Options
+# params = {
+#     "text.usetex": True,
+#     "font.size": 11,
+#     "font.family": "lmodern",
+#     # "text.latex.unicode": True,
+# }
+# plt.rcParams.update(params)
+
 # def plot(x, ys, dim_0_names, dim_1_names, out):
 #     fontsize = 12
 #     K, J, _ = ys.shape
@@ -60,14 +81,15 @@ from scripts.utils import (
 
 
 def plot(x, ys, dim_0_names, dim_1_names, out):
-    fontsize = 15
     K, J, _ = ys.shape
     fig, axis = plt.subplots(
-        nrows=1, ncols=K, figsize=(6.27, 3), sharex=True, sharey=False
+        nrows=1,
+        ncols=K,
+        figsize=(6.2689, 2),
+        sharex=True,
+        sharey=False,
+        constrained_layout=True,
     )
-    plt.rcParams["text.usetex"] = True
-    plt.rcParams["font.family"] = ["Latin Modern Roman"]
-    plt.rcParams.update({"font.size": 10.95})
 
     axis = axis if isinstance(axis, np.ndarray) else [axis]
     # colours = sns.cubehelix_palette(n_colors=J, light=1.0, dark=0.0, start=0.5, rot=-0.75, reverse=False)
@@ -86,13 +108,17 @@ def plot(x, ys, dim_0_names, dim_1_names, out):
                 linestyle=linestyle,
                 lw=3,
             )
-        axis[k].set_title(dim_0_names[k], fontsize=fontsize)  # , y=-0.01)
-        axis[k].tick_params(axis="both", which="major", labelsize=13)
-    axis[-1].legend(loc="best", fontsize=12.5)
-    axis[1].set_xlabel(r"Signed $d_{\mathcal{M}}(x_0, x)$", fontsize=fontsize)
+        axis[k].set_title(dim_0_names[k], fontsize=11)  # , y=-0.01)
+        axis[k].tick_params(axis="both", which="major")
+    axis[-1].legend(loc="best", fontsize=8)
+    axis[1].set_xlabel(r"Signed $d_{\mathcal{M}}(x_0, x_t)$")
     plt.xticks([-math.pi / 4, 0.0, math.pi / 4], [r"$-\pi/4$", 0, r"$\pi/4$"])
-    axis[0].set_ylabel("Density", fontsize=fontsize)
-    plt.savefig("{}.png".format(out), dpi=300, bbox_inches="tight")
+    axis[0].set_ylabel("Density")
+    # plt.tight_layout()
+    # plt.subplots_adjust(
+    #     left=None, bottom=None, right=None, top=None, wspace=None, hspace=None
+    # )
+    plt.savefig("{}.pdf".format(out), dpi=300, bbox_inches="tight")
     plt.clf()
     plt.close("all")
 
