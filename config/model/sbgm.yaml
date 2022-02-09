@@ -1,7 +1,8 @@
 # @package _global_
 
 defaults:
-  - /sde: brownian
   - /transform: id
-  - /loss: dsm
+  - /flow: brownian
+  - /pushf: sde
+  - /loss: dsm0
   - /generator: div_free

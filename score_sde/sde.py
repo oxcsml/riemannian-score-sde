@@ -10,6 +10,18 @@ import numpy as np
 import jax.numpy as jnp
 
 
+class NormalDistribution:
+
+    def sample(self, rng, shape):
+        return jax.random.normal(rng, shape)
+
+    def log_prob(self, z):
+        shape = z.shape
+        N = np.prod(shape[1:])
+        logp_fn = lambda z: -N / 2.0 * jnp.log(2 * np.pi) - jnp.sum(z ** 2) / 2.0
+        return jax.vmap(logp_fn)(z)
+
+
 class SDE(ABC):
     # Specify if the sde returns full diffusion matrix, or just a scalar indicating diagonal variance
 
@@ -213,6 +225,7 @@ class VPSDE(SDE):
         super().__init__(tf, t0)
         self.beta_0 = beta_0
         self.beta_f = beta_f
+        self.limiting = NormalDistribution()
 
     def beta_t(self, t):
         normed_t = (t - self.t0) / (self.tf - self.t0)
@@ -234,15 +247,10 @@ class VPSDE(SDE):
         return mean, std
 
     def sample_limiting_distribution(self, rng, shape):
-        # TODO: rename from `prior_sampling`
-        return jax.random.normal(rng, shape)
+        return self.limiting.sample(rng, shape)
 
     def limiting_distribution_logp(self, z):
-        # TODO: rename from `prior_logp`
-        shape = z.shape
-        N = np.prod(shape[1:])
-        logp_fn = lambda z: -N / 2.0 * jnp.log(2 * np.pi) - jnp.sum(z ** 2) / 2.0
-        return jax.vmap(logp_fn)(z)
+        return self.limiting.log_prob(z)
 
 
 class subVPSDE(SDE):

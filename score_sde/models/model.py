@@ -17,35 +17,16 @@
 """All functions and modules related to model definition.
 """
 from dataclasses import dataclass
-from typing import Any, NamedTuple, Callable, Sequence
-import math
 
 import jax
-import haiku as hk
-import optax
 import numpy as np
 import jax.numpy as jnp
 
 from score_sde.utils.jax import batch_mul
-from score_sde.utils import register_category
 from score_sde.utils.typing import ParametrisedScoreFunction
 
 from score_sde.sde import SDE, VESDE, VPSDE, subVPSDE
 from riemannian_score_sde.sde import Brownian
-from .mlp import MLP
-
-
-def get_sigmas(sigma_min, sigma_max, num_scales):
-    """Get sigmas --- the set of noise levels for SMLD."""
-    sigmas = jnp.exp(
-        jnp.linspace(
-            jnp.log(sigma_max),
-            jnp.log(sigma_min),
-            num_scales,
-        )
-    )
-
-    return sigmas
 
 
 def get_score_fn(
@@ -54,7 +35,6 @@ def get_score_fn(
     params,
     state,
     train=False,
-    continuous=False,
     return_state=False,
 ):
     """Wraps `score_fn` so that the model output corresponds to a real time-dependent score function.
@@ -64,16 +44,13 @@ def get_score_fn(
       params: A dictionary that contains all trainable parameters.
       states: A dictionary that contains all other mutable parameters.
       train: `True` for training and `False` for evaluation.
-      continuous: If `True`, the score-based model is expected to directly take continuous time steps.
       return_state: If `True`, return the new mutable states alongside the model output.
     Returns:
       A score function.
     """
-    # model_fn = get_model_fn(model, params, states, train=train)
-
     if isinstance(sde, Brownian):
 
-        def score_fn(x, t, s=0, std_trick=True, rng=None):
+        def score_fn(x, t, std_trick=True, rng=None):
             model_out, new_state = model.apply(params, state, rng, x=x, t=t)
             # NOTE: scaling the output with 1.0 / std helps cf 'Improved Techniques for Training Score-Based Generative Model'
             score = model_out
@@ -89,18 +66,12 @@ def get_score_fn(
 
         def score_fn(x, t, rng=None):
             # Scale neural network output by standard deviation and flip sign
-            if continuous or isinstance(sde, subVPSDE):
-                # For VP-trained models, t=0 corresponds to the lowest noise level
-                # The maximum value of time embedding is assumed to 999 for
-                # continuously-trained models.
-                labels = t * 999  # TODO: remove?
-                model_out, new_state = model.apply(params, state, rng, x=x, t=labels)
-                std = sde.marginal_prob(jnp.zeros_like(x), t)[1]
-            else:
-                # For VP-trained models, t=0 corresponds to the lowest noise level
-                labels = t * (sde.N - 1)
-                model_out, new_state = model.apply(params, state, rng, x=x, t=labels)
-                std = sde.sqrt_1m_alphas_cumprod[labels.astype(jnp.int32)]
+            # For VP-trained models, t=0 corresponds to the lowest noise level
+            # The maximum value of time embedding is assumed to 999 for
+            # continuously-trained models.
+            labels = t * 999  # TODO: remove?
+            model_out, new_state = model.apply(params, state, rng, x=x, t=labels)
+            std = sde.marginal_prob(jnp.zeros_like(x), t)[1]
 
             score = batch_mul(-model_out, 1.0 / std)
             if return_state:
@@ -111,14 +82,7 @@ def get_score_fn(
     elif isinstance(sde, VESDE):
 
         def score_fn(x, t, rng=None):
-            if continuous:
-                labels = sde.marginal_prob(jnp.zeros_like(x), t)[1]
-            else:
-                # For VE-trained models, t=0 corresponds to the highest noise level
-                labels = sde.T - t
-                labels *= sde.N - 1
-                labels = jnp.round(labels).astype(jnp.int32)
-
+            labels = sde.marginal_prob(jnp.zeros_like(x), t)[1]
             score, state = model(x, labels, rng)
             if return_state:
                 return score, state
@@ -131,169 +95,3 @@ def get_score_fn(
         )
 
     return score_fn
-
-
-def get_model_fn(model, params, state, train=False):
-    """Create a function to give the output of the score-based model.
-    Args:
-      model: A transformed Haiku function the represent the architecture of score-based model.
-      params: A dictionary that contains all trainable parameters.
-      states: A dictionary that contains all mutable states.
-      train: `True` for training and `False` for evaluation.
-    Returns:
-      A model function.
-    """
-
-    def model_fn(x, labels, rng=None):
-        """Compute the output of the score-based model.
-        Args:
-          x: A mini-batch of input data.
-          labels: A mini-batch of conditioning variables for time steps. Should be interpreted differently
-            for different models.
-          rng: If present, it is the random state for dropout
-        Returns:
-          A tuple of (model output, new mutable states)
-        """
-        return model.apply(
-            parmas, state, rng if rng is not None else hk.next_rng_key(), x, lables
-        )
-
-    return model_fn
-
-
-@dataclass
-class Concat(hk.Module):
-    def __init__(self, output_shape, hidden_shapes, act):
-        super().__init__()
-        self._layer = MLP(
-            hidden_shapes=hidden_shapes, output_shape=output_shape, act=act
-        )
-
-    def __call__(self, x, t):
-        t = jnp.array(t)
-        if len(t.shape) == 0:
-            t = t * jnp.ones(x.shape[:-1])
-
-        if len(t.shape) == len(x.shape) - 1:
-            t = jnp.expand_dims(t, axis=-1)
-
-        return self._layer(jnp.concatenate([x, t], axis=-1))
-
-
-@dataclass
-class Ignore(hk.Module):
-    def __init__(self, output_shape, hidden_shapes, act):
-        super().__init__()
-        self._layer = MLP(
-            hidden_shapes=hidden_shapes, output_shape=output_shape, act=act
-        )
-
-    def __call__(self, x, t):
-        return self._layer(x)
-
-
-@dataclass
-class Sum(hk.Module):
-    def __init__(self, output_shape, hidden_shapes, act):
-        super().__init__()
-        self._layer = MLP(
-            hidden_shapes=hidden_shapes, output_shape=output_shape, act=act
-        )
-        self._hyper_bias = MLP(
-            hidden_shapes=[], output_shape=output_shape, act="", bias=False
-        )
-
-    def __call__(self, x, t):
-        t = jnp.array(t, dtype=float).reshape(-1, 1)
-        return self._layer(x) + self._hyper_bias(t)
-
-
-@dataclass
-class Squash(hk.Module):
-    def __init__(self, output_shape, hidden_shapes, act):
-        super().__init__()
-        self._layer = MLP(
-            hidden_shapes=hidden_shapes, output_shape=output_shape, act=act
-        )
-        self._hyper = MLP(hidden_shapes=[], output_shape=output_shape, act="")
-
-    def __call__(self, x, t):
-        t = jnp.array(t, dtype=float).reshape(-1, 1)
-        return self._layer(x) * jax.nn.sigmoid(self._hyper(t))
-
-
-@dataclass
-class SquashSum(hk.Module):
-    def __init__(self, output_shape, hidden_shapes, act):
-        super().__init__()
-        self._layer = MLP(
-            hidden_shapes=hidden_shapes, output_shape=output_shape, act=act
-        )
-        self._hyper_bias = MLP(
-            hidden_shapes=[], output_shape=output_shape, act="", bias=False
-        )
-        self._hyper_gate = MLP(hidden_shapes=[], output_shape=output_shape, act="")
-
-    def __call__(self, x, t):
-        t = jnp.array(t, dtype=float).reshape(-1, 1)
-        return self._layer(x) * jax.nn.sigmoid(self._hyper_gate(t)) + self._hyper_bias(
-            t
-        )
-
-
-def get_timestep_embedding(timesteps, embedding_dim=128):
-    """
-    From Fairseq.
-    Build sinusoidal embeddings.
-    This matches the implementation in tensor2tensor, but differs slightly
-    from the description in Section 3.5 of "Attention Is All You Need".
-    https://github.com/pytorch/fairseq/blob/master/fairseq/modules/sinusoidal_positional_embedding.py
-    """
-    half_dim = embedding_dim // 2
-    emb = math.log(10000) / (half_dim - 1)
-    emb = jnp.exp(jnp.arange(half_dim, dtype=float) * -emb)
-
-    emb = timesteps * jnp.expand_dims(emb, 0)
-    emb = jnp.concatenate([jnp.sin(emb), jnp.cos(emb)], -1)
-    if embedding_dim % 2 == 1:  # zero pad
-        emb = jnp.pad(emb, [0, 1])
-
-    return emb
-
-
-@dataclass
-class ConcatEmbed(hk.Module):
-    def __init__(
-        self,
-        output_shape,
-        enc_shapes,
-        t_dim,
-        dec_shapes,
-        act,
-    ):
-        super().__init__()
-        self.temb_dim = t_dim
-        t_enc_dim = t_dim * 2
-
-        self.net = MLP(hidden_shapes=dec_shapes, output_shape=output_shape, act=act)
-
-        self.t_encoder = MLP(
-            hidden_shapes=enc_shapes, output_shape=t_enc_dim, act=act
-        )
-
-        self.x_encoder = MLP(
-            hidden_shapes=enc_shapes, output_shape=t_enc_dim, act=act
-        )
-
-    def __call__(self, x, t):
-        t = jnp.array(t, dtype=float).reshape(-1, 1)
-        if len(x.shape) == 1:
-            x = x.unsqueeze(0)
-
-        temb = get_timestep_embedding(t, self.temb_dim)
-        temb = self.t_encoder(temb)
-        xemb = self.x_encoder(x)
-        temb = jnp.broadcast_to(temb, [xemb.shape[0], *temb.shape[1:]])
-        h = jnp.concatenate([xemb, temb], -1)
-        out = self.net(h)
-        return out

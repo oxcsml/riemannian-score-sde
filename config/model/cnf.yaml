@@ -1,0 +1,8 @@
+# @package _global_
+
+defaults:
+  - /transform: id
+  - /flow: cnf
+  - /pushf: cnf
+  - /loss: logp
+  - /generator: div_free

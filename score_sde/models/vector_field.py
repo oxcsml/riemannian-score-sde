@@ -8,24 +8,7 @@ import jax.numpy as jnp
 from hydra.utils import instantiate
 from geomstats.geometry.hypersphere import Hypersphere
 from geomstats.geometry.base import VectorSpace, EmbeddedManifold
-
-
-def div_noise(
-    rng: jax.random.KeyArray, shape: Sequence[int], hutchinson_type: str
-) -> jnp.ndarray:
-    """Sample noise for the hutchinson estimator."""
-    if hutchinson_type == "Gaussian":
-        epsilon = jax.random.normal(rng, shape)
-    elif hutchinson_type == "Rademacher":
-        epsilon = (
-            jax.random.randint(rng, shape, minval=0, maxval=2).astype(jnp.float32) * 2
-            - 1
-        )
-    elif hutchinson_type == "None":
-        epsilon = None
-    else:
-        raise NotImplementedError(f"Hutchinson type {hutchinson_type} unknown.")
-    return epsilon
+from .flow import div_noise
 
 
 def get_div_fn(fi_fn, Xi, hutchinson_type: str):

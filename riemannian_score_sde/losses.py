@@ -2,24 +2,19 @@
 """
 
 from typing import Callable, Tuple
-from functools import partial
 
 import jax
-import optax
 import jax.numpy as jnp
 import jax.random as random
 
-from score_sde.sde import VESDE, VPSDE, SDE
-from riemannian_score_sde.sde import Brownian
 from score_sde.utils import batch_mul
-from score_sde.models import get_score_fn, get_model_fn
+from score_sde.models import get_score_fn, PushForward, SDEPushForward, MoserFlow
 from score_sde.utils import ParametrisedScoreFunction, TrainState
-from score_sde.likelihood import div_noise, get_drift_fn, get_div_fn
-from score_sde.sampling import get_pc_sampler
+from score_sde.models import div_noise, get_div_fn, get_ode_drift_fn
 
 
 def get_dsm_loss_fn(
-    sde: SDE,
+    pushforward: SDEPushForward,
     model: ParametrisedScoreFunction,
     train: bool = True,
     reduce_mean: bool = True,
@@ -28,6 +23,7 @@ def get_dsm_loss_fn(
     s_zero = True,
     **kwargs
 ):
+    sde = pushforward.sde
     reduce_op = (
         jnp.mean
         if reduce_mean
@@ -43,7 +39,6 @@ def get_dsm_loss_fn(
             params,
             states,
             train=train,
-            continuous=True,
             return_state=True,
         )
         x_0 = batch["data"]
@@ -90,7 +85,7 @@ def get_dsm_loss_fn(
 
 
 def get_ism_loss_fn(
-    sde: SDE,
+    pushforward: SDEPushForward,
     model: ParametrisedScoreFunction,
     train: bool,
     reduce_mean: bool = True,
@@ -98,11 +93,7 @@ def get_ism_loss_fn(
     hutchinson_type="Rademacher",
     eps: float = 1e-3,
 ):
-    reduce_op = (
-        jnp.mean
-        if reduce_mean
-        else lambda *args, **kwargs: 0.5 * jnp.sum(*args, **kwargs)
-    )
+    sde = pushforward.sde
 
     def loss_fn(
         rng: jax.random.KeyArray, params: dict, states: dict, batch: dict
@@ -113,7 +104,6 @@ def get_ism_loss_fn(
             params,
             states,
             train=train,
-            continuous=True,
             return_state=True,
         )
         x_0 = batch["data"]
@@ -142,5 +132,56 @@ def get_ism_loss_fn(
 
         loss = jnp.mean(losses)
         return loss, new_model_state
+
+    return loss_fn
+
+
+def get_moser_loss_fn(
+    pushforward: MoserFlow,
+    model: ParametrisedScoreFunction,
+    alpha_m: float,
+    alpha_p: float,
+    K: int,
+    hutchinson_type: str,
+    eps: float,
+    **kwargs
+):
+    def loss_fn(
+        rng: jax.random.KeyArray, params: dict, states: dict, batch: dict
+    ) -> Tuple[float, dict]:
+        drift_fn = get_ode_drift_fn(model, params, states)
+        x_0 = batch["data"]
+
+        rng, step_rng = random.split(rng)
+        div_fn = get_div_fn(drift_fn, hutchinson_type)
+
+        def mu(x):
+            prob_base = jnp.exp(pushforward.base.log_prob(x))
+            # x = x.reshape(-1, *x.shape)
+            t = jnp.zeros((*x.shape[:-1],))  # NOTE: How to deal with that?
+            epsilon = div_noise(step_rng, x.shape, hutchinson_type)
+            div_drift = div_fn(x, t, epsilon)
+            # div_drift = jnp.squeeze(div_drift)
+            mu = prob_base - div_drift
+            mu_plus = jnp.maximum(eps, mu)
+            mu_minus = eps - jnp.minimum(eps, mu)
+            return mu_plus, mu_minus
+        # mu = jax.vmap(mu)  #NOTE: gives different results?
+
+        mu_plus = mu(x_0)[0]
+        log_prob = jnp.mean(jnp.log(mu_plus))
+
+        rng, step_rng = random.split(rng)
+        xs = pushforward.base.sample(step_rng, (K,))
+        prior_prob = jnp.exp(pushforward.base.log_prob(xs))
+
+        _, mu_minus = mu(xs)
+        volume_m = jnp.mean(batch_mul(mu_minus, 1 / prior_prob) , axis=0)
+        penalty = alpha_m * volume_m# + alpha_p * volume_p
+
+        loss = - log_prob + penalty
+
+        # return loss, new_model_state
+        return loss, states
 
     return loss_fn

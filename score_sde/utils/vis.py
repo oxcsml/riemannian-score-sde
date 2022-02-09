@@ -155,27 +155,29 @@ def scatter_earth(x, ax=None, s=50, color="green"):
     cax = ax.scatter(x[:, 0], x[:, 1], -x[:, 2], s=s, color=color)
 
 
-def earth_plot(cfg, log_prob, train_ds, test_ds, N, azimuth=None):
+def earth_plot(cfg, log_prob, train_ds, test_ds, N, azimuth=None, samples=None):
     """ generate earth plots with model density or integral paths aka streamplot  """
     has_cartopy = importlib.find_loader('cartopy')
     if not has_cartopy:
         return
 
     # parameters
-    azimuth_dict = {"earthquake": 70, "fire": 50, "floow": 60, "volecanoe": 170}
+    azimuth_dict = {"earthquake": 70, "fire": 50, "floow": 60, "volcanoe": 170}
     azimuth = azimuth_dict[str(cfg.dataset.name)] if azimuth is None else azimuth
     polar = 30
-    projs = ["ortho", "robinson"]
-    # projs = ["ortho"]
+    # projs = ["ortho", "robinson"]
+    projs = ["ortho"]
 
     xs, lat, lon = get_spherical_grid(N, eps=0.)
-    # ts = [0.01, 0.05, cfg.sde.tf]
-    ts = [cfg.sde.tf]
+    # ts = [0.01, 0.05, cfg.flow.tf]
+    ts = [cfg.flow.tf]
     figs = []
-  
+
     for t in ts:
         print(t)
-        fs = log_prob(xs, t).reshape((lat.shape[0], lon.shape[0]), order="F")
+        # fs = log_prob(xs, t)
+        fs = log_prob(xs)
+        fs = fs.reshape((lat.shape[0], lon.shape[0]), order="F")
         fs = jnp.exp(fs)
         # norm = mcolors.PowerNorm(3.)  # NOTE: tweak that value
         norm = mcolors.PowerNorm(.2)  # N=500
@@ -231,6 +233,10 @@ def earth_plot(cfg, log_prob, train_ds, test_ds, N, azimuth=None):
             # colors = sns.color_palette()
             train_idx = train_ds.dataset.indices
             test_idx = test_ds.dataset.indices
+            if samples is not None:
+                samples = np.array(latlon_from_cartesian(samples)) * 180 / math.pi
+                points = projection.transform_points(ccrs.Geodetic(), samples[:, 1], samples[:, 0])
+                ax.scatter(points[:, 0], points[:, 1], s=1., c=[colors[1]], alpha=1.)
             samples = train_ds.dataset.dataset.data
             samples = np.array(latlon_from_cartesian(samples)) * 180 / math.pi
             points = projection.transform_points(ccrs.Geodetic(), samples[:, 1], samples[:, 0])

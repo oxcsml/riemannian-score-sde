@@ -41,8 +41,4 @@ def partialclass(cls, *args, **kwds):
 
 
 def partialfunction(func, *args, **kwargs):
-    print("partialfunction")
-    print(func)
-    print(args)
-    print(kwargs)
     return functools.partial(func, *args, **kwargs)
