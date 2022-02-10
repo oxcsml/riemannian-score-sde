@@ -1,9 +1,8 @@
 import os
-from pathlib import Path
 import logging
+from functools import partial
 
 from hydra.utils import instantiate, get_class, call
-import omegaconf
 from omegaconf import OmegaConf
 
 import jax
@@ -15,10 +14,8 @@ from tqdm import tqdm
 
 from score_sde.utils import TrainState, save, restore
 from score_sde.utils.loggers_pl import LoggerCollection, Logger
-from score_sde.sampling import EulerMaruyamaManifoldPredictor, get_pc_sampler
-from score_sde.likelihood import get_likelihood_fn
 from score_sde.utils.vis import plot, earth_plot
-from score_sde.models import get_score_fn
+from score_sde.models import get_likelihood_fn_w_transform
 from score_sde.datasets import random_split, DataLoader, TensorDataset
 from score_sde.utils.tmp import compute_normalization
 from score_sde.losses import get_ema_loss_step_fn
@@ -29,7 +26,7 @@ log = logging.getLogger(__name__)
 def run(cfg):
     def train(train_state):
         loss = instantiate(
-            cfg.loss, sde=sde, model=score_model, eps=cfg.eps, train=True
+            cfg.loss, pushforward=pushforward, model=model, eps=cfg.eps, train=True
         )
         train_step_fn = get_ema_loss_step_fn(
             loss,
@@ -44,7 +41,7 @@ def run(cfg):
             range(cfg.steps),
             total=cfg.steps,
             bar_format="{desc}{bar}{r_bar}",
-            miniters=50,
+            mininterval=1,
         )
         for step in t:
             batch = {"data": transform.inv(next(train_ds))}
@@ -64,31 +61,23 @@ def run(cfg):
 
         return train_state, True
 
+
     def evaluate(train_state, stage, step=None):
         log.info("Running evaluation")
         rng = jax.random.PRNGKey(cfg.seed)
         dataset = eval_ds if stage == "val" else test_ds
-        likelihood_fn = get_likelihood_fn(
-            sde,
-            get_score_fn(
-                sde,
-                score_model,
-                train_state.params_ema,
-                train_state.model_state,
-                continuous=True,
-            ),
-            hutchinson_type="None",
-            bits_per_dimension=False,
-            eps=cfg.eps,
-        )
+
+        model_w_dicts = (model, train_state.params_ema, train_state.model_state)
+        likelihood_fn = pushforward.get_log_prob(model_w_dicts, train=False)
+        # TODO: merge transorm as part of PushForward
+        likelihood_fn = get_likelihood_fn_w_transform(likelihood_fn, transform)
 
         logp = 0.0
         N = 0
+
         if hasattr(dataset, "__len__"):
             for x in dataset:
-                z = transform.inv(x)
-                logp_step, _, _ = likelihood_fn(rng, z)
-                logp_step -= transform.log_abs_det_jacobian(z, x)
+                logp_step = likelihood_fn(rng, x)
                 logp += logp_step.sum()
                 N += logp_step.shape[0]
         else:
@@ -96,18 +85,18 @@ def run(cfg):
             samples = 10
             for i in range(samples):
                 x = next(dataset)
-                z = transform.inv(x)
-                logp_step, _, _ = likelihood_fn(rng, z)
-                logp_step -= transform.log_abs_det_jacobian(z, x)
+                logp_step = likelihood_fn(rng, x)
                 logp += logp_step.sum()
                 N += logp_step.shape[0]
         logp /= N
 
-        logger.log_metrics({f"{stage}/logp": logp.mean()}, step)
+        logger.log_metrics({f"{stage}/logp": logp}, step)
+        log.info(f"{stage}/logp = {logp:.3f}")
         if stage == "test":
-            Z = compute_normalization(likelihood_fn, transform, model_manifold)
-            print(Z)
+            Z = compute_normalization(likelihood_fn)
+            log.info(f"Z = {Z:.2f}")
             logger.log_metrics({f"{stage}/Z": Z}, step)
+
 
     def generate_plots(train_state, stage, step=None):
         log.info("Generating plots")
@@ -117,65 +106,36 @@ def run(cfg):
         x0 = next(dataset)
         z0 = transform.inv(x0)
         ## p_0 (backward)
-        sampler = jax.jit(
-            get_pc_sampler(
-                sde.reverse(
-                    get_score_fn(
-                        sde,
-                        score_model,
-                        train_state.params_ema,
-                        train_state.model_state,
-                        continuous=True,
-                    )
-                ),
-                100,
-                predictor="EulerMaruyamaManifoldPredictor",
-                corrector=None,
-                eps=cfg.eps,
-            )
-        )
+
+        model_w_dicts = (model, train_state.params_ema, train_state.model_state)
+        sampler = pushforward.get_sample(model_w_dicts, train=False)
         rng, next_rng = jax.random.split(rng)
-        z, _, _ = sampler(next_rng, sde.sample_limiting_distribution(rng, z0.shape))
+        z = sampler(next_rng, z0.shape, N=100, eps=cfg.eps)
         x = transform(z)
+        log.info(f"Prop samples in M: {100 * data_manifold.belongs(x, atol=1e-4).mean().item()}")
 
-        def get_log_prob(train_state, sde, score_model, transform, cfg):
-            likelihood_fn = get_likelihood_fn(
-                sde,
-                get_score_fn(
-                    sde,
-                    score_model,
-                    train_state.params_ema,
-                    train_state.model_state,
-                    continuous=True,
-                ),
-                hutchinson_type="None",
-                bits_per_dimension=False,
-                eps=cfg.eps,
-            )
-            def log_prob(x):
-                z = transform.inv(x)
-                logp, _, _ = likelihood_fn(rng, z)
-                logp -= transform.log_abs_det_jacobian(z, x)
-                return logp
-            return log_prob
-        log_prob = get_log_prob(train_state, sde, score_model, transform, cfg)
-        # x = x0
-        logp = log_prob(x)
-        Path("logs/images").mkdir(parents=True, exist_ok=True)  # Create logs dir
-        plt = plot(None, x, jnp.exp(logp), None)
+        model_w_dicts = (model, train_state.params_ema, train_state.model_state)
+        likelihood_fn = pushforward.get_log_prob(model_w_dicts, train=False)
+        # TODO: merge transorm as part of PushForward
+        likelihood_fn = get_likelihood_fn_w_transform(likelihood_fn, transform)
+        likelihood_fn = partial(likelihood_fn, rng)
+
+        plt = plot(None, x, jnp.exp(likelihood_fn(x)), None)
         logger.log_plot("x0_backw", plt, cfg.steps)
-        prob = jnp.exp(dataset.log_prob(x0)) if hasattr(dataset, "log_prob") else None
-        plt = plot(None, x0, prob, None)
-        logger.log_plot("x0_true", plt, cfg.steps)
+        # prob = jnp.exp(dataset.log_prob(x0)) if hasattr(dataset, "log_prob") else None
+        # plt = plot(None, x0, prob, None)
+        # logger.log_plot("x0_true", plt, cfg.steps)
 
-        plt = earth_plot(cfg, log_prob, train_ds, test_ds, N=500)
+        plt = earth_plot(cfg, likelihood_fn, train_ds, test_ds, N=500, samples=x)
         if plt is not None:
             logger.log_plot("pdf", plt, cfg.steps)
+
 
     ### Main
     log.info("Stage : Startup")
     log.info(f"Jax devices: {jax.devices()}")
     run_path = os.getcwd()
+    log.info(f"run_path: {run_path}")
     ckpt_path = os.path.join(run_path, cfg.ckpt_dir)
     os.makedirs(ckpt_path, exist_ok=True)
     loggers = [instantiate(logger_cfg) for logger_cfg in cfg.logger.values()]
@@ -189,7 +149,8 @@ def run(cfg):
     data_manifold = instantiate(cfg.manifold)
     transform = instantiate(cfg.transform, data_manifold)
     model_manifold = transform.domain
-    sde = instantiate(cfg.sde, manifold=model_manifold)
+    flow = instantiate(cfg.flow, manifold=model_manifold)
+    pushforward = instantiate(cfg.pushf, model_manifold, flow)
 
     log.info("Stage : Instantiate dataset")
 
@@ -238,7 +199,7 @@ def run(cfg):
 
     log.info("Stage : Instantiate model")
 
-    def score_model(x, t):
+    def model(x, t):
         output_shape = get_class(cfg.generator._target_).output_shape(model_manifold)
         score = instantiate(
             cfg.generator,
@@ -249,10 +210,10 @@ def run(cfg):
         )
         return score(x, t)
 
-    score_model = hk.transform_with_state(score_model)
+    model = hk.transform_with_state(model)
 
     rng, next_rng = jax.random.split(rng)
-    params, state = score_model.init(rng=next_rng, x=z, t=0)
+    params, state = model.init(rng=next_rng, x=z, t=0)
 
     log.info("Stage : Instantiate optimiser")
 

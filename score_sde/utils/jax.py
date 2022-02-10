@@ -25,6 +25,8 @@ def get_estimate_div_fn(fn: ScoreFunction):
     def div_fn(x: jnp.ndarray, t: float, eps: jnp.ndarray):
         grad_fn = lambda data: jnp.sum(fn(data, t) * eps)
         grad_fn_eps = jax.grad(grad_fn)(x)
+        # grad_fn = lambda x, t, eps: jnp.sum(fn(x, t) * eps)
+        # grad_fn_eps = jax.vmap(jax.grad(grad_fn, argnums=0))(x, t, eps)
         return jnp.sum(grad_fn_eps * eps, axis=tuple(range(1, len(x.shape))))
 
     return div_fn

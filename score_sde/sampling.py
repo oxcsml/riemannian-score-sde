@@ -29,74 +29,10 @@ import jax.random as random
 
 from score_sde.sde import SDE, RSDE, VPSDE, subVPSDE  # , VESDE
 from riemannian_score_sde.sde import ReverseBrownian
-from score_sde.models import get_score_fn
-from score_sde.utils import from_flattened_numpy, to_flattened_numpy
-from score_sde.utils import batch_mul, batch_add
 from score_sde.utils import register_category
-from score_sde.utils import ParametrisedScoreFunction, ScoreFunction, SDEUpdateFunction
-from score_sde.utils import TrainState
 
 get_predictor, register_predictor = register_category("predictors")
 get_corrector, register_corrector = register_category("correctors")
-
-
-# def get_sampling_fn(
-#     sampling_method: str,
-#     sde: sde.SDE,
-#     model: flax.l,
-#     shape,
-#     inverse_scaler,
-#     eps,
-#     noise_removal: bool,
-# ):
-#     """Create a sampling function.
-
-#     Args:
-#       config: A `ml_collections.ConfigDict` object that contains all configuration information.
-#       sde: A `sde_lib.SDE` object that represents the forward SDE.
-#       model: A `flax.linen.Module` object that represents the architecture of a time-dependent score-based model.
-#       shape: A sequence of integers representing the expected shape of a single sample.
-#       inverse_scaler: The inverse data normalizer function.
-#       eps: A `float` number. The reverse-time SDE is only integrated to `eps` for numerical stability.
-
-#     Returns:
-#       A function that takes random states and a replicated training state and outputs samples with the
-#         trailing dimensions matching `shape`.
-#     """
-
-#     sampler_name = sampling.method
-#     # Probability flow ODE sampling with black-box ODE solvers
-#     if sampler_name.lower() == "ode":
-#         sampling_fn = get_ode_sampler(
-#             sde=sde,
-#             model=model,
-#             shape=shape,
-#             inverse_scaler=inverse_scaler,
-#             denoise=noise_removal,
-#             eps=eps,
-#         )
-#     # Predictor-Corrector sampling. Predictor-only and Corrector-only samplers are special cases.
-#     elif sampler_name.lower() == "pc":
-#         predictor = get_predictor(config.sampling.predictor.lower())
-#         corrector = get_corrector(config.sampling.corrector.lower())
-#         sampling_fn = get_pc_sampler(
-#             sde=sde,
-#             model=model,
-#             shape=shape,
-#             predictor=predictor,
-#             corrector=corrector,
-#             inverse_scaler=inverse_scaler,
-#             snr=config.sampling.snr,
-#             n_steps=config.sampling.n_steps_each,
-#             probability_flow=config.sampling.probability_flow,
-#             continuous=config.training.continuous,
-#             denoise=config.sampling.noise_removal,
-#             eps=eps,
-#         )
-#     else:
-#         raise ValueError(f"Sampler name {sampler_name} unknown.")
-
-#     return sampling_fn
 
 
 class Predictor(abc.ABC):
@@ -194,15 +130,11 @@ class EulerMaruyamaManifoldPredictor(Predictor):
     def update_fn(
         self, rng: jax.random.KeyArray, x: jnp.ndarray, t: float, dt: float
     ) -> Tuple[jnp.ndarray, jnp.ndarray]:
-        # dt = self.rsde.T / self.rsde.N
         rng, z = self.sde.manifold.random_normal_tangent(
             state=rng, base_point=x, n_samples=x.shape[0]
         )
         drift, diffusion = self.sde.coefficients(x, t)
         drift = drift * dt[..., None]
-        # NOTE: should we use retraction? can we not compute x_mean?
-        # x_mean = self.sde.manifold.metric.exp(tangent_vec=drift, base_point=x)  # NOTE: do we really need this in practice? only if denoise=True
-
         if len(diffusion.shape) > 1 and diffusion.shape[-1] == diffusion.shape[-2]:
             # if square matrix diffusion coeffs
             tangent_vector = drift + jnp.einsum(
@@ -215,7 +147,9 @@ class EulerMaruyamaManifoldPredictor(Predictor):
             )
 
         x = self.sde.manifold.metric.exp(tangent_vec=tangent_vector, base_point=x)
-        # x = self.sde.manifold.projection(x + self.sde.manifold.metric.metric_matrix @ tangent_vector)
+        # x = self.sde.manifold.projection(x + tangent_vector)
+        # TODO: Retraction as an option
+        # x = self.sde.manifold.projection(x + self.sde.manifold.metric.metric_matrix() @ tangent_vector)
         return x, x  # x_mean
 
 
@@ -253,14 +187,14 @@ class NoneCorrector(Corrector):
 def get_pc_sampler(
     sde: SDE,
     N: int,
-    predictor: Predictor = "EulerMaruyamaPredictor",
+    predictor: Predictor = "EulerMaruyamaManifoldPredictor",
     corrector: Corrector = None,
     inverse_scaler=lambda x: x,  # TODO: Figure type
     snr: float = 0.2,
     n_steps: int = 1,
     denoise: bool = True,
     eps: float = 1e-3,
-    # return_t=False,
+    return_hist=False,
 ):
     """Create a Predictor-Corrector (PC) sampler.
 
@@ -332,17 +266,16 @@ def get_pc_sampler(
 
         x_hist = jnp.zeros((N, *x.shape))
 
-        # x_mean = x
-        # for i in range(N):
-        #     rng, x, x_mean, x_hist = loop_body(i, (rng, x, x, x_hist))
-
         _, x, x_mean, x_hist = jax.lax.fori_loop(0, N, loop_body, (rng, x, x, x_hist))
         # Denoising is equivalent to running one predictor step without adding noise.
-        return (
-            inverse_scaler(x_mean if denoise else x),
-            inverse_scaler(x_hist),
-            timesteps,
-        )
+        if return_hist:
+            return (
+                inverse_scaler(x_mean if denoise else x),
+                inverse_scaler(x_hist),
+                timesteps,
+            )
+        else:
+            return inverse_scaler(x_mean if denoise else x)
 
 
     return pc_sampler

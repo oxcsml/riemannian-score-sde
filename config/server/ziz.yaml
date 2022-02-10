@@ -18,7 +18,7 @@ hydra:
     timeout_min: 840
     cpus_per_task: ${num_gpus}
     tasks_per_node: 1
-    mem_gb: ${eval:126//8*${num_gpus}}
+    mem_gb: 10
     name: ${hydra.job.name}
     partition: ziz-gpu
     max_num_timeout: 0
@@ -29,5 +29,6 @@ hydra:
     additional_parameters: {
       "wckey": "bigbayes_project",
       "gres": "gpu:${num_gpus}",
+      # "nodelist": "zizgpu01.cpu.stats.ox.ac.uk"
       # "nodelist": "zizgpu04.cpu.stats.ox.ac.uk"
     }

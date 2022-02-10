@@ -346,7 +346,7 @@ def main(train=False):
         eps=1e-3,
     )
     rng, next_rng = jax.random.split(rng)
-    x, _ = sampler(next_rng, train_state, x=x0, t=jnp.ones(x0.shape[0]) * t)
+    x, _, _ = sampler(next_rng, train_state, x=x0, t=jnp.ones(x0.shape[0]) * t)
     logp, logp_grad = sde.grad_marginal_log_prob(x0, x, jnp.ones(x.shape[0]) * t)
     # logp_grad = score_true(x0, x, jnp.ones(x.shape[0]) * t, sde)
     plot_and_save3(
@@ -369,7 +369,7 @@ def main(train=False):
     # p_train_state = replicate(train_state)
     # samples, _ = sampler(replicate(jax.random.PRNGKey(0)), p_train_state)
     rng, next_rng = jax.random.split(rng)
-    x, _ = sampler(next_rng, train_state, t=t)
+    x, _, _ = sampler(next_rng, train_state, t=t)
     # prior_likelihood = lambda x: jnp.exp(sde.prior_logp(x))
     score = score_fn(x, jnp.ones(x.shape[0]) * t)
     prob = jax.vmap(sde.marginal_log_prob)(x0, x, jnp.ones(x.shape[0]) * t)
@@ -378,7 +378,7 @@ def main(train=False):
     ## p_0 (backward)
     t = 1e-3
     rng, next_rng = jax.random.split(rng)
-    x, _ = sampler(next_rng, train_state, t=t)
+    x, _, _ = sampler(next_rng, train_state, t=t)
     # prob = jax.vmap(sde.marginal_log_prob)(x0, x, jnp.ones(x.shape[0]) * t)
     likelihood_fn = get_likelihood_fn(
         sde, score_model, hutchinson_type="None", bits_per_dimension=False, eps=1e-3

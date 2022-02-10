@@ -8,6 +8,15 @@ from geomstats.geometry.hypersphere import Hypersphere
 from geomstats.geometry.euclidean import Euclidean
 
 
+def get_likelihood_fn_w_transform(likelihood_fn, transform):
+    def log_prob(rng, x):
+        z = transform.inv(x)
+        logp = likelihood_fn(rng, z)
+        logp -= transform.log_abs_det_jacobian(z, x)
+        return logp
+    return log_prob
+
+
 class Transform(abc.ABC):
     def __init__(self, domain, codomain):
         self.domain = domain

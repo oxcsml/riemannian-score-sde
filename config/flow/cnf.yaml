@@ -1,0 +1,10 @@
+_target_: score_sde.models.CNF
+get_drift_fn:
+  _target_: hydra.utils.get_method
+  path: score_sde.models.get_ode_drift_fn
+t0: 0
+tf: 1
+hutchinson_type: Rademacher
+rtol: 1e-5
+atol: 1e-5
+backend: jax

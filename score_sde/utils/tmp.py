@@ -1,15 +1,7 @@
 import jax
 from jax import numpy as jnp
 import numpy as np
-import geomstats.backend as gs
-
-
-def log_prob(likelihood_fn, transform, x):
-    rng = jax.random.PRNGKey(0)
-    z = transform.inv(x)
-    logp, zT, nfe = likelihood_fn(rng, z)
-    logp -= transform.log_abs_det_jacobian(z, x)
-    return logp, zT, nfe
+from score_sde.models.transform import get_likelihood_fn_w_transform
 
 
 def get_spherical_grid(N, eps=0.):
@@ -27,13 +19,25 @@ def get_spherical_grid(N, eps=0.):
     return xs, theta, phi
 
 
-def compute_normalization(likelihood_fn, transform, model_manifold, N=200, eps=0.):
+# def compute_microbatch_split(x, K=1):
+#     """ Checks if batch needs to be broken down further to fit in memory. """
+#     B = x.shape[0]
+#     S = int(2e5 / (K * np.prod(x.shape[1:])))  # float heuristic for 12Gb cuda memory
+#     return min(B, S)
+
+
+# def compute_across_microbatch(func, x):
+#     S = compute_microbatch_split(x)
+#     split = jnp.split(x, S)
+#     lw = jnp.concatenate([func(_x) for _x in split], axis=0)  # concat on batch
+#     return lw
+
+
+def compute_normalization(likelihood_fn, model_manifold=None, N=200, eps=0.):
+    rng = jax.random.PRNGKey(0)
     xs, theta, phi = get_spherical_grid(N, eps)
 
-    logp, zT, nfe = log_prob(likelihood_fn, transform, xs)
-    print("nfe", nfe)
-    belongs_manifold = model_manifold.belongs(zT, atol=1e-4)
-    print("belongs_manifold", jnp.sum(belongs_manifold) / belongs_manifold.shape[0])
+    logp = likelihood_fn(rng, xs)
 
     prob = jnp.exp(logp)
     volume = (2 * np.pi) * np.pi

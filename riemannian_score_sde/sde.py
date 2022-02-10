@@ -6,13 +6,27 @@ from score_sde.sde import VPSDE as VPSDEBase, RSDE as RSDEBase
 from score_sde.utils import batch_mul
 
 
+class UniformDistribution:
+    """Uniform density on compact manifold"""
+    def __init__(self, manifold):
+        self.manifold = manifold
+
+    def sample(self, rng, shape):
+        return self.manifold.random_uniform(state=rng, n_samples=shape[0])
+
+    def log_prob(self, z):
+        return -jnp.ones([*z.shape[:-1]]) * self.manifold.metric.log_volume
+
+
 class Brownian(SDE):
-    def __init__(self, manifold, tf: float, t0: float = 0, beta_0=0.1, beta_f=20):
+    def __init__(self, manifold, tf: float, t0: float = 0, beta_0=0.1, beta_f=20, N=100):
         """Construct a Brownian motion on a compact manifold"""
         super().__init__(tf, t0)
         self.beta_0 = beta_0
         self.beta_f = beta_f
         self.manifold = manifold
+        self.limiting = UniformDistribution(manifold)
+        self.N = N
 
     def beta_t(self, t):
         normed_t = (t - self.t0) / (self.tf - self.t0)
@@ -26,7 +40,7 @@ class Brownian(SDE):
 
     def marginal_prob(self, x, t):
         """Should not rely on closed-form marginal probability"""
-        # TODO: this is a Euclidean approx
+        # NOTE: this is a Euclidean approx
         log_mean_coeff = (
             -0.25 * t ** 2 * (self.beta_f - self.beta_0) - 0.5 * t * self.beta_0
         )
@@ -35,34 +49,25 @@ class Brownian(SDE):
         return jnp.zeros_like(x), std
 
     def marginal_sample(self, rng, x, t, return_hist=False):
-        from score_sde.sampling import (
-            EulerMaruyamaManifoldPredictor,
-            get_pc_sampler,
-        )  # TODO: remove from class
+        from score_sde.sampling import get_pc_sampler
+        # TODO: remove from class
 
-        perturbed_x = self.manifold.random_walk(rng, x, t)
-        if return_hist or perturbed_x is None:
-            # TODO: should pmap the pc_sampler?
+        out = self.manifold.random_walk(rng, x, t)
+        if return_hist or out is None:
             sampler = get_pc_sampler(
                 self,
-                100,
-                predictor="EulerMaruyamaManifoldPredictor",
-                corrector=None,
+                self.N,
+                return_hist=return_hist
             )
-            perturbed_x, hist, timesteps = sampler(rng, x, tf=t)
-        if return_hist:
-            return perturbed_x, hist, timesteps
-        return perturbed_x
-
-    # def marginal_log_prob(self, x0, x, t, **kwargs):
-    #     # NOTE: reshape: https://github.com/google/jax/issues/2303
-    #     s = 2 * (0.25 * t ** 2 * (self.beta_f - self.beta_0) + 0.5 * t * self.beta_0)
-    #     return jnp.reshape(self.manifold.log_heat_kernel(x0, x, s, **kwargs), ())
+            out = sampler(rng, x, tf=t)
+        return out
 
     def grad_marginal_log_prob(self, x0, x, t, **kwargs):
         s = 2 * (0.25 * t ** 2 * (self.beta_f - self.beta_0) + 0.5 * t * self.beta_0)
         logp_grad = self.manifold.grad_marginal_log_prob(x0, x, s, **kwargs)
         return None, logp_grad
+        # TODO: Appears that only Varhadan works as well
+        # return None, self.varhadan_exp(x0, x, jnp.zeros_like(t), t)[0]
 
     def varhadan_exp(self, xs, xt, s, t):
         rescaled_t = lambda t: 2 * (0.25 * t ** 2 * (self.beta_f - self.beta_0) + 0.5 * t * self.beta_0)
@@ -71,10 +76,10 @@ class Brownian(SDE):
         return grad, delta_t
 
     def sample_limiting_distribution(self, rng, shape):
-        return self.manifold.random_uniform(state=rng, n_samples=shape[0])
+        return self.limiting.sample(rng, shape)
 
     def limiting_distribution_logp(self, z):
-        return -jnp.ones([*z.shape[:-1]]) * self.manifold.metric.log_volume
+        return self.limiting.log_prob(z)
 
     def reverse(self, score_fn):
         return ReverseBrownian(self, score_fn)
@@ -84,7 +89,7 @@ class ReverseBrownian(Brownian):
     """Reverse time SDE, assuming the drift coefficient is spatially homogenous"""
 
     def __init__(self, sde: SDE, score_fn):
-        super().__init__(sde.manifold, tf=sde.t0, t0=sde.tf)
+        super().__init__(manifold=sde.manifold, tf=sde.t0, t0=sde.tf)
 
         self.sde = sde
         self.score_fn = score_fn
@@ -112,7 +117,7 @@ class ReverseBrownian(Brownian):
 
 
 class VPSDE(VPSDEBase):
-    def __init__(self, manifold, tf: float, t0: float = 0, beta_0=0.1, beta_f=20):
+    def __init__(self, tf: float, t0: float = 0, beta_0=0.1, beta_f=20, manifold=None):
         super().__init__(tf, t0, beta_0, beta_f)
         self.manifold = manifold
 

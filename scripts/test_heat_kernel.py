@@ -139,23 +139,25 @@ def heat_kernel(y, s, x, thresh, n_max, sde):
     return jnp.exp(jax.vmap(marginal_log_prob)(x, y, s))
 
 
-@partial(jax.jit, static_argnums=(4))
-def brownian_motion_traj(previous_x, traj, dt, N, manifold):
+@partial(jax.jit, static_argnums=(5))
+def brownian_motion_traj(previous_x, N, dt, timesteps, traj, sde):
     rng = jax.random.PRNGKey(0)
 
     def body(step, val):
         rng, x, traj = val
         traj = traj.at[step].set(x)
-        rng, z = manifold.random_normal_tangent(
+        t = jnp.broadcast_to(timesteps[step], (x.shape[0], 1))
+        rng, z = sde.manifold.random_normal_tangent(
             state=rng, base_point=x, n_samples=x.shape[0]
         )
-        tangent_vector = jnp.sqrt(dt) * z
-        x = manifold.metric.exp(tangent_vec=tangent_vector, base_point=x)
+        drift, diffusion = sde.coefficients(x, t)  # sde.sde(x, t)
+        tangent_vector = drift * dt + batch_mul(diffusion, jnp.sqrt(dt) * z)
+        x = sde.manifold.metric.exp(tangent_vec=tangent_vector, base_point=x)
         return rng, x, traj
 
     _, x, traj = jax.lax.fori_loop(0, N, body, (rng, previous_x, traj))
     traj = traj.at[-1].set(x)
-    return x, traj
+    return traj
 
 
 @partial(jax.jit, static_argnums=(4))

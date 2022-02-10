@@ -53,7 +53,6 @@ def main(cfg):
                 score_model,
                 params,
                 state,
-                continuous=True,
             )
     likelihood_fn = get_likelihood_fn(
         sde,

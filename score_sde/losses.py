@@ -18,30 +18,27 @@
 """
 
 from typing import Callable, Tuple
-from functools import partial
 
 import jax
 import optax
 import jax.numpy as jnp
 import jax.random as random
 
-from score_sde.sde import VESDE, VPSDE, SDE
-from riemannian_score_sde.sde import Brownian
 from score_sde.utils import batch_mul
-from score_sde.models import get_score_fn, get_model_fn
+from score_sde.models import get_score_fn, PushForward, SDEPushForward
 from score_sde.utils import ParametrisedScoreFunction, TrainState
-from score_sde.likelihood import div_noise, get_drift_fn, get_div_fn
-from score_sde.sampling import get_pc_sampler
+from score_sde.models import div_noise, get_div_fn
 
 
 def get_dsm_loss_fn(
-    sde: SDE,
+    pushforward: SDEPushForward,
     model: ParametrisedScoreFunction,
     train: bool = True,
     reduce_mean: bool = True,
     like_w: bool = True,
     eps: float = 1e-3,
 ):
+    sde = pushforward.sde
     reduce_op = (
         jnp.mean
         if reduce_mean
@@ -57,7 +54,6 @@ def get_dsm_loss_fn(
             params,
             states,
             train=train,
-            continuous=True,
             return_state=True,
         )
         x_0 = batch["data"]
@@ -92,7 +88,7 @@ def get_dsm_loss_fn(
 
 
 def get_ism_loss_fn(
-    sde: SDE,
+    pushforward: SDEPushForward,
     model: ParametrisedScoreFunction,
     train: bool,
     reduce_mean: bool = True,
@@ -100,12 +96,7 @@ def get_ism_loss_fn(
     hutchinson_type="Rademacher",
     eps: float = 1e-3,
 ):
-    reduce_op = (
-        jnp.mean
-        if reduce_mean
-        else lambda *args, **kwargs: 0.5 * jnp.sum(*args, **kwargs)
-    )
-
+    sde = pushforward.sde
     def loss_fn(
         rng: jax.random.KeyArray, params: dict, states: dict, batch: dict
     ) -> Tuple[float, dict]:
@@ -115,7 +106,6 @@ def get_ism_loss_fn(
             params,
             states,
             train=train,
-            continuous=True,
             return_state=True,
         )
         x_0 = batch["data"]
@@ -144,6 +134,29 @@ def get_ism_loss_fn(
 
         loss = jnp.mean(losses)
         return loss, new_model_state
+
+    return loss_fn
+
+
+def get_logp_loss_fn(
+    pushforward: PushForward,
+    model: ParametrisedScoreFunction,
+    train: bool = True,
+    **kwargs
+):
+
+    def loss_fn(
+        rng: jax.random.KeyArray, params: dict, states: dict, batch: dict
+    ) -> Tuple[float, dict]:
+        x_0 = batch["data"]
+
+        model_w_dicts = (model, params, states)
+        log_prob = pushforward.get_log_prob(model_w_dicts, train=train)
+        losses = - log_prob(rng, x_0)
+        loss = jnp.mean(losses)
+
+        # return loss, new_model_state
+        return loss, states
 
     return loss_fn
 
