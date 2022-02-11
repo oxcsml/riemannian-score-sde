@@ -1,6 +1,7 @@
 import os
 import logging
 from functools import partial
+from timeit import default_timer as timer
 
 from hydra.utils import instantiate, get_class, call
 from omegaconf import OmegaConf
@@ -43,6 +44,7 @@ def run(cfg):
             bar_format="{desc}{bar}{r_bar}",
             mininterval=1,
         )
+        train_time = timer()
         for step in t:
             batch = {"data": transform.inv(next(train_ds))}
             rng, next_rng = jax.random.split(rng)
@@ -56,11 +58,16 @@ def run(cfg):
                 t.set_description(f"Loss: {loss:.3f}")
 
             if step > 0 and step % cfg.val_freq == 0:
+                logger.log_metrics(
+                    {"train/time_per_it": (timer() - train_time) / cfg.val_freq}, step
+                )
                 save(ckpt_path, train_state)
+                eval_time = timer()
                 evaluate(train_state, "val", step)
+                logger.log_metrics({"val/time_per_it": (timer() - eval_time)}, step)
+                train_time = timer()
 
         return train_state, True
-
 
     def evaluate(train_state, stage, step=None):
         log.info("Running evaluation")
@@ -97,7 +104,6 @@ def run(cfg):
             log.info(f"Z = {Z:.2f}")
             logger.log_metrics({f"{stage}/Z": Z}, step)
 
-
     def generate_plots(train_state, stage, step=None):
         log.info("Generating plots")
         rng = jax.random.PRNGKey(cfg.seed)
@@ -112,7 +118,9 @@ def run(cfg):
         rng, next_rng = jax.random.split(rng)
         z = sampler(next_rng, z0.shape, N=100, eps=cfg.eps)
         x = transform(z)
-        log.info(f"Prop samples in M: {100 * data_manifold.belongs(x, atol=1e-4).mean().item()}")
+        log.info(
+            f"Prop samples in M: {100 * data_manifold.belongs(x, atol=1e-4).mean().item()}"
+        )
 
         model_w_dicts = (model, train_state.params_ema, train_state.model_state)
         likelihood_fn = pushforward.get_log_prob(model_w_dicts, train=False)
@@ -129,7 +137,6 @@ def run(cfg):
         plt = earth_plot(cfg, likelihood_fn, train_ds, test_ds, N=500, samples=x)
         if plt is not None:
             logger.log_plot("pdf", plt, cfg.steps)
-
 
     ### Main
     log.info("Stage : Startup")
