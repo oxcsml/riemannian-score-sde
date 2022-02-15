@@ -5,7 +5,13 @@ import wandb
 api = wandb.Api()
 
 # Project is specified by <entity/project-name>
-runs = api.runs("oxcsml/diffusion_manifold")
+runs = api.runs(
+    "oxcsml/diffusion_manifold",
+    filters={
+        # "createdAt": {"$gte": {"$toDate": "2020-02-13"}}
+        # 'config.name': 'fire's
+    },
+)
 
 summary_list, config_list, name_list = [], [], []
 

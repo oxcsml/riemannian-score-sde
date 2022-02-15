@@ -4,6 +4,7 @@
 # python main.py experiment=s2_toy
 
 name: earthquake
+experiment: earthquake
 
 defaults:
   - earth_data

@@ -4,6 +4,7 @@
 # python main.py experiment=s2_toy
 
 name: flood
+experiment: flood
 
 defaults:
   - earth_data

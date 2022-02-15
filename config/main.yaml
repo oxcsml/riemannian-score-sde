@@ -7,7 +7,7 @@ defaults:
   - experiment: s2_toy
 
   # - callbacks: wandb # set this to null if you don't want to use callbacks
-  - logger: csv
+  - logger: all
   # - checkpoint: val_loss
 
   - optim: adam

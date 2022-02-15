@@ -6,7 +6,7 @@ defaults:
 # paths:
 #   experiments: /data/ziz/not-backed-up/scratch/${oc.env:USER}/${PROJECT_NAME}/results
 
-n_jobs: 2
+n_jobs: 8
 num_gpus: 1
 
 hydra:
@@ -22,7 +22,7 @@ hydra:
     name: ${hydra.job.name}
     partition: ziz-gpu
     max_num_timeout: 0
-    array_parallelism: 32
+    array_parallelism: ${n_jobs}
     setup: ["export XLA_FLAGS='--xla_gpu_cuda_data_dir=/opt/cuda'", "export PATH=/opt/cuda/bin/:$PATH", "export LD_LIBRARY_PATH=/opt/cuda/lib64:$LD_LIBRARY_PATH", "export XLA_PYTHON_CLIENT_PREALLOCATE=false"]
     # setup: ["export XLA_PYTHON_CLIENT_PREALLOCATE=false"]
     executable: /data/localhost/not-backed-up/${oc.env:USER}/${PROJECT_NAME}/venv/bin/python

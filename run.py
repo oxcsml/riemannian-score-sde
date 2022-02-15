@@ -45,6 +45,7 @@ def run(cfg):
             mininterval=1,
         )
         train_time = timer()
+        total_train_time = 0
         for step in t:
             batch = {"data": transform.inv(next(train_ds))}
             rng, next_rng = jax.random.split(rng)
@@ -61,12 +62,14 @@ def run(cfg):
                 logger.log_metrics(
                     {"train/time_per_it": (timer() - train_time) / cfg.val_freq}, step
                 )
+                total_train_time += timer() - train_time
                 save(ckpt_path, train_state)
                 eval_time = timer()
                 evaluate(train_state, "val", step)
                 logger.log_metrics({"val/time_per_it": (timer() - eval_time)}, step)
                 train_time = timer()
 
+        logger.log_metrics({"train/total_time": total_train_time}, step)
         return train_state, True
 
     def evaluate(train_state, stage, step=None):
