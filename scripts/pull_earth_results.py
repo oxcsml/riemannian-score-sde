@@ -1,14 +1,19 @@
 # %%
+import numpy as np
 import pandas as pd
 import wandb
+from datetime import datetime
+from scipy import stats
 
 api = wandb.Api()
+
+# %%
 
 # Project is specified by <entity/project-name>
 runs = api.runs(
     "oxcsml/diffusion_manifold",
     filters={
-        # "createdAt": {"$gte": {"$toDate": "2020-02-13"}}
+        "createdAt": {"$gte": "2022-02-14T00:00:00.000Z"}
         # 'config.name': 'fire's
     },
 )
@@ -82,26 +87,54 @@ bold = True
 
 def make_table_from_metric(
     metric,
-    raw_results,
+    results,
     val_metric=None,
-    pm_metric="sem",
+    ci=0.95,
     latex=False,
     bold=True,
+    drop_nans=False,
     show_group=False,
 ):
     if val_metric is None:
         val_metric = metric
 
+    alpha = (1 - ci) / 2
+
+    if drop_nans:
+        results = results[results[metric].notna()]
+        results = results[results[val_metric].notna()]
+
+    def half_ci(group):
+        data = group.to_numpy()
+        sem = stats.sem(data)
+        t2 = stats.t.ppf(1 - alpha, len(data) - 1) - stats.t.ppf(alpha, len(data) - 1)
+        return sem * (t2 / 2)
+
+    def lower_ci(group):
+        data = group.to_numpy()
+        sem = stats.sem(data)
+        mean = data.mean()
+        t = stats.t.ppf(alpha, len(data) - 1)
+        return mean + sem * t
+
+    def upper_ci(group):
+        data = group.to_numpy()
+        sem = stats.sem(data)
+        mean = data.mean()
+        t = stats.t.ppf(1 - alpha, len(data) - 1)
+        return mean + sem * t
+
     results = (
-        runs_df.groupby(by=["group", "method", "dataset"])
+        results.groupby(by=["group", "method", "dataset"])
         .agg(
             {
-                metric: ["mean", pm_metric],
-                val_metric: ["mean", "std", "sem"],
+                metric: ["mean", "std", "sem", lower_ci, upper_ci, half_ci],
+                val_metric: ["mean", "std", "sem", lower_ci, upper_ci, half_ci],
             }
         )
         .reset_index()
     )
+
     group_max_idx = (
         results.groupby(by=["method", "dataset"]).transform(max)[val_metric]["mean"]
         == results[val_metric]["mean"]
@@ -114,7 +147,7 @@ def make_table_from_metric(
 
         def format_result(row):
             return (
-                f"{{{-row[metric]['mean']:0.2f}_{{\pm {row[metric][pm_metric]:0.2f}}}}}"
+                f"{{{-row[metric]['mean']:0.2f}_{{\pm {row[metric]['half_ci']:0.2f}}}}}"
             )
 
         def bold_result(row):
@@ -123,14 +156,26 @@ def make_table_from_metric(
     else:
 
         def format_result(row):
-            return f"{-row[metric]['mean']:0.2f} ± {row[metric][pm_metric]:0.2f}"
+            return f"{-row[metric]['mean']:0.2f} ± {row[metric]['half_ci']:0.2f}"
 
         def bold_result(row):
             return "* " + row["result"] if row["bold"].any() else row["result"]
 
-    table["bold"] = (
-        table.groupby(by=["dataset"]).transform(max)[metric]["mean"]
-        == table[metric]["mean"]
+    table["group_max"] = table.groupby(by=["dataset"]).transform(max)[metric]["mean"]
+    table["group_max"] = table.apply(
+        lambda row: table.index[table[metric]["mean"] == row["group_max"].squeeze()][0],
+        axis=1,
+    )
+    table["bold"] = table.apply(
+        lambda row: (
+            table.loc[row["group_max"], (metric, "mean")].squeeze()
+            < row[metric]["upper_ci"]
+        )
+        or (
+            row[metric]["mean"]
+            > table.loc[row["group_max"], (metric, "lower_ci")].squeeze()
+        ),
+        axis=1,
     )
 
     table["result"] = table.apply(format_result, axis=1)
@@ -169,7 +214,9 @@ def make_table_from_metric(
 val_table = make_table_from_metric("val/logp", runs_df)
 val_table
 # %%
-test_table = make_table_from_metric("test/logp", runs_df, val_metric="val/logp")
+test_table = make_table_from_metric(
+    "test/logp", runs_df, val_metric="val/logp", drop_nans=True
+)
 test_table
 # %%
 test_table = make_table_from_metric("test/logp", runs_df, val_metric="test/logp")
