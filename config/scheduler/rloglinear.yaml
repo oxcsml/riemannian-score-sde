@@ -1,0 +1,13 @@
+_target_: optax.join_schedules
+schedules:
+  - _target_: optax.linear_schedule
+    init_value: 0.0
+    end_value: 1.0
+    transition_steps: ${warmup_steps}
+  - _target_: score_sde.utils.schedule.loglinear_schedule
+    init_value: 1.0
+    end_value: 1e-5
+    decay_steps: ${eval:${steps}-${warmup_steps}}
+  
+boundaries:
+  - ${warmup_steps}

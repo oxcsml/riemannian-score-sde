@@ -15,7 +15,7 @@ hydra:
   #     XLA_FLAGS: --xla_gpu_cuda_data_dir=/opt/cuda11.1
   launcher:
     submitit_folder: ${hydra.sweep.dir}/.submitit/%j
-    timeout_min: 840
+    timeout_min: 2880
     cpus_per_task: ${num_gpus}
     tasks_per_node: 1
     mem_gb: 10

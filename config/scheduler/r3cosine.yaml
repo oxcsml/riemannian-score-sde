@@ -1,0 +1,23 @@
+_target_: optax.join_schedules
+schedules:
+  - _target_: optax.linear_schedule
+    init_value: 0.0
+    end_value: 1.0
+    transition_steps: ${warmup_steps}
+  - _target_: optax.cosine_decay_schedule
+    init_value: 1.0
+    decay_steps: ${int:${eval:${eval:${steps}-${warmup_steps}}/3}}
+    alpha: 0.1
+  - _target_: optax.cosine_decay_schedule
+    init_value: 0.1
+    decay_steps: ${int:${eval:${eval:${steps}-${warmup_steps}}/3}}
+    alpha: 0.1
+  - _target_: optax.cosine_decay_schedule
+    init_value: 0.01
+    decay_steps: ${int:${eval:${eval:${steps}-${warmup_steps}}/3}}
+    alpha: 0.1
+  
+boundaries:
+  - ${warmup_steps}
+  - ${eval:${warmup_steps} + ${int:${eval:${eval:${steps}-${warmup_steps}}/3}}}
+  - ${eval:${warmup_steps} + ${eval:2*${int:${eval:${eval:${steps}-${warmup_steps}}/3}}}}
