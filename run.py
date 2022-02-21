@@ -39,8 +39,8 @@ def run(cfg):
 
         rng = train_state.rng
         t = tqdm(
-            range(cfg.steps),
-            total=cfg.steps,
+            range(train_state.step, cfg.steps),
+            total=cfg.steps - train_state.step,
             bar_format="{desc}{bar}{r_bar}",
             mininterval=1,
         )
