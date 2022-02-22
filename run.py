@@ -2,6 +2,7 @@ import os
 import logging
 from functools import partial
 from timeit import default_timer as timer
+import socket
 
 from hydra.utils import instantiate, get_class, call
 from omegaconf import OmegaConf
@@ -146,6 +147,7 @@ def run(cfg):
     log.info(f"Jax devices: {jax.devices()}")
     run_path = os.getcwd()
     log.info(f"run_path: {run_path}")
+    log.info(f"hostname: {socket.gethostname()}")
     ckpt_path = os.path.join(run_path, cfg.ckpt_dir)
     os.makedirs(ckpt_path, exist_ok=True)
     loggers = [instantiate(logger_cfg) for logger_cfg in cfg.logger.values()]

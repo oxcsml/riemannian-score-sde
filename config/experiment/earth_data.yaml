@@ -5,7 +5,7 @@
 
 defaults:
   - /manifold: nsphere
-  - /model: sbgm
+  - /model: rsgm
   - /architecture: concat
   - /embedding: none
 
