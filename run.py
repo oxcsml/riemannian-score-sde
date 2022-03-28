@@ -135,9 +135,9 @@ def run(cfg):
         likelihood_fn = pushforward.get_log_prob(model_w_dicts, train=False)
         
         context = next(dataset)[1]
-        unique_context = [None] if context is None else jnp.unique(context).reshape((-1))
+        unique_context = [None] if context is None else jnp.unique(context)
         for k, context in enumerate(unique_context):
-            context = context
+            context = context.reshape((1,))
             likelihood_fn = get_likelihood_fn_w_transform(likelihood_fn, transform)
             likelihood_fn = partial(likelihood_fn, rng, context=context)
 

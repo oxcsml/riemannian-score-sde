@@ -49,9 +49,15 @@ def get_score_fn(
       A score function.
     """
     if isinstance(sde, Brownian):
-
-        def score_fn(x, t, std_trick=True, rng=None):
-            model_out, new_state = model.apply(params, state, rng, x=x, t=t)
+        def score_fn(x, t, context=None, std_trick=True, rng=None):
+            if context is not None:
+                t_expanded = jnp.expand_dims(t.reshape(-1), -1)
+                if context.shape[0] != x.shape[0]:
+                    context = jnp.repeat(jnp.expand_dims(context, 0), x.shape[0], 0)
+                context = jnp.concatenate([t_expanded, context], axis=-1)
+            else:
+                context = t
+            model_out, new_state = model.apply(params, state, rng, x=x, t=context)
             # NOTE: scaling the output with 1.0 / std helps cf 'Improved Techniques for Training Score-Based Generative Model'
             score = model_out
             if std_trick:
@@ -63,14 +69,17 @@ def get_score_fn(
                 return score
 
     elif isinstance(sde, (VPSDE, subVPSDE)):
-
-        def score_fn(x, t, rng=None):
+        def score_fn(x, t, context=None, rng=None):
             # Scale neural network output by standard deviation and flip sign
             # For VP-trained models, t=0 corresponds to the lowest noise level
             # The maximum value of time embedding is assumed to 999 for
             # continuously-trained models.
-            labels = t * 999  # TODO: remove?
-            model_out, new_state = model.apply(params, state, rng, x=x, t=labels)
+            if context is not None:
+                t_expanded = jnp.expand_dims((t * 999).reshape(-1), -1)
+                context = jnp.concatenate([t_expanded, context], axis=-1)
+            else:
+                context = t * 999  # TODO: remove?
+            model_out, new_state = model.apply(params, state, rng, x=x, t=context)
             std = sde.marginal_prob(jnp.zeros_like(x), t)[1]
 
             score = batch_mul(-model_out, 1.0 / std)
@@ -79,15 +88,15 @@ def get_score_fn(
             else:
                 return score
 
-    elif isinstance(sde, VESDE):
+    # elif isinstance(sde, VESDE):
 
-        def score_fn(x, t, rng=None):
-            labels = sde.marginal_prob(jnp.zeros_like(x), t)[1]
-            score, state = model(x, labels, rng)
-            if return_state:
-                return score, state
-            else:
-                return score
+    #     def score_fn(x, t, rng=None):
+    #         labels = sde.marginal_prob(jnp.zeros_like(x), t)[1]
+    #         score, state = model(x, labels, rng)
+    #         if return_state:
+    #             return score, state
+    #         else:
+    #             return score
 
     else:
         raise NotImplementedError(

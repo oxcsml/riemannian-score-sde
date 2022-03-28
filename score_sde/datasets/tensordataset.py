@@ -45,7 +45,7 @@ class DataLoader:
             next_rng, len(self.dataset), shape=(self.batch_dims,)
         )
 
-        return self.dataset[indices]
+        return self.dataset[indices], None
         # return self.data[indices].reshape((self.batch_dims, *self.dataset.shape[1:]))
 
 
@@ -78,7 +78,7 @@ class DatasetIterator:
         else:
             raise StopIteration
 
-        return batch
+        return batch, None
 
 
 # TODO: assumes 1d batch_dims

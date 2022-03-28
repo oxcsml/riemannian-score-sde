@@ -36,7 +36,7 @@ def get_dsm_loss_fn(
             train=train,
             return_state=True,
         )
-        x_0 = batch["data"]
+        x_0, context = batch["data"], batch["context"]
 
         rng, step_rng = random.split(rng)
         # uniformly sample from SDE timeframe
@@ -65,7 +65,7 @@ def get_dsm_loss_fn(
             std = jnp.expand_dims(sde.marginal_prob(jnp.zeros_like(x_t), delta_t)[1], -1)
 
         # compute approximate score at x_t
-        score, new_model_state = score_fn(x_t, t, rng=step_rng)
+        score, new_model_state = score_fn(x_t, t, context, rng=step_rng)
         score = score.reshape(x_t.shape)
 
         if not like_w:

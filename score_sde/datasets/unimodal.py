@@ -29,7 +29,7 @@ class vMFDataset:
         )
         samples = samples.reshape([*self.batch_dims, samples.shape[-1]])
 
-        return samples
+        return (samples, None)
         # return jnp.expand_dims(samples, axis=-1)
 
     def _log_normalization(self):
@@ -65,4 +65,4 @@ class DiracDataset:
     def __next__(self):
         n_samples=np.prod(self.batch_dims)
         samples = jnp.repeat(self.mu.reshape(1, -1), n_samples, 0)
-        return samples
+        return (samples, None)

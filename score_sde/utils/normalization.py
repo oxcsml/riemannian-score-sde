@@ -80,7 +80,7 @@ def get_euclidean_grid(N, dim):
     return xs, volume, lambda_x
 
 
-def compute_normalization(likelihood_fn, manifold, N=None, eps=0.):
+def compute_normalization(likelihood_fn, manifold, context=None, N=None, eps=0.):
     if isinstance(manifold, Euclidean):
         N = N if N is not None else int(jnp.power(1e5, 1/manifold.dim))
         xs, volume, lambda_x = get_euclidean_grid(N, manifold.dim)
@@ -94,8 +94,9 @@ def compute_normalization(likelihood_fn, manifold, N=None, eps=0.):
         print('Only integration over R^d, S^2 and SO(3) is implemented.')
         return 0.
 
-    rng = jax.random.PRNGKey(0)
-    logp = likelihood_fn(rng, xs)
+    if context is not None:
+        context = jnp.repeat(jnp.expand_dims(context, 0), xs.shape[0], 0)
+    logp = likelihood_fn(xs, context)
     prob = jnp.exp(logp)
     Z = (prob * lambda_x).mean() * volume
     return Z.item()

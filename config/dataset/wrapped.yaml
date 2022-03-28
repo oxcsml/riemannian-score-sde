@@ -6,3 +6,4 @@ batch_dims:
   - ${batch_size}
 manifold: ${manifold}
 seed: ${seed}
+conditional: false

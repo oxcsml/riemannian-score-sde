@@ -22,12 +22,12 @@ class Uniform:
         self.rng = rng
         n_samples=np.prod(self.batch_dims)
         samples = self.manifold.random_uniform(state=next_rng, n_samples=n_samples)
-        return samples
+        return (samples, None)
 
 
 class Wrapped:
     def __init__(
-        self, scale, K, batch_dims, manifold, seed, **kwargs
+        self, scale, K, batch_dims, manifold, seed, conditional, **kwargs
     ):
         self.K = K
         self.scale = scale
@@ -36,6 +36,7 @@ class Wrapped:
         rng = jax.random.PRNGKey(seed)
         rng, next_rng = jax.random.split(rng)
         self.rng = rng
+        self.conditional = conditional
         if 'mean' in kwargs:
             self.mean = kwargs["mean"]
         else:
@@ -58,7 +59,10 @@ class Wrapped:
         )[1]
         tangent_vec = self.scale * tangent_vec
         samples = self.manifold.exp(tangent_vec, mean)
-        return samples
+        if self.conditional:
+            return samples, jnp.expand_dims(k, -1)
+        else:
+            return (samples, None)
 
 
 class Langevin:
@@ -106,4 +110,4 @@ class Langevin:
             samples = (1 - mask) * samples + mask * X
             cond = (1 - mask) * cond + mask * mask
             
-        return samples
+        return (samples, None)
