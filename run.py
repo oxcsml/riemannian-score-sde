@@ -19,7 +19,7 @@ from score_sde.utils.loggers_pl import LoggerCollection, Logger
 from score_sde.utils.vis import plot, earth_plot
 from score_sde.models import get_likelihood_fn_w_transform
 from score_sde.datasets import random_split, DataLoader, TensorDataset
-from score_sde.utils.tmp import compute_normalization
+from score_sde.utils.normalization import compute_normalization
 from score_sde.losses import get_ema_loss_step_fn
 
 log = logging.getLogger(__name__)
@@ -48,7 +48,8 @@ def run(cfg):
         train_time = timer()
         total_train_time = 0
         for step in t:
-            batch = {"data": transform.inv(next(train_ds))}
+            data, context = next(train_ds)
+            batch = {"data": transform.inv(data), "context": context}
             rng, next_rng = jax.random.split(rng)
             (rng, train_state), loss = train_step_fn((next_rng, train_state), batch)
             if jnp.isnan(loss).any():
@@ -79,32 +80,35 @@ def run(cfg):
         dataset = eval_ds if stage == "val" else test_ds
 
         model_w_dicts = (model, train_state.params_ema, train_state.model_state)
-        likelihood_fn = pushforward.get_log_prob(model_w_dicts, train=False)
+        likelihood_fn_wo_tr = pushforward.get_log_prob(model_w_dicts, train=False)
+        likelihood_fn_wo_tr = partial(likelihood_fn_wo_tr, rng)
         # TODO: merge transorm as part of PushForward
-        likelihood_fn = get_likelihood_fn_w_transform(likelihood_fn, transform)
+        likelihood_fn = get_likelihood_fn_w_transform(likelihood_fn_wo_tr, transform)
 
         logp = 0.0
         N = 0
 
         if hasattr(dataset, "__len__"):
-            for x in dataset:
-                logp_step = likelihood_fn(rng, x)
+            for (x, context) in dataset:
+                logp_step = likelihood_fn(x, context)
                 logp += logp_step.sum()
                 N += logp_step.shape[0]
         else:
             # TODO: handle infinite datasets more elegnatly
             samples = 10
             for i in range(samples):
-                x = next(dataset)
-                logp_step = likelihood_fn(rng, x)
+                (x, context) = next(dataset)
+                logp_step = likelihood_fn(x, context)
                 logp += logp_step.sum()
                 N += logp_step.shape[0]
         logp /= N
 
         logger.log_metrics({f"{stage}/logp": logp}, step)
         log.info(f"{stage}/logp = {logp:.3f}")
+
         if stage == "test":
-            Z = compute_normalization(likelihood_fn)
+            default_context = context[0] if context is not None else None
+            Z = compute_normalization(likelihood_fn, data_manifold, context=default_context)
             log.info(f"Z = {Z:.2f}")
             logger.log_metrics({f"{stage}/Z": Z}, step)
 
@@ -113,36 +117,45 @@ def run(cfg):
         rng = jax.random.PRNGKey(cfg.seed)
         dataset = eval_ds if stage == "eval" else test_ds
 
-        x0 = next(dataset)
+        x0 = jnp.concatenate([next(dataset)[0] for _ in range(32)], axis=0)
         z0 = transform.inv(x0)
         ## p_0 (backward)
 
-        model_w_dicts = (model, train_state.params_ema, train_state.model_state)
-        sampler = pushforward.get_sample(model_w_dicts, train=False)
         rng, next_rng = jax.random.split(rng)
-        z = sampler(next_rng, z0.shape, N=100, eps=cfg.eps)
-        x = transform(z)
-        log.info(
-            f"Prop samples in M: {100 * data_manifold.belongs(x, atol=1e-4).mean().item()}"
-        )
-
         model_w_dicts = (model, train_state.params_ema, train_state.model_state)
+
+        # from score_sde.sampling import get_pc_sampler
+        # sampler = get_pc_sampler(pushforward.sde, N=100, return_hist=True)
+        # z, x_hist, _ = sampler(next_rng, z0)
+        # for i in range(x_hist.shape[0]):
+            # belong = data_manifold.belongs(x_hist[i], atol=1e-4).mean().item()
+            # print(f"{i:03d} -- {100*belong:.2f}")
+
+        sampler = pushforward.get_sample(model_w_dicts, train=False)
         likelihood_fn = pushforward.get_log_prob(model_w_dicts, train=False)
-        # TODO: merge transorm as part of PushForward
-        likelihood_fn = get_likelihood_fn_w_transform(likelihood_fn, transform)
-        likelihood_fn = partial(likelihood_fn, rng)
+        
+        context = next(dataset)[1]
+        unique_context = [None] if context is None else jnp.unique(context).reshape((-1))
+        for k, context in enumerate(unique_context):
+            context = context
+            likelihood_fn = get_likelihood_fn_w_transform(likelihood_fn, transform)
+            likelihood_fn = partial(likelihood_fn, rng, context=context)
 
-        plt = plot(None, x, jnp.exp(likelihood_fn(x)), None)
-        logger.log_plot("x0_backw", plt, cfg.steps)
-        # prob = jnp.exp(dataset.log_prob(x0)) if hasattr(dataset, "log_prob") else None
-        # plt = plot(None, x0, prob, None)
-        # logger.log_plot("x0_true", plt, cfg.steps)
+            z = sampler(next_rng, z0.shape, context, N=100, eps=cfg.eps)
+            x = transform(z)
+            log.info(
+                f"Prop samples in M: {100 * data_manifold.belongs(x, atol=1e-4).mean().item()}"
+            )
 
-        plt = earth_plot(cfg, likelihood_fn, train_ds, test_ds, N=500, samples=x)
-        if plt is not None:
-            logger.log_plot("pdf", plt, cfg.steps)
+            plt = plot(data_manifold, x0, x) #prob=jnp.exp(likelihood_fn(x)
+            logger.log_plot(f"x0_backw_{k}", plt, cfg.steps)
+
+            # plt = earth_plot(cfg, likelihood_fn, train_ds, test_ds, N=500, samples=x)
+            # if plt is not None:
+            #     logger.log_plot("pdf", plt, cfg.steps)
 
     ### Main
+    # jax.config.update("jax_enable_x64", True)
     log.info("Stage : Startup")
     log.info(f"Jax devices: {jax.devices()}")
     run_path = os.getcwd()
@@ -206,9 +219,7 @@ def run(cfg):
         )
     else:
         train_ds, eval_ds, test_ds = dataset, dataset, dataset
-
-    z = transform.inv(next(train_ds))
-
+    
     log.info("Stage : Instantiate model")
 
     def model(x, t):
@@ -225,7 +236,11 @@ def run(cfg):
     model = hk.transform_with_state(model)
 
     rng, next_rng = jax.random.split(rng)
-    params, state = model.init(rng=next_rng, x=z, t=0)
+    t = jnp.zeros((cfg.batch_size, 1))
+    data, context = next(train_ds)
+    t = jnp.concatenate([t, context], axis=-1) if context is not None else t
+    z = transform.inv(data)
+    params, state = model.init(rng=next_rng, x=z, t=t)
 
     log.info("Stage : Instantiate optimiser")
 

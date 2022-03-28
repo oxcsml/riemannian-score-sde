@@ -140,8 +140,9 @@ class SDEPushForward(PushForward):
             def sample(rng, shape, **kwargs):
                 x = self.base.sample(rng, shape)
                 score_fn = get_score_fn(self.sde, *model_w_dicts)
-                sampler = jax.jit(get_pc_sampler(
-                    self.sde.reverse(score_fn), **kwargs))
+                sampler = get_pc_sampler(
+                    self.sde.reverse(score_fn), **kwargs)
+                sampler = jax.jit(sampler)
                 return sampler(rng, x)
         else:
             raise ValueError(diffeq)
@@ -242,24 +243,25 @@ class CNF:
             ################ .ode.odeint ###############
             elif self.backend == "jax":
                 def ode_func(x: jnp.ndarray, t: jnp.ndarray, params, states) -> np.array:
-                    sample = x[:, :shape[1]]
+                    sample = x[:, :-1]#.reshape(shape)
                     vec_t = jnp.ones((sample.shape[0],)) * t
                     drift_fn = self.get_drift_fn(model, params, states)
                     drift_fn = jax.jit(drift_fn)  #TODO: useless?
                     drift = drift_fn(sample, vec_t)
                     div_fn = get_div_fn(drift_fn, hutchinson_type)
                     div_fn = jax.jit(div_fn)  #TODO: useless?
-                    logp_grad = div_fn(sample, vec_t, epsilon).reshape([*shape[:-1], 1])
+                    logp_grad = div_fn(sample, vec_t, epsilon).reshape([shape[0], 1])
                     return jnp.concatenate([drift, logp_grad], axis=1)
 
+                data = data.reshape(shape[0], -1)
                 init = jnp.concatenate([data, np.zeros((shape[0], 1))], axis=1)
                 ode_func = ReverseWrapper(ode_func, tf) if reverse else ode_func
                 y, nfe = odeint(ode_func, init, ts, params, states, **ode_kwargs)
-                z = y[-1, ..., :-1]
+                z = y[-1, ..., :-1].reshape(shape)
                 delta_logp = y[-1, ..., -1]
             else:
                 raise ValueError(f"{self.backend} is not a valid option.")
-
+            print(f"nfe: {nfe}")
             return z, delta_logp
 
         return forward

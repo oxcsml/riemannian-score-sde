@@ -190,3 +190,30 @@ class AmbientGenerator(VectorFieldGenerator):
     def __call__(self, x, t):
         # `to_tangent`` have an 1/sq_norm(x) term that wrongs the div
         return self.manifold.to_tangent(self.net(x, t), x)
+
+
+class LieAlgebraGenerator(VectorFieldGenerator):
+    def __init__(self, architecture, embedding, output_shape, manifold):
+        super().__init__(architecture, embedding, output_shape, manifold)
+
+    @staticmethod
+    def output_shape(manifold):
+        return manifold.dim
+
+    def _generators(self, x):
+        return self.manifold.lie_algebra.basis
+
+    def __call__(self, x, t):
+        x = x.reshape((x.shape[0], self.manifold.dim, self.manifold.dim))
+        fi_fn, Xi_fn = self.decomposition
+        #TODO: what representation to use for NN's input?
+        x_input = x.reshape((*x.shape[:-2], -1))
+        # x_input = self.manifold.vee(self.manifold.log(x)) #NOTE: extremly unstable
+        fi, Xi = fi_fn(x_input, t), Xi_fn(x)
+        out = jnp.einsum("...i,ijk ->...jk", fi, Xi)
+        # is_tangent = self.manifold.lie_algebra.belongs(out, atol=1e-3).all()
+        # print(is_tangent)
+        out = self.manifold.compose(x, out)
+        # is_tangent = self.manifold.is_tangent(out, x, atol=1e-3).all()
+        # out = self.manifold.to_tangent(out, x)
+        return out.reshape((x.shape[0], -1))

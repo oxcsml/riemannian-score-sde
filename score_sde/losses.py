@@ -181,7 +181,6 @@ def get_ema_loss_step_fn(
       A one-step function for training or evaluation.
     """
 
-    # @partial(jax.jit)
     def step_fn(carry_state: Tuple[jax.random.KeyArray, TrainState], batch: dict):
         """Running one step of training or evaluation.
 

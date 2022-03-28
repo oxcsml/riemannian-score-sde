@@ -9,6 +9,8 @@ import seaborn as sns
 import geomstats.backend as gs
 import geomstats.visualization as visualization
 from geomstats.geometry.hypersphere import Hypersphere
+from geomstats.geometry.euclidean import Euclidean
+from geomstats.geometry.special_orthogonal import _SpecialOrthogonalMatrices, _SpecialOrthogonal3Vectors
 
 import jax
 from jax import numpy as jnp
@@ -117,7 +119,7 @@ def get_spherical_grid(N, eps=0.0):
     return xs, lat, lon
 
 
-def plot(x0, xt, prob, grad, x0prob=None, size=10, dpi=300, out="out.jpg", color="red"):
+def plot_3d(x0, xt, size, prob):
     fig = plt.figure(figsize=(size, size))
     ax = fig.add_subplot(111, projection="3d")
     ax = remove_background(ax)
@@ -135,12 +137,12 @@ def plot(x0, xt, prob, grad, x0prob=None, size=10, dpi=300, out="out.jpg", color
         x, y, z = xt[:, 0], xt[:, 1], xt[:, 2]
         c = prob if prob is not None else np.ones([*xt.shape[:-1]])
         cax = ax.scatter(x, y, z, s=50, vmin=0.0, vmax=2.0, c=c, cmap=cmap)
-    if grad is not None:
-        u, v, w = grad[:, 0], grad[:, 1], grad[:, 2]
-        quiver = ax.quiver(
-            x, y, z, u, v, w, length=0.2, lw=2, normalize=False, cmap=cmap
-        )
-        quiver.set_array(c)
+    # if grad is not None:
+    #     u, v, w = grad[:, 0], grad[:, 1], grad[:, 2]
+    #     quiver = ax.quiver(
+    #         x, y, z, u, v, w, length=0.2, lw=2, normalize=False, cmap=cmap
+    #     )
+    #     quiver.set_array(c)
 
     plt.colorbar(cax)
     # plt.savefig(out, dpi=dpi, bbox_inches="tight", transparent=True)
@@ -148,28 +150,10 @@ def plot(x0, xt, prob, grad, x0prob=None, size=10, dpi=300, out="out.jpg", color
     return fig
 
 
-def setup_sphere_plot(size=10, dpi=300, elev=0, azim=45):
-    fig = plt.figure(figsize=(size, size))
-    ax = fig.add_subplot(111, projection="3d")
-    ax = remove_background(ax)
-    fig.subplots_adjust(left=-0.2, bottom=-0.2, right=1.2, top=1.2, wspace=0, hspace=0)
-    # ax.view_init(elev=30, azim=45)
-    ax.view_init(elev=elev, azim=azim)
-    sphere = visualization.Sphere()
-    sphere.draw(ax, color="red", marker=".")
-
-    return fig, ax
-
-
-def scatter_earth(x, ax=None, s=50, color="green"):
-    if ax is None:
-        ax = setup_sphere_plot()
-    cax = ax.scatter(x[:, 0], x[:, 1], -x[:, 2], s=s, color=color)
-
-
 def earth_plot(cfg, log_prob, train_ds, test_ds, N, azimuth=None, samples=None):
     """generate earth plots with model density or integral paths aka streamplot"""
     has_cartopy = importlib.find_loader("cartopy")
+    print('has_cartopy', has_cartopy)
     if not has_cartopy:
         return
 
@@ -276,3 +260,34 @@ def earth_plot(cfg, log_prob, train_ds, test_ds, N, azimuth=None, samples=None):
             figs.append(fig)
 
     return figs
+
+
+def plot_so3(x0, xt, size, **kwargs):
+    fig, axes = plt.subplots(2, 3, figsize=(3*size, size), sharex=False, sharey=False, tight_layout=True)
+
+    for i, x in enumerate([x0, xt]):
+        w = _SpecialOrthogonal3Vectors().tait_bryan_angles_from_matrix(x)
+        # w = _SpecialOrthogonal3Vectors().rotation_vector_from_matrix(x)
+        w = np.array(w)
+        for j in range(3):
+            axes[i, j].hist(w[:, j], bins=40, density=True, alpha=0.5)
+            if j == 1:
+                axes[i, j].set(xlim=(-math.pi/2, math.pi/2))
+            else:
+                axes[i, j].set(xlim=(-math.pi, math.pi))
+
+    plt.close(fig)
+    return fig
+
+
+def plot(manifold, x0, xt, prob=None, size=10):
+    if isinstance(manifold, Euclidean) and manifold.dim == 3:
+       fig = plot_3d(x0, xt, size, prob=prob)
+    elif isinstance(manifold, Hypersphere) and manifold.dim == 2:
+        fig = plot_3d(x0, xt, size, prob=prob)
+    elif isinstance(manifold, _SpecialOrthogonalMatrices) and manifold.dim == 3:
+        fig = plot_so3(x0, xt, size, prob=prob)
+    else:
+        print('Only plotting over R^3, S^2 and SO(3) is implemented.')
+        return None
+    return fig

@@ -130,10 +130,11 @@ class EulerMaruyamaManifoldPredictor(Predictor):
     def update_fn(
         self, rng: jax.random.KeyArray, x: jnp.ndarray, t: float, dt: float
     ) -> Tuple[jnp.ndarray, jnp.ndarray]:
-        rng, z = self.sde.manifold.random_normal_tangent(
+        shape = x.shape
+        z = self.sde.manifold.random_normal_tangent(
             state=rng, base_point=x, n_samples=x.shape[0]
-        )
-        drift, diffusion = self.sde.coefficients(x, t)
+        )[1].reshape(shape[0], -1)
+        drift, diffusion = self.sde.coefficients(x.reshape(shape[0], -1), t)
         drift = drift * dt[..., None]
         if len(diffusion.shape) > 1 and diffusion.shape[-1] == diffusion.shape[-2]:
             # if square matrix diffusion coeffs
@@ -146,7 +147,9 @@ class EulerMaruyamaManifoldPredictor(Predictor):
                 "...,...i,...->...i", diffusion, z, jnp.sqrt(jnp.abs(dt))
             )
 
-        x = self.sde.manifold.metric.exp(tangent_vec=tangent_vector, base_point=x)
+        tangent_vector = tangent_vector.reshape(shape)
+        x = self.sde.manifold.exp(tangent_vec=tangent_vector, base_point=x)
+        # x = self.sde.manifold.projection(x)
         # x = self.sde.manifold.projection(x + tangent_vector)
         # TODO: Retraction as an option
         # x = self.sde.manifold.projection(x + self.sde.manifold.metric.metric_matrix() @ tangent_vector)
@@ -236,9 +239,8 @@ def get_pc_sampler(
 
         t0 = sde.t0 if t0 is None else t0
         tf = sde.tf if tf is None else tf
-
-        t0 = jnp.broadcast_to(t0, x.shape[:-1])
-        tf = jnp.broadcast_to(tf, x.shape[:-1])
+        t0 = jnp.broadcast_to(t0, x.shape[0])
+        tf = jnp.broadcast_to(tf, x.shape[0])
 
         # TODO: to match rng state of old code, debugging.
         rng, step_rng = random.split(rng)
