@@ -48,8 +48,8 @@ def run(cfg):
         train_time = timer()
         total_train_time = 0
         for step in t:
-            data, context = next(train_ds)
-            batch = {"data": transform.inv(data), "context": context}
+            data, z = next(train_ds)
+            batch = {"data": transform.inv(data), "context": z}
             rng, next_rng = jax.random.split(rng)
             (rng, train_state), loss = train_step_fn((next_rng, train_state), batch)
             if jnp.isnan(loss).any():
@@ -89,16 +89,16 @@ def run(cfg):
         N = 0
 
         if hasattr(dataset, "__len__"):
-            for (x, context) in dataset:
-                logp_step = likelihood_fn(x, context)
+            for (x, z) in dataset:
+                logp_step = likelihood_fn(x, z)
                 logp += logp_step.sum()
                 N += logp_step.shape[0]
         else:
             # TODO: handle infinite datasets more elegnatly
             samples = 10
             for i in range(samples):
-                (x, context) = next(dataset)
-                logp_step = likelihood_fn(x, context)
+                (x, z) = next(dataset)
+                logp_step = likelihood_fn(x, z)
                 logp += logp_step.sum()
                 N += logp_step.shape[0]
         logp /= N
@@ -107,8 +107,8 @@ def run(cfg):
         log.info(f"{stage}/logp = {logp:.3f}")
 
         if stage == "test":
-            default_context = context[0] if context is not None else None
-            Z = compute_normalization(likelihood_fn, data_manifold, context=default_context)
+            default_z = z[0] if z is not None else None
+            Z = compute_normalization(likelihood_fn, data_manifold, z=default_z)
             log.info(f"Z = {Z:.2f}")
             logger.log_metrics({f"{stage}/Z": Z}, step)
 
@@ -134,15 +134,15 @@ def run(cfg):
         sampler = pushforward.get_sample(model_w_dicts, train=False)
         likelihood_fn = pushforward.get_log_prob(model_w_dicts, train=False)
         
-        context = next(dataset)[1]
-        unique_context = [None] if context is None else jnp.unique(context)
-        for k, context in enumerate(unique_context):
-            context = context.reshape((1,))
+        z = next(dataset)[1]
+        unique_z = [None] if z is None else jnp.unique(z).reshape((-1, 1))
+        for k, z in enumerate(unique_z):
+            # z = z.reshape((1,))
             likelihood_fn = get_likelihood_fn_w_transform(likelihood_fn, transform)
-            likelihood_fn = partial(likelihood_fn, rng, context=context)
+            likelihood_fn = partial(likelihood_fn, rng, z=z)
 
-            z = sampler(next_rng, z0.shape, context, N=100, eps=cfg.eps)
-            x = transform(z)
+            y = sampler(next_rng, z0.shape, z, N=100, eps=cfg.eps)
+            x = transform(y)
             log.info(
                 f"Prop samples in M: {100 * data_manifold.belongs(x, atol=1e-4).mean().item()}"
             )
@@ -222,7 +222,7 @@ def run(cfg):
     
     log.info("Stage : Instantiate model")
 
-    def model(x, t):
+    def model(x, t, z):
         output_shape = get_class(cfg.generator._target_).output_shape(model_manifold)
         score = instantiate(
             cfg.generator,
@@ -231,16 +231,22 @@ def run(cfg):
             output_shape,
             manifold=model_manifold,
         )
-        return score(x, t)
+        if z is not None:
+            t_expanded = jnp.expand_dims(t.reshape(-1), -1)
+            if z.shape[0] != x.shape[0]:
+                z = jnp.repeat(jnp.expand_dims(z, 0), x.shape[0], 0)
+            z = jnp.concatenate([t_expanded, z], axis=-1)
+        else:
+            z = t
+        return score(x, z)
 
     model = hk.transform_with_state(model)
 
     rng, next_rng = jax.random.split(rng)
     t = jnp.zeros((cfg.batch_size, 1))
-    data, context = next(train_ds)
-    t = jnp.concatenate([t, context], axis=-1) if context is not None else t
-    z = transform.inv(data)
-    params, state = model.init(rng=next_rng, x=z, t=t)
+    data, z = next(train_ds)
+    y = transform.inv(data)
+    params, state = model.init(rng=next_rng, x=y, t=t, z=z)
 
     log.info("Stage : Instantiate optimiser")
 

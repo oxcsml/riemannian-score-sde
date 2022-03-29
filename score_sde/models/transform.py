@@ -11,10 +11,10 @@ from geomstats import algebra_utils as utils
 
 
 def get_likelihood_fn_w_transform(likelihood_fn, transform):
-    def log_prob(x, context):
-        z = transform.inv(x)
-        logp = likelihood_fn(z, context=context)
-        log_abs_det_jacobian = transform.log_abs_det_jacobian(z, x)
+    def log_prob(x, z):
+        y = transform.inv(x)
+        logp = likelihood_fn(y, z=z)
+        log_abs_det_jacobian = transform.log_abs_det_jacobian(y, x)
         logp -= log_abs_det_jacobian
         return logp
     return log_prob

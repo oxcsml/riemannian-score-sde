@@ -49,15 +49,8 @@ def get_score_fn(
       A score function.
     """
     if isinstance(sde, Brownian):
-        def score_fn(x, t, context=None, std_trick=True, rng=None):
-            if context is not None:
-                t_expanded = jnp.expand_dims(t.reshape(-1), -1)
-                if context.shape[0] != x.shape[0]:
-                    context = jnp.repeat(jnp.expand_dims(context, 0), x.shape[0], 0)
-                context = jnp.concatenate([t_expanded, context], axis=-1)
-            else:
-                context = t
-            model_out, new_state = model.apply(params, state, rng, x=x, t=context)
+        def score_fn(x, t, z, std_trick=True, rng=None):
+            model_out, new_state = model.apply(params, state, rng, x=x, t=t, z=z)
             # NOTE: scaling the output with 1.0 / std helps cf 'Improved Techniques for Training Score-Based Generative Model'
             score = model_out
             if std_trick:
@@ -69,17 +62,13 @@ def get_score_fn(
                 return score
 
     elif isinstance(sde, (VPSDE, subVPSDE)):
-        def score_fn(x, t, context=None, rng=None):
+        def score_fn(x, t, z=None, rng=None):
             # Scale neural network output by standard deviation and flip sign
             # For VP-trained models, t=0 corresponds to the lowest noise level
             # The maximum value of time embedding is assumed to 999 for
             # continuously-trained models.
-            if context is not None:
-                t_expanded = jnp.expand_dims((t * 999).reshape(-1), -1)
-                context = jnp.concatenate([t_expanded, context], axis=-1)
-            else:
-                context = t * 999  # TODO: remove?
-            model_out, new_state = model.apply(params, state, rng, x=x, t=context)
+            # TODO: remove t * 999 scaling ?
+            model_out, new_state = model.apply(params, state, rng, x=x, t=t * 999, z=z)
             std = sde.marginal_prob(jnp.zeros_like(x), t)[1]
 
             score = batch_mul(-model_out, 1.0 / std)

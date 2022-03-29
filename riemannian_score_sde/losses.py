@@ -36,7 +36,7 @@ def get_dsm_loss_fn(
             train=train,
             return_state=True,
         )
-        x_0, context = batch["data"], batch["context"]
+        x_0, z = batch["data"], batch["context"]
 
         rng, step_rng = random.split(rng)
         # uniformly sample from SDE timeframe
@@ -65,7 +65,7 @@ def get_dsm_loss_fn(
             std = jnp.expand_dims(sde.marginal_prob(jnp.zeros_like(x_t), delta_t)[1], -1)
 
         # compute approximate score at x_t
-        score, new_model_state = score_fn(x_t, t, context, rng=step_rng)
+        score, new_model_state = score_fn(x_t, t, z, rng=step_rng)
         score = score.reshape(x_t.shape)
 
         if not like_w:
@@ -105,7 +105,7 @@ def get_ism_loss_fn(
             train=train,
             return_state=True,
         )
-        x_0 = batch["data"]
+        x_0, z = batch["data"], batch["context"]
 
         rng, step_rng = random.split(rng)
         t = random.uniform(
@@ -114,15 +114,15 @@ def get_ism_loss_fn(
 
         rng, step_rng = random.split(rng)
         x_t = sde.marginal_sample(step_rng, x_0, t)
-        score, new_model_state = score_fn(x_t, t, rng=step_rng)
+        score, new_model_state = score_fn(x_t, t, z, rng=step_rng)
         score = score.reshape(x_t.shape)
 
         # ISM loss
         rng, step_rng = random.split(rng)
         epsilon = div_noise(step_rng, x_0.shape, hutchinson_type)
-        drift_fn = lambda x, t: score_fn(x, t, rng=step_rng)[0]
+        drift_fn = lambda x, t, z: score_fn(x, t, z, rng=step_rng)[0]
         div_fn = get_div_fn(drift_fn, hutchinson_type)
-        div_score = div_fn(x_t, t, epsilon)
+        div_score = div_fn(x_t, t, z, epsilon)
         sq_norm_score = sde.manifold.metric.squared_norm(score, x_t)
         losses = 0.5 * sq_norm_score + div_score
 
@@ -150,7 +150,7 @@ def get_moser_loss_fn(
         rng: jax.random.KeyArray, params: dict, states: dict, batch: dict
     ) -> Tuple[float, dict]:
         drift_fn = get_ode_drift_fn(model, params, states)
-        x_0 = batch["data"]
+        x_0, z = batch["data"], batch["context"]
 
         rng, step_rng = random.split(rng)
         div_fn = get_div_fn(drift_fn, hutchinson_type)
@@ -160,7 +160,7 @@ def get_moser_loss_fn(
             # x = x.reshape(-1, *x.shape)
             t = jnp.zeros((*x.shape[:-1],))  # NOTE: How to deal with that?
             epsilon = div_noise(step_rng, x.shape, hutchinson_type)
-            div_drift = div_fn(x, t, epsilon)
+            div_drift = div_fn(x, t, z, epsilon)
             # div_drift = jnp.squeeze(div_drift)
             mu = prob_base - div_drift
             mu_plus = jnp.maximum(eps, mu)
