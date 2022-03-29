@@ -89,16 +89,16 @@ def run(cfg):
         N = 0
 
         if hasattr(dataset, "__len__"):
-            for (x, z) in dataset:
-                logp_step = likelihood_fn(x, z)
+            for batch in dataset:
+                logp_step = likelihood_fn(*batch)
                 logp += logp_step.sum()
                 N += logp_step.shape[0]
         else:
             # TODO: handle infinite datasets more elegnatly
             samples = 10
             for i in range(samples):
-                (x, z) = next(dataset)
-                logp_step = likelihood_fn(x, z)
+                batch = next(dataset)
+                logp_step = likelihood_fn(*batch)
                 logp += logp_step.sum()
                 N += logp_step.shape[0]
         logp /= N

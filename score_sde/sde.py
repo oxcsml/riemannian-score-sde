@@ -171,7 +171,7 @@ class ProbabilityFlowODE:
         elif isinstance(sde, RSDE):
             self.score_fn = sde.score_fn
 
-    def coefficients(self, x, t, z):
+    def coefficients(self, x, t, z=None):
         drift, diffusion = self.sde.coefficients(x, t)
         score_fn = self.score_fn(x, t, z)
         # compute G G^T score_fn

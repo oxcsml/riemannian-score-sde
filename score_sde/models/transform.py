@@ -11,7 +11,7 @@ from geomstats import algebra_utils as utils
 
 
 def get_likelihood_fn_w_transform(likelihood_fn, transform):
-    def log_prob(x, z):
+    def log_prob(x, z=None):
         y = transform.inv(x)
         logp = likelihood_fn(y, z=z)
         log_abs_det_jacobian = transform.log_abs_det_jacobian(y, x)
