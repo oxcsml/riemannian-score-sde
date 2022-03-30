@@ -6,6 +6,10 @@ import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 import seaborn as sns
 
+# plt.rcParams["text.usetex"] = True
+# plt.rcParams["font.family"] = ["Computer Modern Roman"]
+# plt.rcParams.update({"font.size": 20})
+
 import geomstats.backend as gs
 import geomstats.visualization as visualization
 from geomstats.geometry.hypersphere import Hypersphere
@@ -119,7 +123,7 @@ def get_spherical_grid(N, eps=0.0):
     return xs, lat, lon
 
 
-def plot_3d(x0, xt, size, prob):
+def plot_3d(x0s, xts, size, prob):
     fig = plt.figure(figsize=(size, size))
     ax = fig.add_subplot(111, projection="3d")
     ax = remove_background(ax)
@@ -131,18 +135,19 @@ def plot_3d(x0, xt, size, prob):
     sphere.draw(ax, color="red", marker=".")
     # sphere_plot(ax)
     # sphere.plot_heatmap(ax, pdf, n_points=16000, alpha=0.2, cmap=cmap)
-    if x0 is not None:
-        cax = ax.scatter(x0[:, 0], x0[:, 1], x0[:, 2], s=50, color="green")
-    if xt is not None:
-        x, y, z = xt[:, 0], xt[:, 1], xt[:, 2]
-        c = prob if prob is not None else np.ones([*xt.shape[:-1]])
-        cax = ax.scatter(x, y, z, s=50, vmin=0.0, vmax=2.0, c=c, cmap=cmap)
-    # if grad is not None:
-    #     u, v, w = grad[:, 0], grad[:, 1], grad[:, 2]
-    #     quiver = ax.quiver(
-    #         x, y, z, u, v, w, length=0.2, lw=2, normalize=False, cmap=cmap
-    #     )
-    #     quiver.set_array(c)
+    for k, (x0, xt) in enumerate(zip(x0s, xts)):
+        if x0 is not None:
+            cax = ax.scatter(x0[:, 0], x0[:, 1], x0[:, 2], s=50, color="green")
+        if xt is not None:
+            x, y, z = xt[:, 0], xt[:, 1], xt[:, 2]
+            c = prob if prob is not None else np.ones([*xt.shape[:-1]])
+            cax = ax.scatter(x, y, z, s=50, vmin=0.0, vmax=2.0, c=c, cmap=cmap)
+        # if grad is not None:
+        #     u, v, w = grad[:, 0], grad[:, 1], grad[:, 2]
+        #     quiver = ax.quiver(
+        #         x, y, z, u, v, w, length=0.2, lw=2, normalize=False, cmap=cmap
+        #     )
+        #     quiver.set_array(c)
 
     plt.colorbar(cax)
     # plt.savefig(out, dpi=dpi, bbox_inches="tight", transparent=True)
@@ -262,19 +267,37 @@ def earth_plot(cfg, log_prob, train_ds, test_ds, N, azimuth=None, samples=None):
     return figs
 
 
-def plot_so3(x0, xt, size, **kwargs):
-    fig, axes = plt.subplots(2, 3, figsize=(3*size, size), sharex=False, sharey=False, tight_layout=True)
-
-    for i, x in enumerate([x0, xt]):
-        w = _SpecialOrthogonal3Vectors().tait_bryan_angles_from_matrix(x)
-        # w = _SpecialOrthogonal3Vectors().rotation_vector_from_matrix(x)
-        w = np.array(w)
-        for j in range(3):
-            axes[i, j].hist(w[:, j], bins=40, density=True, alpha=0.5)
-            if j == 1:
-                axes[i, j].set(xlim=(-math.pi/2, math.pi/2))
-            else:
-                axes[i, j].set(xlim=(-math.pi, math.pi))
+def plot_so3(x0s, xts, size, **kwargs):
+    # colors = sns.color_palette("huls", 8)
+    colors = sns.color_palette("tab10")
+    fig, axes = plt.subplots(2, 3, figsize=(1.2*size, 0.6*size), sharex=False, sharey=True, tight_layout=True)
+    x_labels = [r'$\alpha$', r'$\beta$', r'$\gamma$']
+    y_labels = ['Target', 'Model']
+    
+    for k, (x0, xt) in enumerate(zip(x0s, xts)):
+        for i, x in enumerate([x0, xt]):
+            w = _SpecialOrthogonal3Vectors().tait_bryan_angles_from_matrix(x)
+            # w = _SpecialOrthogonal3Vectors().rotation_vector_from_matrix(x)
+            w = np.array(w)
+            for j in range(3):
+                axes[i, j].hist(w[:, j], bins=40, density=True, alpha=0.3, color=colors[k], label=f"Component #{k}")
+                if j == 1:
+                    axes[i, j].set(xlim=(-math.pi/2, math.pi/2))
+                    axes[i, j].set_xticks([-math.pi/2, 0, math.pi/2])
+                    axes[i, j].set_xticklabels([r"$-\pi/2$", "0", r"$\pi/2$"], color="k")
+                else:
+                    axes[i, j].set(xlim=(-math.pi, math.pi))
+                    axes[i, j].set_xticks([-math.pi, 0, math.pi])
+                    axes[i, j].set_xticklabels([r"$-\pi$", "0", r"$\pi$"], color="k")
+                if j == 0:
+                    axes[i, j].set_ylabel(y_labels[i], fontsize=20)
+                if i == 0 and j == 0:
+                    axes[i, j].legend(loc="best", fontsize=15)
+                if i == 0:
+                    axes[i, j].get_xaxis().set_visible(False)
+                if i == 1:
+                    axes[i, j].set_xlabel(x_labels[j], fontsize=20)
+                axes[i, j].tick_params(axis='both', which='major', labelsize=15)
 
     plt.close(fig)
     return fig

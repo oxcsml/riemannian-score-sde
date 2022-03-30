@@ -30,7 +30,6 @@ class Wrapped:
         self, scale, K, batch_dims, manifold, seed, conditional, **kwargs
     ):
         self.K = K
-        self.scale = scale
         self.batch_dims = batch_dims
         self.manifold = manifold
         rng = jax.random.PRNGKey(seed)
@@ -42,22 +41,24 @@ class Wrapped:
         else:
             self.mean = self.manifold.random_uniform(state=next_rng, n_samples=K)
             # self.mean = self.manifold.identity
+        precision = jax.random.gamma(key=next_rng, a=scale, shape=(K,))
+        self.precision = jnp.expand_dims(precision, (-1, -2))
 
     def __iter__(self):
         return self
 
     def __next__(self):
+        n_samples=np.prod(self.batch_dims)
+        ks = jnp.arange(self.mean.shape[0])
         rng, next_rng = jax.random.split(self.rng)
         self.rng = rng
-        n_samples=np.prod(self.batch_dims)
-        # _, mean = gs.random.choice(state=next_rng, a=self.mean, n=n_samples)
-        ks = jnp.arange(self.mean.shape[0])
         _, k = gs.random.choice(state=next_rng, a=ks, n=n_samples)
         mean = self.mean[k]
+        scale = 1 / jnp.sqrt(self.precision[k])
         tangent_vec = self.manifold.random_normal_tangent(
             state=next_rng, base_point=mean, n_samples=n_samples
         )[1]
-        tangent_vec = self.scale * tangent_vec
+        tangent_vec = scale * tangent_vec
         samples = self.manifold.exp(tangent_vec, mean)
         if self.conditional:
             return samples, jnp.expand_dims(k, -1)
