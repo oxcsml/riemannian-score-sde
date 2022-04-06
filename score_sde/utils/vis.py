@@ -14,7 +14,10 @@ import geomstats.backend as gs
 import geomstats.visualization as visualization
 from geomstats.geometry.hypersphere import Hypersphere
 from geomstats.geometry.euclidean import Euclidean
-from geomstats.geometry.special_orthogonal import _SpecialOrthogonalMatrices, _SpecialOrthogonal3Vectors
+from geomstats.geometry.special_orthogonal import (
+    _SpecialOrthogonalMatrices,
+    _SpecialOrthogonal3Vectors,
+)
 
 import jax
 from jax import numpy as jnp
@@ -106,9 +109,7 @@ def latlon_from_cartesian(points):
     lat = -jnp.arcsin(z / r)
     lon = jnp.arctan2(y, x)
     lon = jnp.where(lon > 0, lon - math.pi, lon + math.pi)
-    return jnp.concatenate(
-        [jnp.expand_dims(lat, -1), jnp.expand_dims(lon, -1)], axis=-1
-    )
+    return jnp.concatenate([jnp.expand_dims(lat, -1), jnp.expand_dims(lon, -1)], axis=-1)
 
 
 def get_spherical_grid(N, eps=0.0):
@@ -116,9 +117,7 @@ def get_spherical_grid(N, eps=0.0):
     lon = jnp.linspace(-180 + eps, 180 - eps, N)
     Lat, Lon = jnp.meshgrid(lat, lon)
     latlon_xs = jnp.concatenate([Lat.reshape(-1, 1), Lon.reshape(-1, 1)], axis=-1)
-    spherical_xs = (
-        jnp.pi * (latlon_xs / 180.0) + jnp.array([jnp.pi / 2, jnp.pi])[None, :]
-    )
+    spherical_xs = jnp.pi * (latlon_xs / 180.0) + jnp.array([jnp.pi / 2, jnp.pi])[None, :]
     xs = Hypersphere(2).spherical_to_extrinsic(spherical_xs)
     return xs, lat, lon
 
@@ -158,7 +157,7 @@ def plot_3d(x0s, xts, size, prob):
 def earth_plot(cfg, log_prob, train_ds, test_ds, N, azimuth=None, samples=None):
     """generate earth plots with model density or integral paths aka streamplot"""
     has_cartopy = importlib.find_loader("cartopy")
-    print('has_cartopy', has_cartopy)
+    print("has_cartopy", has_cartopy)
     if not has_cartopy:
         return
 
@@ -268,36 +267,54 @@ def earth_plot(cfg, log_prob, train_ds, test_ds, N, azimuth=None, samples=None):
 
 
 def plot_so3(x0s, xts, size, **kwargs):
-    # colors = sns.color_palette("huls", 8)
-    colors = sns.color_palette("tab10")
-    fig, axes = plt.subplots(2, 3, figsize=(1.2*size, 0.6*size), sharex=False, sharey=True, tight_layout=True)
-    x_labels = [r'$\alpha$', r'$\beta$', r'$\gamma$']
-    y_labels = ['Target', 'Model']
-    
+    colors = sns.color_palette("husl", len(x0s))
+    # colors = sns.color_palette("tab10")
+    fig, axes = plt.subplots(
+        2,
+        3,
+        figsize=(1.2 * size, 0.6 * size),
+        sharex=False,
+        sharey=True,
+        tight_layout=True,
+    )
+    # x_labels = [r"$\alpha$", r"$\beta$", r"$\gamma$"]
+    x_labels = [r"$\phi$", r"$\theta$", r"$\psi$"]
+    y_labels = ["Target", "Model"]
+
     for k, (x0, xt) in enumerate(zip(x0s, xts)):
+        # print(k, x0.shape, xt.shape)
         for i, x in enumerate([x0, xt]):
             w = _SpecialOrthogonal3Vectors().tait_bryan_angles_from_matrix(x)
             # w = _SpecialOrthogonal3Vectors().rotation_vector_from_matrix(x)
             w = np.array(w)
+            # w_idx = [1, 0, 2]
+            w_idx = [0, 1, 2]
             for j in range(3):
-                axes[i, j].hist(w[:, j], bins=40, density=True, alpha=0.3, color=colors[k], label=f"Component #{k}")
+                axes[i, j].hist(
+                    w[:, w_idx[j]],
+                    bins=40,
+                    density=True,
+                    alpha=0.3,
+                    color=colors[k],
+                    label=f"Component #{k}",
+                )
                 if j == 1:
-                    axes[i, j].set(xlim=(-math.pi/2, math.pi/2))
-                    axes[i, j].set_xticks([-math.pi/2, 0, math.pi/2])
+                    axes[i, j].set(xlim=(-math.pi / 2, math.pi / 2))
+                    axes[i, j].set_xticks([-math.pi / 2, 0, math.pi / 2])
                     axes[i, j].set_xticklabels([r"$-\pi/2$", "0", r"$\pi/2$"], color="k")
                 else:
                     axes[i, j].set(xlim=(-math.pi, math.pi))
                     axes[i, j].set_xticks([-math.pi, 0, math.pi])
                     axes[i, j].set_xticklabels([r"$-\pi$", "0", r"$\pi$"], color="k")
                 if j == 0:
-                    axes[i, j].set_ylabel(y_labels[i], fontsize=20)
-                if i == 0 and j == 0:
-                    axes[i, j].legend(loc="best", fontsize=15)
+                    axes[i, j].set_ylabel(y_labels[i], fontsize=30)
+                # if i == 0 and j == 0:
+                # axes[i, j].legend(loc="best", fontsize=15)
                 if i == 0:
                     axes[i, j].get_xaxis().set_visible(False)
                 if i == 1:
-                    axes[i, j].set_xlabel(x_labels[j], fontsize=20)
-                axes[i, j].tick_params(axis='both', which='major', labelsize=15)
+                    axes[i, j].set_xlabel(x_labels[j], fontsize=30)
+                axes[i, j].tick_params(axis="both", which="major", labelsize=20)
 
     plt.close(fig)
     return fig
@@ -305,12 +322,12 @@ def plot_so3(x0s, xts, size, **kwargs):
 
 def plot(manifold, x0, xt, prob=None, size=10):
     if isinstance(manifold, Euclidean) and manifold.dim == 3:
-       fig = plot_3d(x0, xt, size, prob=prob)
+        fig = plot_3d(x0, xt, size, prob=prob)
     elif isinstance(manifold, Hypersphere) and manifold.dim == 2:
         fig = plot_3d(x0, xt, size, prob=prob)
     elif isinstance(manifold, _SpecialOrthogonalMatrices) and manifold.dim == 3:
         fig = plot_so3(x0, xt, size, prob=prob)
     else:
-        print('Only plotting over R^3, S^2 and SO(3) is implemented.')
+        print("Only plotting over R^3, S^2 and SO(3) is implemented.")
         return None
     return fig

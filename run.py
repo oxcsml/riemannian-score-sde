@@ -18,7 +18,12 @@ from score_sde.utils import TrainState, save, restore
 from score_sde.utils.loggers_pl import LoggerCollection, Logger
 from score_sde.utils.vis import plot, earth_plot
 from score_sde.models import get_likelihood_fn_w_transform
-from score_sde.datasets import random_split, DataLoader, TensorDataset, get_data_per_context
+from score_sde.datasets import (
+    random_split,
+    DataLoader,
+    TensorDataset,
+    get_data_per_context,
+)
 from score_sde.utils.normalization import compute_normalization
 from score_sde.losses import get_ema_loss_step_fn
 
@@ -127,7 +132,7 @@ def run(cfg):
 
         sampler = pushforward.get_sample(model_w_dicts, train=False)
         likelihood_fn = pushforward.get_log_prob(model_w_dicts, train=False)
-        
+
         z = next(dataset)[1]
         unique_z = [None] if z is None else jnp.unique(z).reshape((-1, 1))
         xs = []
@@ -145,7 +150,7 @@ def run(cfg):
             # if plt is not None:
             #     logger.log_plot(f"pdf_{k}", plt, cfg.steps)
 
-        plt = plot(data_manifold, x0, xs) #prob=jnp.exp(likelihood_fn(x)
+        plt = plot(data_manifold, x0, xs)  # prob=jnp.exp(likelihood_fn(x)
         logger.log_plot(f"x0_backw", plt, cfg.steps)
 
     ### Main
@@ -213,7 +218,7 @@ def run(cfg):
         )
     else:
         train_ds, eval_ds, test_ds = dataset, dataset, dataset
-    
+
     log.info("Stage : Instantiate model")
 
     def model(x, t, z):
@@ -245,9 +250,7 @@ def run(cfg):
     log.info("Stage : Instantiate optimiser")
 
     schedule_fn = instantiate(cfg.scheduler)
-    optimiser = optax.chain(
-        instantiate(cfg.optim), optax.scale_by_schedule(schedule_fn)
-    )
+    optimiser = optax.chain(instantiate(cfg.optim), optax.scale_by_schedule(schedule_fn))
     opt_state = optimiser.init(params)
 
     if cfg.resume or cfg.mode == "test":  # if resume or evaluate
