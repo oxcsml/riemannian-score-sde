@@ -20,7 +20,7 @@ def get_dsm_loss_fn(
     reduce_mean: bool = True,
     like_w: bool = True,
     eps: float = 1e-3,
-    s_zero = True,
+    s_zero=True,
     **kwargs
 ):
     sde = pushforward.sde
@@ -50,19 +50,27 @@ def get_dsm_loss_fn(
         if s_zero:  # l_{t|0}
             x_t = sde.marginal_sample(step_rng, x_0, t)
             if "n_max" in kwargs and kwargs["n_max"] <= -1:
-                get_logp_grad = lambda x_0, x_t, t: \
-                    sde.varhadan_exp(x_0, x_t, jnp.zeros_like(t), t)[1]
+                get_logp_grad = lambda x_0, x_t, t: sde.varhadan_exp(
+                    x_0, x_t, jnp.zeros_like(t), t
+                )[1]
             else:
-                get_logp_grad = lambda x_0, x_t, t: \
-                    sde.grad_marginal_log_prob(x_0, x_t, t, **kwargs)[1]
+                get_logp_grad = lambda x_0, x_t, t: sde.grad_marginal_log_prob(
+                    x_0, x_t, t, **kwargs
+                )[1]
             logp_grad = get_logp_grad(x_0, x_t, t)
             std = jnp.expand_dims(sde.marginal_prob(jnp.zeros_like(x_t), t)[1], -1)
-        else:      # l_{t|s}
-            x_t, x_hist, timesteps = sde.marginal_sample(step_rng, x_0, t, return_hist=True)
+        else:  # l_{t|s}
+            x_t, x_hist, timesteps = sde.marginal_sample(
+                step_rng, x_0, t, return_hist=True
+            )
             x_s = x_hist[-2]
-            delta_t, logp_grad = sde.varhadan_exp(x_s, x_t, timesteps[-2], timesteps[-1])
+            delta_t, logp_grad = sde.varhadan_exp(
+                x_s, x_t, timesteps[-2], timesteps[-1]
+            )
             delta_t = t  # NOTE: works better?
-            std = jnp.expand_dims(sde.marginal_prob(jnp.zeros_like(x_t), delta_t)[1], -1)
+            std = jnp.expand_dims(
+                sde.marginal_prob(jnp.zeros_like(x_t), delta_t)[1], -1
+            )
 
         # compute approximate score at x_t
         score, new_model_state = score_fn(x_t, t, z, rng=step_rng)
@@ -166,6 +174,7 @@ def get_moser_loss_fn(
             mu_plus = jnp.maximum(eps, mu)
             mu_minus = eps - jnp.minimum(eps, mu)
             return mu_plus, mu_minus
+
         # mu = jax.vmap(mu)  #NOTE: gives different results?
 
         mu_plus = mu(x_0)[0]
@@ -176,10 +185,10 @@ def get_moser_loss_fn(
         prior_prob = jnp.exp(pushforward.base.log_prob(xs))
 
         _, mu_minus = mu(xs)
-        volume_m = jnp.mean(batch_mul(mu_minus, 1 / prior_prob) , axis=0)
-        penalty = alpha_m * volume_m# + alpha_p * volume_p
+        volume_m = jnp.mean(batch_mul(mu_minus, 1 / prior_prob), axis=0)
+        penalty = alpha_m * volume_m  # + alpha_p * volume_p
 
-        loss = - log_prob + penalty
+        loss = -log_prob + penalty
 
         # return loss, new_model_state
         return loss, states

@@ -25,7 +25,8 @@ hydra:
     array_parallelism: ${n_jobs}
     setup: ["export XLA_FLAGS='--xla_gpu_cuda_data_dir=/opt/cuda'", "export PATH=/opt/cuda/bin/:$PATH", "export LD_LIBRARY_PATH=/opt/cuda/lib64:$LD_LIBRARY_PATH", "export XLA_PYTHON_CLIENT_PREALLOCATE=false"]
     # setup: ["export XLA_PYTHON_CLIENT_PREALLOCATE=false"]
-    executable: /data/localhost/not-backed-up/${oc.env:USER}/${PROJECT_NAME}/venv/bin/python
+    # TODO: replicate envs
+    executable: /data/ziz/not-backed-up/${oc.env:USER}/${PROJECT_NAME}/venv/bin/python
     additional_parameters: {
       "clusters": "srf_gpu_01",
       "wckey": "wck_${oc.env:USER}",

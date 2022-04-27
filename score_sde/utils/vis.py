@@ -14,7 +14,11 @@ import geomstats.backend as gs
 import geomstats.visualization as visualization
 from geomstats.geometry.hypersphere import Hypersphere
 from geomstats.geometry.euclidean import Euclidean
-from geomstats.geometry.special_orthogonal import _SpecialOrthogonalMatrices, _SpecialOrthogonal3Vectors
+from geomstats.geometry.special_orthogonal import (
+    _SpecialOrthogonalMatrices,
+    _SpecialOrthogonal3Vectors,
+)
+from geomstats.geometry.product_manifold import ProductSameManifold
 
 import jax
 from jax import numpy as jnp
@@ -158,7 +162,7 @@ def plot_3d(x0s, xts, size, prob):
 def earth_plot(cfg, log_prob, train_ds, test_ds, N, azimuth=None, samples=None):
     """generate earth plots with model density or integral paths aka streamplot"""
     has_cartopy = importlib.find_loader("cartopy")
-    print('has_cartopy', has_cartopy)
+    print("has_cartopy", has_cartopy)
     if not has_cartopy:
         return
 
@@ -270,21 +274,37 @@ def earth_plot(cfg, log_prob, train_ds, test_ds, N, azimuth=None, samples=None):
 def plot_so3(x0s, xts, size, **kwargs):
     # colors = sns.color_palette("huls", 8)
     colors = sns.color_palette("tab10")
-    fig, axes = plt.subplots(2, 3, figsize=(1.2*size, 0.6*size), sharex=False, sharey=True, tight_layout=True)
-    x_labels = [r'$\alpha$', r'$\beta$', r'$\gamma$']
-    y_labels = ['Target', 'Model']
-    
+    fig, axes = plt.subplots(
+        2,
+        3,
+        figsize=(1.2 * size, 0.6 * size),
+        sharex=False,
+        sharey=True,
+        tight_layout=True,
+    )
+    x_labels = [r"$\alpha$", r"$\beta$", r"$\gamma$"]
+    y_labels = ["Target", "Model"]
+
     for k, (x0, xt) in enumerate(zip(x0s, xts)):
         for i, x in enumerate([x0, xt]):
             w = _SpecialOrthogonal3Vectors().tait_bryan_angles_from_matrix(x)
             # w = _SpecialOrthogonal3Vectors().rotation_vector_from_matrix(x)
             w = np.array(w)
             for j in range(3):
-                axes[i, j].hist(w[:, j], bins=40, density=True, alpha=0.3, color=colors[k], label=f"Component #{k}")
+                axes[i, j].hist(
+                    w[:, j],
+                    bins=40,
+                    density=True,
+                    alpha=0.3,
+                    color=colors[k],
+                    label=f"Component #{k}",
+                )
                 if j == 1:
-                    axes[i, j].set(xlim=(-math.pi/2, math.pi/2))
-                    axes[i, j].set_xticks([-math.pi/2, 0, math.pi/2])
-                    axes[i, j].set_xticklabels([r"$-\pi/2$", "0", r"$\pi/2$"], color="k")
+                    axes[i, j].set(xlim=(-math.pi / 2, math.pi / 2))
+                    axes[i, j].set_xticks([-math.pi / 2, 0, math.pi / 2])
+                    axes[i, j].set_xticklabels(
+                        [r"$-\pi/2$", "0", r"$\pi/2$"], color="k"
+                    )
                 else:
                     axes[i, j].set(xlim=(-math.pi, math.pi))
                     axes[i, j].set_xticks([-math.pi, 0, math.pi])
@@ -297,7 +317,99 @@ def plot_so3(x0s, xts, size, **kwargs):
                     axes[i, j].get_xaxis().set_visible(False)
                 if i == 1:
                     axes[i, j].set_xlabel(x_labels[j], fontsize=20)
-                axes[i, j].tick_params(axis='both', which='major', labelsize=15)
+                axes[i, j].tick_params(axis="both", which="major", labelsize=15)
+
+    plt.close(fig)
+    return fig
+
+
+def proj_t2(x):
+    return jnp.mod(
+        jnp.stack(
+            [jnp.arctan2(x[..., 0], x[..., 1]), jnp.arctan2(x[..., 2], x[..., 3])],
+            axis=-1,
+        ),
+        jnp.pi * 2,
+    )
+
+
+def plot_t2(x0s, xts, size, **kwargs):
+    fig, axes = plt.subplots(
+        1,
+        2,
+        figsize=(0.6 * size, 0.6 * size),
+        sharex=False,
+        sharey=False,
+        tight_layout=True,
+    )
+
+    for k, (x0, xt) in enumerate(zip(x0s, xts)):
+        for i, x in enumerate([x0, xt]):
+            x = proj_t2(x)
+            axes[i].scatter(x[..., 0], x[..., 1], s=0.1)
+
+    for ax in axes:
+        ax.set_xlim([0, 2 * jnp.pi])
+        ax.set_ylim([0, 2 * jnp.pi])
+        ax.set_aspect("equal")
+
+    plt.close(fig)
+    return fig
+
+
+def plot_tn(x0s, xts, size, **kwargs):
+    n = x0s[0].shape[-1]
+    n = min(5, n // 2)
+
+    fig, axes = plt.subplots(
+        n,
+        2,
+        figsize=(0.6 * size, 0.6 * size * n / 2),
+        sharex=False,
+        sharey=False,
+        tight_layout=True,
+    )
+    for k, (x0, xt) in enumerate(zip(x0s, xts)):
+        for i, x in enumerate([x0, xt]):
+            for j in range(n):
+                x_ = proj_t2(x[..., (4 * j) : (4 * (j + 1))])
+                axes[j][i].scatter(x_[..., 0], x_[..., 1], s=0.1)
+
+    axes = [item for sublist in axes for item in sublist]
+    for ax in axes:
+        ax.set_xlim([0, 2 * jnp.pi])
+        ax.set_ylim([0, 2 * jnp.pi])
+        ax.set_aspect("equal")
+
+    plt.close(fig)
+    return fig
+
+
+import seaborn as sns
+
+
+def proj_t1(x):
+    return jnp.mod(jnp.arctan2(x[..., 0], x[..., 1]), 2 * np.pi)
+
+
+def plot_t1(x0s, xts, size, **kwargs):
+    fig, axes = plt.subplots(
+        1,
+        2,
+        figsize=(0.6 * size, 0.6 * size),
+        sharex=False,
+        sharey=True,
+        tight_layout=True,
+    )
+
+    for k, (x0, xt) in enumerate(zip(x0s, xts)):
+        for i, x in enumerate([x0, xt]):
+            x = proj_t1(x)
+            sns.kdeplot(x, ax=axes[i])
+            plt.scatter(jnp.zeros_like(x), x, marker="|")
+
+    for ax in axes:
+        ax.set_xlim([0, 2 * jnp.pi])
 
     plt.close(fig)
     return fig
@@ -305,12 +417,32 @@ def plot_so3(x0s, xts, size, **kwargs):
 
 def plot(manifold, x0, xt, prob=None, size=10):
     if isinstance(manifold, Euclidean) and manifold.dim == 3:
-       fig = plot_3d(x0, xt, size, prob=prob)
+        fig = plot_3d(x0, xt, size, prob=prob)
     elif isinstance(manifold, Hypersphere) and manifold.dim == 2:
         fig = plot_3d(x0, xt, size, prob=prob)
     elif isinstance(manifold, _SpecialOrthogonalMatrices) and manifold.dim == 3:
         fig = plot_so3(x0, xt, size, prob=prob)
+    elif (
+        isinstance(manifold, ProductSameManifold)
+        and isinstance(manifold.manifold, Hypersphere)
+        and manifold.manifold.dim == 1
+        and manifold.dim == 2
+    ):
+        fig = plot_t2(x0, xt, size, prob=prob)
+    elif (
+        isinstance(manifold, ProductSameManifold)
+        and isinstance(manifold.manifold, Hypersphere)
+        and manifold.manifold.dim == 1
+        and manifold.dim == 1
+    ) or (isinstance(manifold, Hypersphere) and manifold.dim == 1):
+        fig = plot_t1(x0, xt, size, prob=prob)
+    elif (
+        isinstance(manifold, ProductSameManifold)
+        and isinstance(manifold.manifold, Hypersphere)
+        and manifold.manifold.dim == 1
+    ):
+        fig = plot_tn(x0, xt, size, prob=prob)
     else:
-        print('Only plotting over R^3, S^2 and SO(3) is implemented.')
+        print("Only plotting over R^3, S^2, S1/T1, T2, TN and SO(3) is implemented.")
         return None
     return fig

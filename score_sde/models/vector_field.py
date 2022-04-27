@@ -206,7 +206,7 @@ class LieAlgebraGenerator(VectorFieldGenerator):
     def __call__(self, x, t):
         x = x.reshape((x.shape[0], self.manifold.dim, self.manifold.dim))
         fi_fn, Xi_fn = self.decomposition
-        #TODO: what representation to use for NN's input?
+        # TODO: what representation to use for NN's input?
         x_input = x.reshape((*x.shape[:-2], -1))
         # x_input = self.manifold.vee(self.manifold.log(x)) #NOTE: extremly unstable
         fi, Xi = fi_fn(x_input, t), Xi_fn(x)
@@ -217,3 +217,40 @@ class LieAlgebraGenerator(VectorFieldGenerator):
         # is_tangent = self.manifold.is_tangent(out, x, atol=1e-3).all()
         # out = self.manifold.to_tangent(out, x)
         return out.reshape((x.shape[0], -1))
+
+
+# class ParallisableManifoldGenerator(VectorFieldGenerator):
+#     def __init__(self, architecture, embedding, output_shape, manifold):
+#         super().__init__(architecture, embedding, output_shape, manifold)
+
+#     @staticmethod
+#     def output_shape(manifold):
+#         return manifold.dim
+
+#     def _generators(self, x):
+#         return self.manifold.
+
+
+class TorusGenerator(VectorFieldGenerator):
+    def __init__(self, architecture, embedding, output_shape, manifold):
+        super().__init__(architecture, embedding, output_shape, manifold)
+
+        self.rot_mat = jnp.array([[0, -1], [1, 0]])
+
+    @staticmethod
+    def output_shape(manifold):
+        return manifold.dim
+
+    def _generators(self, x):
+        return (
+            self.rot_mat @ x.reshape((*x.shape[:-1], self.manifold.dim, 2))[..., None]
+        )[..., 0]
+
+    def __call__(self, x, t):
+        weights_fn, fields_fn = self.decomposition
+        weights = weights_fn(x, t)
+        fields = fields_fn(x)
+
+        return (fields * weights[..., None]).reshape(
+            (*x.shape[:-1], self.manifold.dim * 2)
+        )

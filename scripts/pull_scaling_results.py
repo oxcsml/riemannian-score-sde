@@ -4,6 +4,7 @@ import pandas as pd
 import wandb
 from datetime import datetime
 from scipy import stats
+import matplotlib.pyplot as plt
 
 api = wandb.Api()
 
@@ -13,8 +14,8 @@ api = wandb.Api()
 runs = api.runs(
     "oxcsml/diffusion_manifold",
     filters={
-        "createdAt": {"$gte": "2022-02-14T00:00:00.000Z"}
-        # 'config.name': 'fire's
+        "createdAt": {"$gte": "2022-02-14T00:00:00.000Z"},
+        "group": {"$regex": "testtn"},
     },
 )
 
@@ -64,20 +65,22 @@ def make_method(row):
         return "Stereo SGM"
     elif "cnf" in row["group"]:
         return "CNF"
-    else:
+    elif "rsgm" in row["group"]:
         return "RSGM"
+    else:
+        return "Oops!"
 
 
 runs_df["method"] = runs_df.apply(make_method, axis=1)
-runs_df["dataset"] = runs_df["config/dataset/_target_"].replace(
-    {
-        "riemannian_score_sde.datasets.earth.Flood": "Flood",
-        "riemannian_score_sde.datasets.earth.Earthquake": "Earthquake",
-        "riemannian_score_sde.datasets.earth.Fire": "Fire",
-        "riemannian_score_sde.datasets.earth.VolcanicErruption": "Volcano",
-        "score_sde.datasets.vMFDataset": "vMF",
-    }
-)
+# runs_df["dataset"] = runs_df["config/dataset/_target_"].replace(
+#     {
+#         "riemannian_score_sde.datasets.earth.Flood": "Flood",
+#         "riemannian_score_sde.datasets.earth.Earthquake": "Earthquake",
+#         "riemannian_score_sde.datasets.earth.Fire": "Fire",
+#         "riemannian_score_sde.datasets.earth.VolcanicErruption": "Volcano",
+#         "score_sde.datasets.vMFDataset": "vMF",
+#     }
+# )
 
 # %%
 pm_metric = "sem"
@@ -225,25 +228,65 @@ def make_table_from_metric(
 
 
 # %%
-val_table = make_table_from_metric("val/logp", runs_df)
-val_table
-# %%
-test_table = make_table_from_metric(
-    "test/logp", runs_df, val_metric="val/logp", drop_nans=True
+
+results = runs_df[
+    [
+        "group",
+        "method",
+        "config/n",
+        "config/architecture/hidden_shapes",
+        "train/total_time",
+        "val/logp",
+    ]
+]
+
+results = (
+    results.groupby(
+        by=["group", "method", "config/architecture/hidden_shapes", "config/n"]
+    )
+    .agg(
+        {
+            "train/total_time": ["mean", "std"],
+            "val/logp": ["mean", "std"],
+        }
+    )
+    .reset_index()
 )
-test_table
 
-# %%
-test_table = make_table_from_metric("test/logp", runs_df, val_metric="test/logp")
-test_table
-# %%
-make_table_from_metric("val/logp", runs_df, show_group=True).to_csv("best_configs.csv")
+results = results.sort_values(by="config/n")
+results = results.reset_index(drop=True)
+results = results[
+    [
+        "method",
+        "config/n",
+        "config/architecture/hidden_shapes",
+        "train/total_time",
+        "val/logp",
+    ]
+]
+results = results.set_index(['method', "config/architecture/hidden_shapes"])
+results
 # %%
 
-print(
-    make_table_from_metric(
-        "test/logp", runs_df, val_metric="val/logp", drop_nans=True
-    ).to_latex(escape=False)
-)
+fig, axes = plt.subplots(1, 2, figsize=(8, 4))
 
+for idx in results.index.unique():
+    df = results.loc[idx]
+    axes[0].errorbar(
+        df['config/n'],
+        df[('train/total_time', 'mean')],
+        yerr=df[('train/total_time', 'std')],
+        fmt='o',
+        label=idx,
+    )
+
+    axes[1].errorbar(
+        df['config/n'],
+        df[('val/logp', 'mean')],
+        yerr=df[('val/logp', 'std')],
+        label=idx,
+    )
+
+plt.legend(loc='upper center', bbox_to_anchor=(0.5,-0.1))
+plt.tight_layout()
 # %%
