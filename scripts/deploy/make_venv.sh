@@ -9,6 +9,6 @@ deactivate
 rm -rf $parent_dir
 mkdir $parent_dir
 
-virtualenv -p python3.8 $parent_dir/$venv
+virtualenv -p python3.9 $parent_dir/$venv
 source $parent_dir/$venv/bin/activate
 pip install -r requirements.txt
