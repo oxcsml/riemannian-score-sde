@@ -5,4 +5,4 @@ defaults:
   - /flow: moser
   - /pushf: moser
   - /loss: moser
-  - /generator: div_free
+  # - /generator: div_free
