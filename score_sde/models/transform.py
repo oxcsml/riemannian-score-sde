@@ -17,6 +17,7 @@ def get_likelihood_fn_w_transform(likelihood_fn, transform):
         log_abs_det_jacobian = transform.log_abs_det_jacobian(y, x)
         logp -= log_abs_det_jacobian
         return logp
+
     return log_prob
 
 
@@ -35,7 +36,7 @@ class Transform(abc.ABC):
 
     @abc.abstractmethod
     def log_abs_det_jacobian(self, x, y):
-        """ Computes the log det jacobian `log |dy/dx|` given input and output."""
+        """Computes the log det jacobian `log |dy/dx|` given input and output."""
 
 
 class ComposeTransform(Transform):
@@ -85,14 +86,15 @@ class ExpMap(Transform):
         super().__init__(Euclidean(manifold.dim), manifold)
         self.manifold = manifold
         self.base_point = manifold.identity if base_point is None else base_point
-        if (self.base_point == manifold.identity).all() and isinstance(manifold, MatrixLieGroup):
+        if (self.base_point == manifold.identity).all() and isinstance(
+            manifold, MatrixLieGroup
+        ):
             self.forward = lambda x: manifold.exp_from_identity(x)
             self.inverse = lambda y: manifold.log_from_identity(y)
         else:
             # self.manifold.metric.exp(x, base_point=self.base_point)
             self.forward = lambda x: manifold.exp(x, base_point=self.base_point)
             self.inverse = lambda y: manifold.log(y, base_point=self.base_point)
-
 
     def __call__(self, x):
         x = self.manifold.hat(x)
@@ -151,7 +153,7 @@ class RadialTanhTransform(Transform):
         self.radius = radius
 
     def __call__(self, x):
-        """ x -> tanh(||x||) x / ||x|| * R """
+        """x -> tanh(||x||) x / ||x|| * R"""
         # x_norm = jnp.linalg.norm(x, axis=-1, keepdims=True)
         # mask = x_norm > 1e-8
         # x_norm = jnp.where(mask, x_norm, jnp.ones_like(x_norm))
@@ -159,9 +161,7 @@ class RadialTanhTransform(Transform):
         #     mask, jnp.tanh(x_norm) * x / x_norm * self.radius, x * self.radius
         # )
         x_sq_norm = jnp.sum(jnp.square(x), axis=-1, keepdims=True)
-        tanh_ratio = utils.taylor_exp_even_func(
-            x_sq_norm, utils.tanh_close_0, order=5
-        )
+        tanh_ratio = utils.taylor_exp_even_func(x_sq_norm, utils.tanh_close_0, order=5)
         return tanh_ratio * x * self.radius
 
     def inv(self, y):
@@ -177,12 +177,15 @@ class RadialTanhTransform(Transform):
         #     mask, jnp.arctanh(y_norm / self.radius) * y / y_norm, y / self.radius
         # )#.to(org_dtype)
         y_sq_norm = jnp.sum(jnp.square(y), axis=-1, keepdims=True)
-        y_sq_norm = y_sq_norm / (self.radius ** 2)
+        y_sq_norm = y_sq_norm / (self.radius**2)
         # y_sq_norm = jnp.clip(y_sq_norm, a_max=1)
-        y_sq_norm = jnp.clip(y_sq_norm, a_max=1-1e-7)
+        # print("y_sq_norm", y_sq_norm)
+        y_sq_norm = jnp.clip(y_sq_norm, a_max=1 - 1e-7)
+        # print("y_sq_norm", y_sq_norm)
         arctanh = utils.taylor_exp_even_func(
             y_sq_norm, utils.arctanh_card_close_0, order=5
         )
+        # print("arctanh", arctanh)
         return arctanh * y / self.radius
 
     def log_abs_det_jacobian(self, x, y):
@@ -194,7 +197,7 @@ class RadialTanhTransform(Transform):
         :return: Tensor
         """
         x_sq_norm = jnp.sum(jnp.square(x), axis=-1)
-        x_norm = jnp.sqrt(x_sq_norm) #jnp.linalg.norm(x, axis=-1)
+        x_norm = jnp.sqrt(x_sq_norm)  # jnp.linalg.norm(x, axis=-1)
         dim = x.shape[-1]
         # tanh = jnp.tanh(x_norm)
         # term1 = -jnp.log(x_norm / tanh)
@@ -203,12 +206,10 @@ class RadialTanhTransform(Transform):
             x_sq_norm, utils.log1p_m_tanh_sq_close_0, order=5
         )
         # term1 = - jnp.log(utils.taylor_exp_even_func(
-            # x_sq_norm, utils.inv_tanh_close_0, order=5
+        # x_sq_norm, utils.inv_tanh_close_0, order=5
         # ))
         # return jnp.where(x_norm > 1e-8, out, log_radius)
-        term1 = utils.taylor_exp_even_func(
-            x_sq_norm, utils.log_tanh_close_0, order=4
-        )
+        term1 = utils.taylor_exp_even_func(x_sq_norm, utils.log_tanh_close_0, order=4)
 
         log_radius = math.log(self.radius) * jnp.ones_like(x_norm)
         out = dim * log_radius + (dim - 1) * term1 + term2

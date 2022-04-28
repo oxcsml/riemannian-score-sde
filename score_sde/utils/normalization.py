@@ -88,7 +88,7 @@ def compute_normalization(likelihood_fn, manifold, z=None, N=None, eps=0.):
         N = N if N is not None else 200
         xs, volume, lambda_x = get_spherical_grid(N, eps)
     elif isinstance(manifold, _SpecialOrthogonalMatrices) and manifold.dim == 3:
-        N = N if N is not None else 50
+        N = N if N is not None else 30
         xs, volume, lambda_x = get_so3_grid(N, eps=1e-3)
     else:
         print('Only integration over R^d, S^2 and SO(3) is implemented.')
