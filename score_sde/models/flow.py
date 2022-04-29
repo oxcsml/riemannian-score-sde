@@ -34,8 +34,7 @@ def div_noise(
         epsilon = jax.random.normal(rng, shape)
     elif hutchinson_type == "Rademacher":
         epsilon = (
-            jax.random.randint(rng, shape, minval=0, maxval=2).astype(jnp.float32) * 2
-            - 1
+            jax.random.randint(rng, shape, minval=0, maxval=2).astype(jnp.float32) * 2 - 1
         )
     elif hutchinson_type == "None":
         epsilon = None
