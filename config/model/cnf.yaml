@@ -5,4 +5,4 @@ defaults:
   - /flow: cnf
   - /pushf: cnf
   - /loss: logp
-  - /generator: div_free
+  # - /generator: div_free
