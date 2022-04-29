@@ -185,19 +185,6 @@ class ReverseWrapper:
 
     def __call__(self, x: jnp.ndarray, t: jnp.ndarray, z: jnp.ndarray, *args, **kwargs):
         states = self.module(x, self.tf - t, z, *args, **kwargs)
-        # print("ReverseWrapper")
-        # print(states.shape)
-        # print(states[0].shape)
-        # print(states[1:].shape)
-        # print("states")
-        # print(states[..., :-1].shape)
-        # print(states[..., [-1]].shape)
-        # print(
-        #     "output",
-        #     jnp.concatenate([-states[..., :-1], states[..., [-1]]], axis=1).shape,
-        # )
-        # raise
-        # return tuple([-states[0], *states[1:]])
         return jnp.concatenate([-states[..., :-1], states[..., [-1]]], axis=1)
 
 
@@ -267,7 +254,9 @@ class CNF:
             ################ .ode.odeint ###############
             elif self.backend == "jax":
 
-                def ode_func(x: jnp.ndarray, t: jnp.ndarray, params, states) -> np.array:
+                def ode_func(
+                    x: jnp.ndarray, t: jnp.ndarray, z: jnp.ndarray, params, states
+                ) -> np.array:
                     sample = x[:, :-1]  # .reshape(shape)
                     vec_t = jnp.ones((sample.shape[0],)) * t
                     drift_fn = self.get_drift_fn(model, params, states)
@@ -281,7 +270,7 @@ class CNF:
                 data = data.reshape(shape[0], -1)
                 init = jnp.concatenate([data, np.zeros((shape[0], 1))], axis=1)
                 ode_func = ReverseWrapper(ode_func, tf) if reverse else ode_func
-                y, nfe = odeint(ode_func, init, ts, params, states, **ode_kwargs)
+                y, nfe = odeint(ode_func, init, ts, z, params, states, **ode_kwargs)
                 z = y[-1, ..., :-1].reshape(shape)
                 delta_logp = y[-1, ..., -1]
             else:
