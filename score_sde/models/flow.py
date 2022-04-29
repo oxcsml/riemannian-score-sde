@@ -183,9 +183,22 @@ class ReverseWrapper:
         self.module = module
         self.tf = tf
 
-    def __call__(self, x: jnp.ndarray, t: jnp.ndarray, *args, **kwargs):
-        states = self.module(x, self.tf - t, *args, **kwargs)
-        return tuple([-states[0], *states[1:]])
+    def __call__(self, x: jnp.ndarray, t: jnp.ndarray, z: jnp.ndarray, *args, **kwargs):
+        states = self.module(x, self.tf - t, z, *args, **kwargs)
+        # print("ReverseWrapper")
+        # print(states.shape)
+        # print(states[0].shape)
+        # print(states[1:].shape)
+        # print("states")
+        # print(states[..., :-1].shape)
+        # print(states[..., [-1]].shape)
+        # print(
+        #     "output",
+        #     jnp.concatenate([-states[..., :-1], states[..., [-1]]], axis=1).shape,
+        # )
+        # raise
+        # return tuple([-states[0], *states[1:]])
+        return jnp.concatenate([-states[..., :-1], states[..., [-1]]], axis=1)
 
 
 class CNF:
