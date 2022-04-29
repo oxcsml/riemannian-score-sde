@@ -14,19 +14,19 @@ from .flow import div_noise
 def get_div_fn(fi_fn, Xi, hutchinson_type: str):
     """Pmapped divergence of the drift function."""
     if hutchinson_type == "None":
-        return lambda x, t, eps: get_exact_div_fn(fi_fn, Xi)(x, t)
+        return lambda x, t, z, eps: get_exact_div_fn(fi_fn, Xi)(x, t, z)
     else:
-        return lambda x, t, eps: get_estimate_div_fn(fi_fn, Xi)(x, t, eps)
+        return lambda x, t, z, eps: get_estimate_div_fn(fi_fn, Xi)(x, t, z, eps)
 
 
 def get_estimate_div_fn(fi_fn, Xi=None):
     """Create the divergence function of `fn` using the Hutchinson-Skilling trace estimator."""
 
-    def div_fn(x: jnp.ndarray, t: float, eps: jnp.ndarray):
+    def div_fn(x: jnp.ndarray, t: float, z: jnp.ndarray, eps: jnp.ndarray):
         # grad_fn = lambda data: jnp.sum(fi_fn(data, t) * eps)
         # grad_fn_eps = jax.grad(grad_fn)(x)
         def grad_fn(data):
-            fi = fi_fn(data, t)
+            fi = fi_fn(data, t, z)
             return jnp.sum(fi * eps), fi
 
         (_, fi), grad_fn_eps = jax.value_and_grad(grad_fn, has_aux=True)(x)
@@ -47,6 +47,7 @@ def get_exact_div_fn(fi_fn, Xi=None):
     def div_fn(
         x: jnp.ndarray,
         t: float,
+        z: jnp.array = None,
     ):
         if len(t.shape) == len(x.shape) - 1:
             # Assume t is just missing the last dim of x
@@ -55,7 +56,7 @@ def get_exact_div_fn(fi_fn, Xi=None):
         x_shape = x.shape
         x = jnp.expand_dims(x.reshape((-1, x_shape[-1])), 1)
         t = jnp.expand_dims(t.reshape((-1, t.shape[-1])), 1)
-        jac = jax.vmap(jax.jacrev(fi_fn, argnums=0))(x, t)
+        jac = jax.vmap(jax.jacrev(fi_fn, argnums=0))(x, t, z)
         jac = jac.reshape([*x_shape[:-1], -1, x_shape[-1]])
         # G = manifold.metric.metric_matrix(x)
         # Xi = jnp.einsum('...ij,...jk->...ik', G, Xi(x))

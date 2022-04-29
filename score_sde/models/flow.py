@@ -181,9 +181,9 @@ class ReverseWrapper:
         self.module = module
         self.tf = tf
 
-    def __call__(self, x: jnp.ndarray, t: jnp.ndarray, *args, **kwargs):
-        states = self.module(x, self.tf - t, *args, **kwargs)
-        return tuple([-states[0], *states[1:]])
+    def __call__(self, x: jnp.ndarray, t: jnp.ndarray, z: jnp.ndarray, *args, **kwargs):
+        states = self.module(x, self.tf - t, z, *args, **kwargs)
+        return jnp.concatenate([-states[..., :-1], states[..., [-1]]], axis=1)
 
 
 class CNF:
@@ -225,35 +225,36 @@ class CNF:
 
             ############## scipy.integrate #############
             if self.backend == "scipy":  # or not train: # TODO: Issue??
-                drift_fn = jax.jit(self.get_drift_fn(model, params, states))
-                div_fn = jax.jit(get_div_fn(drift_fn, hutchinson_type))
+                raise NotImplementedError("woops, don't do this")
+                # drift_fn = jax.jit(self.get_drift_fn(model, params, states))
+                # div_fn = jax.jit(get_div_fn(drift_fn, hutchinson_type))
 
-                def ode_func(t: float, x: jnp.ndarray) -> np.array:
-                    sample = from_flattened_numpy(x[: -shape[0]], shape)
-                    vec_t = jnp.ones((sample.shape[0],)) * t
-                    drift = to_flattened_numpy(drift_fn(sample, vec_t))
-                    logp_grad = to_flattened_numpy(div_fn(sample, vec_t, epsilon))
-                    return np.concatenate([drift, logp_grad], axis=0)
+                # def ode_func(t: float, x: jnp.ndarray, z: jnp.ndarray) -> np.array:
+                #     sample = from_flattened_numpy(x[: -shape[0]], shape)
+                #     vec_t = jnp.ones((sample.shape[0],)) * t
+                #     drift = to_flattened_numpy(drift_fn(sample, vec_t))
+                #     logp_grad = to_flattened_numpy(div_fn(sample, vec_t, epsilon))
+                #     return np.concatenate([drift, logp_grad], axis=0)
 
-                init = jnp.concatenate(
-                    [to_flattened_numpy(data), np.zeros((shape[0],))], axis=0
-                )
-                if reverse:
-                    raise NotImplementedError("Reverse does not work w scipy")
-                solution = integrate.solve_ivp(
-                    ode_func, ts, init, **ode_kwargs, method="RK45"
-                )
+                # init = jnp.concatenate(
+                #     [to_flattened_numpy(data), np.zeros((shape[0],))], axis=0
+                # )
+                # if reverse:
+                #     raise NotImplementedError("Reverse does not work w scipy")
+                # solution = integrate.solve_ivp(
+                #     ode_func, ts, init, **ode_kwargs, method="RK45"
+                # )
 
-                nfe = solution.nfev
-                zp = jnp.asarray(solution.y[:, -1])
-                z = from_flattened_numpy(zp[: -shape[0]], shape)
-                delta_logp = zp[-shape[0] :]  # .reshape((shape[0], shape[1]))
+                # nfe = solution.nfev
+                # zp = jnp.asarray(solution.y[:, -1])
+                # z = from_flattened_numpy(zp[: -shape[0]], shape)
+                # delta_logp = zp[-shape[0] :]  # .reshape((shape[0], shape[1]))
 
             ################ .ode.odeint ###############
             elif self.backend == "jax":
 
                 def ode_func(
-                    x: jnp.ndarray, t: jnp.ndarray, params, states
+                    x: jnp.ndarray, t: jnp.ndarray, z: jnp.ndarray, params, states
                 ) -> np.array:
                     sample = x[:, :-1]  # .reshape(shape)
                     vec_t = jnp.ones((sample.shape[0],)) * t
@@ -268,12 +269,12 @@ class CNF:
                 data = data.reshape(shape[0], -1)
                 init = jnp.concatenate([data, np.zeros((shape[0], 1))], axis=1)
                 ode_func = ReverseWrapper(ode_func, tf) if reverse else ode_func
-                y, nfe = odeint(ode_func, init, ts, params, states, **ode_kwargs)
+                y, nfe = odeint(ode_func, init, ts, z, params, states, **ode_kwargs)
                 z = y[-1, ..., :-1].reshape(shape)
                 delta_logp = y[-1, ..., -1]
             else:
                 raise ValueError(f"{self.backend} is not a valid option.")
-            print(f"nfe: {nfe}")
+            # print(f"nfe: {nfe}")
             return z, delta_logp
 
         return forward
