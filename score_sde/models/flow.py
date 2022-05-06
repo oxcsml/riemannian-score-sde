@@ -103,7 +103,6 @@ class PushForward:
 
     def get_log_prob(self, model_w_dicts, train=False):
         def log_prob(rng, y, **kwargs):
-            # NOTE: Can/should we jit flow?
             flow = self.flow.get_forward(model_w_dicts, train)
             x, inv_logdets = flow(rng, y, **kwargs)  # NOTE: flow is not reversed
             log_prob = self.base.log_prob(x).reshape(-1)
@@ -113,11 +112,12 @@ class PushForward:
         return log_prob
 
     def get_sample(self, model_w_dicts, train=False):
-        def sample(rng, shape, **kwargs):
-            x = self.base.sample(rng, shape)
+        def sample(rng, shape, z, x=None, reverse=True, **kwargs):
+            x = self.base.sample(rng, shape) if x is None else x
             flow = self.flow.get_forward(model_w_dicts, train)
+            # flow = jax.jit(flow)
             y, inv_logdets = flow(
-                rng, x, reverse=True, **kwargs
+                rng, x, z, reverse=reverse, **kwargs
             )  # NOTE: flow is reversed
             # log_prob = self.base.log_prob(x)
             # log_prob += inv_logdets.reshape(log_prob.shape)
@@ -143,11 +143,12 @@ class SDEPushForward(PushForward):
             return super().get_sample(model_w_dicts, train)
         elif diffeq == "sde":
 
-            def sample(rng, shape, z, **kwargs):
-                x = self.base.sample(rng, shape)
+            def sample(rng, shape, z, x=None, reverse=True, **kwargs):
+                x = self.base.sample(rng, shape) if x is None else x
                 score_fn = get_score_fn(self.sde, *model_w_dicts)
                 score_fn = partial(score_fn, z=z)
-                sampler = get_pc_sampler(self.sde.reverse(score_fn), **kwargs)
+                sde = self.sde.reverse(score_fn) if reverse else self.sde
+                sampler = get_pc_sampler(sde, **kwargs)
                 sampler = jax.jit(sampler)
                 return sampler(rng, x)
 
@@ -168,7 +169,7 @@ class MoserFlow(PushForward):
             x = y
             drift_fn = get_ode_drift_fn(*model_w_dicts)
             div_fn = get_div_fn(drift_fn, hutchinson_type="None")
-            t0 = jnp.zeros((*x.shape[:-1],))
+            t0 = jnp.zeros((x.shape[0], 1))
             # div_u = div_fn(x, t0, None)
             div_u = div_fn(x, t0, z, None)
             base_prob = jnp.exp(self.base.log_prob(x)).reshape(-1)
@@ -225,56 +226,56 @@ class CNF:
 
             drift_fn = self.get_drift_fn(model, params, states)
 
-            ############## scipy.integrate #############
-            if self.backend == "scipy":  # or not train: # TODO: Issue??
-                drift_fn = jax.jit(self.get_drift_fn(model, params, states))
-                div_fn = jax.jit(get_div_fn(drift_fn, hutchinson_type))
+            # ############## scipy.integrate #############
+            # if self.backend == "scipy":  # or not train: # TODO: Issue??
+            #     drift_fn = jax.jit(self.get_drift_fn(model, params, states))
+            #     div_fn = jax.jit(get_div_fn(drift_fn, hutchinson_type))
 
-                def ode_func(t: float, x: jnp.ndarray) -> np.array:
-                    sample = from_flattened_numpy(x[: -shape[0]], shape)
-                    vec_t = jnp.ones((sample.shape[0],)) * t
-                    drift = to_flattened_numpy(drift_fn(sample, vec_t))
-                    logp_grad = to_flattened_numpy(div_fn(sample, vec_t, epsilon))
-                    return np.concatenate([drift, logp_grad], axis=0)
+            #     def ode_func(t: float, x: jnp.ndarray) -> np.array:
+            #         sample = from_flattened_numpy(x[: -shape[0]], shape)
+            #         vec_t = jnp.ones((sample.shape[0],)) * t
+            #         drift = to_flattened_numpy(drift_fn(sample, vec_t))
+            #         logp_grad = to_flattened_numpy(div_fn(sample, vec_t, epsilon))
+            #         return np.concatenate([drift, logp_grad], axis=0)
 
-                init = jnp.concatenate(
-                    [to_flattened_numpy(data), np.zeros((shape[0],))], axis=0
-                )
-                if reverse:
-                    raise NotImplementedError("Reverse does not work w scipy")
-                solution = integrate.solve_ivp(
-                    ode_func, ts, init, **ode_kwargs, method="RK45"
-                )
+            #     init = jnp.concatenate(
+            #         [to_flattened_numpy(data), np.zeros((shape[0],))], axis=0
+            #     )
+            #     if reverse:
+            #         raise NotImplementedError("Reverse does not work w scipy")
+            #     solution = integrate.solve_ivp(
+            #         ode_func, ts, init, **ode_kwargs, method="RK45"
+            #     )
 
-                nfe = solution.nfev
-                zp = jnp.asarray(solution.y[:, -1])
-                z = from_flattened_numpy(zp[: -shape[0]], shape)
-                delta_logp = zp[-shape[0] :]  # .reshape((shape[0], shape[1]))
+            #     nfe = solution.nfev
+            #     zp = jnp.asarray(solution.y[:, -1])
+            #     z = from_flattened_numpy(zp[: -shape[0]], shape)
+            #     delta_logp = zp[-shape[0] :]  # .reshape((shape[0], shape[1]))
 
-            ################ .ode.odeint ###############
-            elif self.backend == "jax":
+            # ################ .ode.odeint ###############
+            # elif self.backend == "jax":
 
-                def ode_func(
-                    x: jnp.ndarray, t: jnp.ndarray, z: jnp.ndarray, params, states
-                ) -> np.array:
-                    sample = x[:, :-1]  # .reshape(shape)
-                    vec_t = jnp.ones((sample.shape[0],)) * t
-                    drift_fn = self.get_drift_fn(model, params, states)
-                    drift_fn = jax.jit(drift_fn)  # TODO: useless?
-                    drift = drift_fn(sample, vec_t, z)
-                    div_fn = get_div_fn(drift_fn, hutchinson_type)
-                    div_fn = jax.jit(div_fn)  # TODO: useless?
-                    logp_grad = div_fn(sample, vec_t, z, epsilon).reshape([shape[0], 1])
-                    return jnp.concatenate([drift, logp_grad], axis=1)
+            def ode_func(
+                x: jnp.ndarray, t: jnp.ndarray, z: jnp.ndarray, params, states
+            ) -> np.array:
+                sample = x[:, :-1]  # .reshape(shape)
+                vec_t = jnp.ones((sample.shape[0],)) * t
+                drift_fn = self.get_drift_fn(model, params, states)
+                drift_fn = jax.jit(drift_fn)  # TODO: useless?
+                drift = drift_fn(sample, vec_t, z)
+                div_fn = get_div_fn(drift_fn, hutchinson_type)
+                div_fn = jax.jit(div_fn)  # TODO: useless?
+                logp_grad = div_fn(sample, vec_t, z, epsilon).reshape([shape[0], 1])
+                return jnp.concatenate([drift, logp_grad], axis=1)
 
-                data = data.reshape(shape[0], -1)
-                init = jnp.concatenate([data, np.zeros((shape[0], 1))], axis=1)
-                ode_func = ReverseWrapper(ode_func, tf) if reverse else ode_func
-                y, nfe = odeint(ode_func, init, ts, z, params, states, **ode_kwargs)
-                z = y[-1, ..., :-1].reshape(shape)
-                delta_logp = y[-1, ..., -1]
-            else:
-                raise ValueError(f"{self.backend} is not a valid option.")
+            data = data.reshape(shape[0], -1)
+            init = jnp.concatenate([data, np.zeros((shape[0], 1))], axis=1)
+            ode_func = ReverseWrapper(ode_func, tf) if reverse else ode_func
+            y, nfe = odeint(ode_func, init, ts, z, params, states, **ode_kwargs)
+            z = y[-1, ..., :-1].reshape(shape)
+            delta_logp = y[-1, ..., -1]
+            # else:
+            #     raise ValueError(f"{self.backend} is not a valid option.")
             print(f"nfe: {nfe}")
             return z, delta_logp
 

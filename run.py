@@ -13,10 +13,11 @@ import numpy as np
 import haiku as hk
 import optax
 from tqdm import tqdm
+from score_sde.models.flow import SDEPushForward
 
 from score_sde.utils import TrainState, save, restore
 from score_sde.utils.loggers_pl import LoggerCollection, Logger
-from score_sde.utils.vis import plot, earth_plot
+from score_sde.utils.vis import plot, earth_plot, plot_ref
 from score_sde.models import get_likelihood_fn_w_transform
 from score_sde.datasets import (
     random_split,
@@ -74,6 +75,7 @@ def run(cfg):
                 eval_time = timer()
                 evaluate(train_state, "val", step)
                 logger.log_metrics({"val/time_per_it": (timer() - eval_time)}, step)
+                generate_plots(train_state, "val", step=step)
                 train_time = timer()
 
         logger.log_metrics({"train/total_time": total_train_time}, step)
@@ -122,8 +124,8 @@ def run(cfg):
         rng = jax.random.PRNGKey(cfg.seed)
         dataset = eval_ds if stage == "eval" else test_ds
 
-        M = 32
-        # M = 2
+        # M = 32
+        M = 8
         x0, y0 = get_data_per_context(dataset, transform, M)
         ## p_0 (backward)
 
@@ -152,6 +154,14 @@ def run(cfg):
 
         plt = plot(data_manifold, x0, xs)  # prob=jnp.exp(likelihood_fn(x)
         logger.log_plot(f"x0_backw", plt, cfg.steps)
+
+        if isinstance(pushforward, SDEPushForward):
+            # sampler = jax.jit(get_pc_sampler(pushforward.sde, N=100))
+            sampler = pushforward.get_sample(model_w_dicts, train=False)
+            x = transform.inv(x0[0])
+            zT = sampler(rng, None, z, x=x, reverse=False, N=100, eps=cfg.eps)
+            plt = plot_ref(model_manifold, zT)
+            logger.log_plot(f"xT", plt, cfg.steps)
 
     ### Main
     # jax.config.update("jax_enable_x64", True)

@@ -1,8 +1,8 @@
 _target_: riemannian_score_sde.datasets.simple.Wrapped
 _convert_: partial
 mean: unif
-scale: 0.2
-K: 1
+scale: 100
+K: 4
 batch_dims:
   - ${batch_size}
 manifold: ${manifold}

@@ -13,8 +13,8 @@ defaults:
 
 data_dir: /data/ziz/not-backed-up/scratch/score-sde/data/
 
-dataset:
-  scale: 10
+# dataset:
+  # scale: 10
   # conditional: true
   # K: 4
 
@@ -22,12 +22,12 @@ flow:
   t0: 0
   tf: 1
   beta_0: 0.001
-  beta_f: 5
+  beta_f: 8
 
 splits: [0.8, 0.1, 0.1]
 batch_size: 512
 warmup_steps: 100
-steps: 50000
+steps: 20000
 val_freq: 1000
 ema_rate: 0.999
 eps: 1e-3

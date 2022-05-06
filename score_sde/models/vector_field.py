@@ -1,6 +1,7 @@
 import abc
 from typing import Sequence
 
+import numpy as np
 import jax
 import haiku as hk
 import jax.numpy as jnp
@@ -8,6 +9,7 @@ import jax.numpy as jnp
 from hydra.utils import instantiate
 from geomstats.geometry.hypersphere import Hypersphere
 from geomstats.geometry.base import VectorSpace, EmbeddedManifold
+from geomstats.geometry.matrices import Matrices
 from .flow import div_noise
 
 
@@ -19,49 +21,68 @@ def get_div_fn(fi_fn, Xi, hutchinson_type: str):
         return lambda x, t, eps: get_estimate_div_fn(fi_fn, Xi)(x, t, eps)
 
 
-def get_estimate_div_fn(fi_fn, Xi=None):
-    """Create the divergence function of `fn` using the Hutchinson-Skilling trace estimator."""
+# def get_estimate_div_fn(fi_fn, Xi=None):
+#     """Create the divergence function of `fn` using the Hutchinson-Skilling trace estimator."""
 
-    def div_fn(x: jnp.ndarray, t: float, eps: jnp.ndarray):
-        # grad_fn = lambda data: jnp.sum(fi_fn(data, t) * eps)
-        # grad_fn_eps = jax.grad(grad_fn)(x)
-        def grad_fn(data):
-            fi = fi_fn(data, t)
-            return jnp.sum(fi * eps), fi
+#     def div_fn(x: jnp.ndarray, t: float, eps: jnp.ndarray):
+#         # grad_fn = lambda data: jnp.sum(fi_fn(data, t) * eps)
+#         # grad_fn_eps = jax.grad(grad_fn)(x)
+#         def grad_fn(data):
+#             fi = fi_fn(data, t)
+#             return jnp.sum(fi * eps), fi
 
-        (_, fi), grad_fn_eps = jax.value_and_grad(grad_fn, has_aux=True)(x)
-        # out = grad_fn_eps * G(x) @ Xi * eps
-        # G = manifold.metric.metric_matrix(x)
-        # Xi = jnp.einsum('...ij,...jk->...ik', G, Xi)
-        if Xi is not None:
-            grad_fn_eps = jnp.einsum("...d,...dn->...n", grad_fn_eps, Xi)
-        div = jnp.sum(grad_fn_eps * eps, axis=tuple(range(1, len(x.shape))))
-        return div, fi
+#         (_, fi), grad_fn_eps = jax.value_and_grad(grad_fn, has_aux=True)(x)
+#         # out = grad_fn_eps * G(x) @ Xi * eps
+#         # G = manifold.metric.metric_matrix(x)
+#         # Xi = jnp.einsum('...ij,...jk->...ik', G, Xi)
+#         if Xi is not None:
+#             grad_fn_eps = jnp.einsum("...d,...dn->...n", grad_fn_eps, Xi)
+#         div = jnp.sum(grad_fn_eps * eps, axis=tuple(range(1, len(x.shape))))
+#         return div, fi
 
-    return div_fn
+#     return div_fn
+
+
+# def get_exact_div_fn(fi_fn, Xi=None):
+#     "flatten all but the last axis and compute the true divergence"
+
+#     def div_fn(
+#         x: jnp.ndarray,
+#         t: float,
+#     ):
+#         if len(t.shape) == len(x.shape) - 1:
+#             # Assume t is just missing the last dim of x
+#             t = jnp.expand_dims(t, axis=-1)
+
+#         x_shape = x.shape
+#         x = jnp.expand_dims(x.reshape((-1, x_shape[-1])), 1)
+#         t = jnp.expand_dims(t.reshape((-1, t.shape[-1])), 1)
+#         jac = jax.vmap(jax.jacrev(fi_fn, argnums=0))(x, t)
+#         jac = jac.reshape([*x_shape[:-1], -1, x_shape[-1]])
+#         # G = manifold.metric.metric_matrix(x)
+#         # Xi = jnp.einsum('...ij,...jk->...ik', G, Xi(x))
+#         if Xi is not None:
+#             jac = jnp.einsum("...nd,...dm->...nm", jac, Xi)
+#         div = jnp.trace(jac, axis1=-1, axis2=-2).reshape(x_shape[:-1])
+#         return div
+
+#     return div_fn
 
 
 def get_exact_div_fn(fi_fn, Xi=None):
     "flatten all but the last axis and compute the true divergence"
 
-    def div_fn(
-        x: jnp.ndarray,
-        t: float,
-    ):
-        if len(t.shape) == len(x.shape) - 1:
-            # Assume t is just missing the last dim of x
-            t = jnp.expand_dims(t, axis=-1)
-
+    def div_fn(x: jnp.ndarray, t: float):
         x_shape = x.shape
-        x = jnp.expand_dims(x.reshape((-1, x_shape[-1])), 1)
-        t = jnp.expand_dims(t.reshape((-1, t.shape[-1])), 1)
+        dim = np.prod(x_shape[1:])
+        t = jnp.expand_dims(t.reshape(-1), axis=-1)
+        x = jnp.expand_dims(x, 1)  # NOTE: need leading batch dim after vmap
+        t = jnp.expand_dims(t, 1)
         jac = jax.vmap(jax.jacrev(fi_fn, argnums=0))(x, t)
-        jac = jac.reshape([*x_shape[:-1], -1, x_shape[-1]])
-        # G = manifold.metric.metric_matrix(x)
-        # Xi = jnp.einsum('...ij,...jk->...ik', G, Xi(x))
+        jac = jac.reshape([x_shape[0], dim, dim])
         if Xi is not None:
             jac = jnp.einsum("...nd,...dm->...nm", jac, Xi)
-        div = jnp.trace(jac, axis1=-1, axis2=-2).reshape(x_shape[:-1])
+        div = jnp.trace(jac, axis1=-1, axis2=-2)  # .reshape(x_shape[:-1])
         return div
 
     return div_fn
@@ -201,12 +222,12 @@ class LieAlgebraGenerator(VectorFieldGenerator):
         return manifold.dim
 
     def _generators(self, x):
-        return self.manifold.lie_algebra.basis
+        return self.manifold.lie_algebra.basis  # / jnp.sqrt(2)
 
     def __call__(self, x, t):
         x = x.reshape((x.shape[0], self.manifold.dim, self.manifold.dim))
         fi_fn, Xi_fn = self.decomposition
-        #TODO: what representation to use for NN's input?
+        # TODO: what representation to use for NN's input?
         x_input = x.reshape((*x.shape[:-2], -1))
         # x_input = self.manifold.vee(self.manifold.log(x)) #NOTE: extremly unstable
         fi, Xi = fi_fn(x_input, t), Xi_fn(x)
@@ -217,3 +238,34 @@ class LieAlgebraGenerator(VectorFieldGenerator):
         # is_tangent = self.manifold.is_tangent(out, x, atol=1e-3).all()
         # out = self.manifold.to_tangent(out, x)
         return out.reshape((x.shape[0], -1))
+
+    def div_split(self, x, t, hutchinson_type):
+        """Returns div(X) = Xi(fi) + fi div(Xi)"""
+        fi_fn, Xi_fn = self.decomposition
+        Xi = Xi_fn(x)
+        assert hutchinson_type == "None"
+        # print("Xi", Xi.shape)
+        # print("x", x.shape)
+        # print("t", t.shape)
+        # fi = fi_fn(x.reshape((x.shape[0], -1)), t)
+        # print("fi", fi.shape)
+        out = 0.0
+        for k in range(self.manifold.dim):
+            fn = lambda x, t: fi_fn(x, t)[..., k]
+            grad_fn = jax.vmap(jax.grad(fn, argnums=0))
+            grad = grad_fn(x.reshape((x.shape[0], -1)), t).reshape(x.shape)
+            print("grad", grad.shape)
+            grad = self.manifold.compose(self.manifold.inverse(x), grad)
+            grad = self.manifold.to_tangent(grad, self.manifold.identity)
+            is_tangent = self.manifold.is_tangent(grad, self.manifold.identity).all()
+            print("is_tangent", is_tangent.item())
+            out_k = self.manifold.metric.inner_product(grad, Xi[..., k])
+            # out_k = Matrices.frobenius_product(grad, Xi[..., k])
+            print("out_k", out_k[5])
+            out_k2 = self.manifold.vee(grad)[..., k]
+            print("out_k2", out_k2[5])
+            out_k3 = jnp.inner(self.manifold.vee(grad), self.manifold.vee(Xi[..., k]))
+            print("out_k3", out_k3[5])
+            out += out_k
+
+        return out

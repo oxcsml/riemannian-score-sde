@@ -20,7 +20,7 @@ def get_dsm_loss_fn(
     reduce_mean: bool = True,
     like_w: bool = True,
     eps: float = 1e-3,
-    s_zero = True,
+    s_zero=True,
     **kwargs
 ):
     sde = pushforward.sde
@@ -40,9 +40,7 @@ def get_dsm_loss_fn(
 
         rng, step_rng = random.split(rng)
         # uniformly sample from SDE timeframe
-        t = random.uniform(
-            step_rng, (x_0.shape[0],), minval=sde.t0 + eps, maxval=sde.tf
-        )
+        t = random.uniform(step_rng, (x_0.shape[0],), minval=sde.t0 + eps, maxval=sde.tf)
         rng, step_rng = random.split(rng)
 
         # sample p(x_t | x_0)
@@ -50,15 +48,19 @@ def get_dsm_loss_fn(
         if s_zero:  # l_{t|0}
             x_t = sde.marginal_sample(step_rng, x_0, t)
             if "n_max" in kwargs and kwargs["n_max"] <= -1:
-                get_logp_grad = lambda x_0, x_t, t: \
-                    sde.varhadan_exp(x_0, x_t, jnp.zeros_like(t), t)[1]
+                get_logp_grad = lambda x_0, x_t, t: sde.varhadan_exp(
+                    x_0, x_t, jnp.zeros_like(t), t
+                )[1]
             else:
-                get_logp_grad = lambda x_0, x_t, t: \
-                    sde.grad_marginal_log_prob(x_0, x_t, t, **kwargs)[1]
+                get_logp_grad = lambda x_0, x_t, t: sde.grad_marginal_log_prob(
+                    x_0, x_t, t, **kwargs
+                )[1]
             logp_grad = get_logp_grad(x_0, x_t, t)
             std = jnp.expand_dims(sde.marginal_prob(jnp.zeros_like(x_t), t)[1], -1)
-        else:      # l_{t|s}
-            x_t, x_hist, timesteps = sde.marginal_sample(step_rng, x_0, t, return_hist=True)
+        else:  # l_{t|s}
+            x_t, x_hist, timesteps = sde.marginal_sample(
+                step_rng, x_0, t, return_hist=True
+            )
             x_s = x_hist[-2]
             delta_t, logp_grad = sde.varhadan_exp(x_s, x_t, timesteps[-2], timesteps[-1])
             delta_t = t  # NOTE: works better?
@@ -108,9 +110,7 @@ def get_ism_loss_fn(
         x_0, z = batch["data"], batch["context"]
 
         rng, step_rng = random.split(rng)
-        t = random.uniform(
-            step_rng, (x_0.shape[0],), minval=sde.t0 + eps, maxval=sde.tf
-        )
+        t = random.uniform(step_rng, (x_0.shape[0],), minval=sde.t0 + eps, maxval=sde.tf)
 
         rng, step_rng = random.split(rng)
         x_t = sde.marginal_sample(step_rng, x_0, t)
@@ -158,7 +158,7 @@ def get_moser_loss_fn(
         def mu(x):
             prob_base = jnp.exp(pushforward.base.log_prob(x))
             # x = x.reshape(-1, *x.shape)
-            t = jnp.zeros((*x.shape[:-1],))  # NOTE: How to deal with that?
+            t = jnp.zeros((x.shape[0], 1))  # NOTE: How to deal with that?
             epsilon = div_noise(step_rng, x.shape, hutchinson_type)
             div_drift = div_fn(x, t, z, epsilon)
             # div_drift = jnp.squeeze(div_drift)
@@ -166,6 +166,7 @@ def get_moser_loss_fn(
             mu_plus = jnp.maximum(eps, mu)
             mu_minus = eps - jnp.minimum(eps, mu)
             return mu_plus, mu_minus
+
         # mu = jax.vmap(mu)  #NOTE: gives different results?
 
         mu_plus = mu(x_0)[0]
@@ -176,10 +177,10 @@ def get_moser_loss_fn(
         prior_prob = jnp.exp(pushforward.base.log_prob(xs))
 
         _, mu_minus = mu(xs)
-        volume_m = jnp.mean(batch_mul(mu_minus, 1 / prior_prob) , axis=0)
-        penalty = alpha_m * volume_m# + alpha_p * volume_p
+        volume_m = jnp.mean(batch_mul(mu_minus, 1 / prior_prob), axis=0)
+        penalty = alpha_m * volume_m  # + alpha_p * volume_p
 
-        loss = - log_prob + penalty
+        loss = -log_prob + penalty
 
         # return loss, new_model_state
         return loss, states
