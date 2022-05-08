@@ -369,6 +369,43 @@ def plot_so3_uniform(x, size=10):
     return fig
 
 
+def plot_so3b(prob, lambda_x, N, size=10):
+    fig, axes = plt.subplots(
+        1,
+        3,
+        # figsize=(1.2 * size, 0.6 * size),
+        figsize=(2 * size, 0.5 * size),
+        sharex=False,
+        sharey=True,
+        tight_layout=True,
+    )
+    x_labels = [r"$\phi$", r"$\theta$", r"$\psi$"]
+    prob = prob.reshape(N, N // 2, N)
+    lambda_x = lambda_x.reshape(N, N // 2, N)
+
+    for j in range(3):
+        if j == 1:
+            grid = np.linspace(-np.pi / 2, np.pi / 2, N // 2)
+            axes[j].set_xticks([grid[0], 0, grid[-1]])
+            axes[j].set_xticklabels([r"$-\pi/2$", "0", r"$\pi/2$"], color="k")
+        else:
+            grid = np.linspace(-np.pi, np.pi, N)
+            axes[j].set_xticks([grid[0], 0, grid[-1]])
+            axes[j].set_xticklabels([r"$-\pi$", "0", r"$\pi$"], color="k")
+
+        y = jnp.mean(prob * lambda_x, axis=jnp.delete(jnp.arange(3), j))
+
+        axes[j].set(xlim=(grid[0], grid[-1]))
+        axes[j].set_xlabel(x_labels[j], fontsize=30)
+        axes[j].tick_params(axis="both", which="major", labelsize=20)
+        axes[j].plot(grid, y, alpha=0.5, lw=4, color="black", label=r"$p_{ref}$")
+        if j == 0:
+            axes[j].legend(loc="best", fontsize=20)
+
+    plt.close(fig)
+    return fig
+
+
 def plot_normal(x, size=10):
     colors = sns.color_palette("husl", len(x))
     fig, axes = plt.subplots(
@@ -394,7 +431,7 @@ def plot_normal(x, size=10):
             label=r"$x_{t_f}$",
         )
         axes[j].set(xlim=(grid[0], grid[-1]))
-        axes[j].set_xlabel(rf"$e_{j}$", fontsize=30)
+        axes[j].set_xlabel(rf"$e_{j+1}$", fontsize=30)
         axes[j].tick_params(axis="both", which="major", labelsize=20)
         axes[j].plot(grid, y, alpha=0.5, lw=4, color="black", label=r"$p_{ref}$")
         if j == 0:

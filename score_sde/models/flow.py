@@ -111,8 +111,8 @@ class PushForward:
 
         return log_prob
 
-    def get_sample(self, model_w_dicts, train=False):
-        def sample(rng, shape, z, x=None, reverse=True, **kwargs):
+    def get_sample(self, model_w_dicts, train=False, reverse=True):
+        def sample(rng, shape, z, x=None, **kwargs):
             x = self.base.sample(rng, shape) if x is None else x
             flow = self.flow.get_forward(model_w_dicts, train)
             # flow = jax.jit(flow)
@@ -138,12 +138,12 @@ class SDEPushForward(PushForward):
         )
         super(SDEPushForward, self).__init__(manifold, flow, self.sde.limiting)
 
-    def get_sample(self, model_w_dicts, train=False, diffeq="sde"):
+    def get_sample(self, model_w_dicts, train=False, reverse=True, diffeq="sde"):
         if diffeq == "ode":
-            return super().get_sample(model_w_dicts, train)
+            return super().get_sample(model_w_dicts, train, reverse)
         elif diffeq == "sde":
 
-            def sample(rng, shape, z, x=None, reverse=True, **kwargs):
+            def sample(rng, shape, z, x=None, **kwargs):
                 x = self.base.sample(rng, shape) if x is None else x
                 score_fn = get_score_fn(self.sde, *model_w_dicts)
                 score_fn = partial(score_fn, z=z)

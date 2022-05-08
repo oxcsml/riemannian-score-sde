@@ -13,11 +13,11 @@ import numpy as np
 import haiku as hk
 import optax
 from tqdm import tqdm
-from score_sde.models.flow import SDEPushForward
+from score_sde.models.flow import SDEPushForward, MoserFlow
 
 from score_sde.utils import TrainState, save, restore
 from score_sde.utils.loggers_pl import LoggerCollection, Logger
-from score_sde.utils.vis import plot, earth_plot, plot_ref
+from score_sde.utils.vis import plot, earth_plot, plot_ref, plot_so3b
 from score_sde.models import get_likelihood_fn_w_transform
 from score_sde.datasets import (
     random_split,
@@ -115,7 +115,7 @@ def run(cfg):
 
         if stage == "test":
             default_z = z[0] if z is not None else None
-            Z = compute_normalization(likelihood_fn, data_manifold, z=default_z)
+            Z, _ = compute_normalization(likelihood_fn, data_manifold, z=default_z)
             log.info(f"Z = {Z:.2f}")
             logger.log_metrics({f"{stage}/Z": Z}, step)
 
@@ -124,8 +124,7 @@ def run(cfg):
         rng = jax.random.PRNGKey(cfg.seed)
         dataset = eval_ds if stage == "eval" else test_ds
 
-        # M = 32
-        M = 8
+        M = 32 if isinstance(pushforward, SDEPushForward) else 8
         x0, y0 = get_data_per_context(dataset, transform, M)
         ## p_0 (backward)
 
@@ -134,6 +133,13 @@ def run(cfg):
 
         sampler = pushforward.get_sample(model_w_dicts, train=False)
         likelihood_fn = pushforward.get_log_prob(model_w_dicts, train=False)
+
+        # # if isinstance(pushforward, MoserFlow):
+        # likelihood_fn = get_likelihood_fn_w_transform(partial(likelihood_fn, rng), transform)
+        # _, prob, lambda_x, N = compute_normalization(likelihood_fn, data_manifold)
+        # plt = plot_so3b(prob, lambda_x, N)
+        # logger.log_plot(f"prob", plt, cfg.steps)
+        # likelihood_fn = pushforward.get_log_prob(model_w_dicts, train=False)
 
         z = next(dataset)[1]
         unique_z = [None] if z is None else jnp.unique(z).reshape((-1, 1))
@@ -157,9 +163,9 @@ def run(cfg):
 
         if isinstance(pushforward, SDEPushForward):
             # sampler = jax.jit(get_pc_sampler(pushforward.sde, N=100))
-            sampler = pushforward.get_sample(model_w_dicts, train=False)
+            sampler = pushforward.get_sample(model_w_dicts, train=False, reverse=False)
             x = transform.inv(x0[0])
-            zT = sampler(rng, None, z, x=x, reverse=False, N=100, eps=cfg.eps)
+            zT = sampler(rng, None, z, x=x, N=100, eps=cfg.eps)
             plt = plot_ref(model_manifold, zT)
             logger.log_plot(f"xT", plt, cfg.steps)
 
