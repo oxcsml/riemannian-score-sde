@@ -93,29 +93,35 @@ def run(cfg):
         likelihood_fn = get_likelihood_fn_w_transform(likelihood_fn_wo_tr, transform)
 
         logp = 0.0
+        nfe = 0.0
         N = 0
 
         if hasattr(dataset, "__len__"):
             for batch in dataset:
-                logp_step = likelihood_fn(*batch)
+                logp_step, nfe_step = likelihood_fn(*batch)
                 logp += logp_step.sum()
+                nfe += nfe_step
                 N += logp_step.shape[0]
         else:
             # TODO: handle infinite datasets more elegnatly
             samples = 10
             for i in range(samples):
                 batch = next(dataset)
-                logp_step = likelihood_fn(*batch)
+                logp_step, nfe_step = likelihood_fn(*batch)
                 logp += logp_step.sum()
+                nfe += nfe_step
                 N += logp_step.shape[0]
         logp /= N
+        nfe /= len(dataset) if hasattr(dataset, "__len__") else samples
 
         logger.log_metrics({f"{stage}/logp": logp}, step)
         log.info(f"{stage}/logp = {logp:.3f}")
+        logger.log_metrics({f"{stage}/nfe": nfe}, step)
+        log.info(f"{stage}/nfe = {nfe:.1f}")
 
         if stage == "test":
             default_z = z[0] if z is not None else None
-            Z, _ = compute_normalization(likelihood_fn, data_manifold, z=default_z)
+            Z, _, _, _ = compute_normalization(likelihood_fn, data_manifold, z=default_z)
             log.info(f"Z = {Z:.2f}")
             logger.log_metrics({f"{stage}/Z": Z}, step)
 
@@ -134,32 +140,44 @@ def run(cfg):
         sampler = pushforward.get_sample(model_w_dicts, train=False)
         likelihood_fn = pushforward.get_log_prob(model_w_dicts, train=False)
 
-        # # if isinstance(pushforward, MoserFlow):
-        # likelihood_fn = get_likelihood_fn_w_transform(partial(likelihood_fn, rng), transform)
-        # _, prob, lambda_x, N = compute_normalization(likelihood_fn, data_manifold)
-        # plt = plot_so3b(prob, lambda_x, N)
-        # logger.log_plot(f"prob", plt, cfg.steps)
-        # likelihood_fn = pushforward.get_log_prob(model_w_dicts, train=False)
+        # if isinstance(pushforward, MoserFlow):
+        #     likelihood_fn = get_likelihood_fn_w_transform(
+        #         partial(likelihood_fn, rng), transform
+        #     )
+        #     _, prob, lambda_x, N = compute_normalization(likelihood_fn, data_manifold)
+        #     plt = plot_so3b(prob, lambda_x, N)
+        #     logger.log_plot(f"prob", plt, cfg.steps)
+        #     likelihood_fn = pushforward.get_log_prob(model_w_dicts, train=False)
 
-        z = next(dataset)[1]
-        unique_z = [None] if z is None else jnp.unique(z).reshape((-1, 1))
-        xs = []
-        shape = (int(cfg.batch_size * M / len(unique_z)), *y0.shape[1:])
-        for k, z in enumerate(unique_z):
-            y = sampler(next_rng, shape, z, N=100, eps=cfg.eps)
-            xs.append(transform(y))
-            log.info(
-                f"Prop samples in M: {100 * data_manifold.belongs(xs[-1], atol=1e-4).mean().item()}"
-            )
+        # if not isinstance(pushforward, MoserFlow):
+        if True:
+            z = next(dataset)[1]
+            unique_z = [None] if z is None else jnp.unique(z).reshape((-1, 1))
+            xs = []
+            shape = (int(cfg.batch_size * M / len(unique_z)), *y0.shape[1:])
+            for k, z in enumerate(unique_z):
+                y = sampler(
+                    next_rng,
+                    shape,
+                    z,
+                    N=100,
+                    eps=cfg.eps,
+                    # corrector="LangevinCorrector",
+                    # n_steps=100,
+                )
+                xs.append(transform(y))
+                log.info(
+                    f"Prop samples in M: {100 * data_manifold.belongs(xs[-1], atol=1e-4).mean().item()}"
+                )
 
-            likelihood_fn = get_likelihood_fn_w_transform(likelihood_fn, transform)
-            likelihood_fn = partial(likelihood_fn, rng, z=z)
-            # plt = earth_plot(cfg, likelihood_fn, train_ds, test_ds, N=500, samples=x)
-            # if plt is not None:
-            #     logger.log_plot(f"pdf_{k}", plt, cfg.steps)
+                likelihood_fn = get_likelihood_fn_w_transform(likelihood_fn, transform)
+                likelihood_fn = partial(likelihood_fn, rng, z=z)
+                # plt = earth_plot(cfg, likelihood_fn, train_ds, test_ds, N=500, samples=x)
+                # if plt is not None:
+                #     logger.log_plot(f"pdf_{k}", plt, cfg.steps)
 
-        plt = plot(data_manifold, x0, xs)  # prob=jnp.exp(likelihood_fn(x)
-        logger.log_plot(f"x0_backw", plt, cfg.steps)
+            plt = plot(data_manifold, x0, xs)  # prob=jnp.exp(likelihood_fn(x)
+            logger.log_plot(f"x0_backw", plt, cfg.steps)
 
         if isinstance(pushforward, SDEPushForward):
             # sampler = jax.jit(get_pc_sampler(pushforward.sde, N=100))

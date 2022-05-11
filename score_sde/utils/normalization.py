@@ -102,7 +102,7 @@ def compute_normalization(likelihood_fn, manifold, z=None, N=None, eps=0.0):
         return 0.0
 
     z = z if z is None else jnp.repeat(jnp.expand_dims(z, 0), xs.shape[0], 0)
-    logp = likelihood_fn(xs, z)
+    logp, nfe = likelihood_fn(xs, z)
     prob = jnp.exp(logp)
     Z = (prob * lambda_x).mean() * volume
     return Z.item(), prob, lambda_x * volume, N

@@ -27,7 +27,7 @@ flow:
 splits: [0.8, 0.1, 0.1]
 batch_size: 512
 warmup_steps: 100
-steps: 20000
-val_freq: 1000
+steps: 100000
+val_freq: 10000
 ema_rate: 0.999
-eps: 1e-3
+eps: 5e-4
