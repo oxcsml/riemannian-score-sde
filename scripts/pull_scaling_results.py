@@ -8,6 +8,10 @@ import matplotlib.pyplot as plt
 
 api = wandb.Api()
 
+plt.rcParams["text.usetex"] = True
+plt.rcParams["font.family"] = ["Computer Modern Roman"]
+plt.rcParams.update({"font.size": 10})
+
 # %%
 
 # Project is specified by <entity/project-name>
@@ -15,7 +19,7 @@ runs = api.runs(
     "oxcsml/diffusion_manifold",
     filters={
         "createdAt": {"$gte": "2022-02-14T00:00:00.000Z"},
-        "group": {"$regex": "testtn"},
+        "group": {"$regex": "sweep_n"},
     },
 )
 
@@ -65,10 +69,10 @@ def make_method(row):
         return "Stereo SGM"
     elif "cnf" in row["group"]:
         return "CNF"
-    elif "rsgm" in row["group"]:
+    elif "rsgm" in row["group"] or "loss=ssm" in row["group"]:
         return "RSGM"
     else:
-        return "Oops!"
+        return "RSGM"
 
 
 runs_df["method"] = runs_df.apply(make_method, axis=1)
@@ -83,10 +87,6 @@ runs_df["method"] = runs_df.apply(make_method, axis=1)
 # )
 
 # %%
-pm_metric = "sem"
-latex = False
-metric = "val/logp"
-bold = True
 
 
 def make_table_from_metric(
@@ -240,53 +240,78 @@ results = runs_df[
     ]
 ]
 
-results = (
+results["val/logp-dim"] = results["val/logp"] / results["config/n"]
+
+grouped_results = (
     results.groupby(
         by=["group", "method", "config/architecture/hidden_shapes", "config/n"]
     )
     .agg(
         {
-            "train/total_time": ["mean", "std"],
-            "val/logp": ["mean", "std"],
+            "train/total_time": ["mean", "std", "min", "max"],
+            "val/logp-dim": ["mean", "std", "min", "max"],
         }
     )
     .reset_index()
 )
 
-results = results.sort_values(by="config/n")
-results = results.reset_index(drop=True)
-results = results[
+grouped_results = grouped_results.sort_values(by="config/n")
+grouped_results = grouped_results.reset_index(drop=True)
+grouped_results = grouped_results[
     [
         "method",
         "config/n",
         "config/architecture/hidden_shapes",
         "train/total_time",
-        "val/logp",
+        "val/logp-dim",
     ]
 ]
-results = results.set_index(['method', "config/architecture/hidden_shapes"])
-results
+grouped_results = grouped_results.set_index(
+    ["method", "config/architecture/hidden_shapes"]
+)
+results = results.set_index(["method", "config/architecture/hidden_shapes"])
+grouped_results
 # %%
 
 fig, axes = plt.subplots(1, 2, figsize=(8, 4))
 
-for idx in results.index.unique():
-    df = results.loc[idx]
+for idx in grouped_results.index.unique():
+    df = grouped_results.loc[idx]
     axes[0].errorbar(
-        df['config/n'],
-        df[('train/total_time', 'mean')],
-        yerr=df[('train/total_time', 'std')],
-        fmt='o',
+        df["config/n"],
+        df[("train/total_time", "mean")],
+        yerr=df[("train/total_time", "std")],
+        # fmt="o",
         label=idx,
     )
 
     axes[1].errorbar(
-        df['config/n'],
-        df[('val/logp', 'mean')],
-        yerr=df[('val/logp', 'std')],
+        df["config/n"],
+        df[("val/logp-dim", "mean")],
+        yerr=np.stack(
+            [
+                df[("val/logp-dim", "mean")] - df[("val/logp-dim", "max")],
+                df[("val/logp-dim", "min")] - df[("val/logp-dim", "mean")],
+            ],
+            axis=0,
+        ),
+        # yerr=df[("val/logp", "std")],
         label=idx,
+        elinewidth=6,
+        alpha=0.3,
     )
 
-plt.legend(loc='upper center', bbox_to_anchor=(0.5,-0.1))
+    df = results.loc[idx]
+
+    axes[1].scatter(df["config/n"], df["val/logp"] / df["config/n"], marker="_")
+
+axes[0].set_yscale("log")
+axes[0].set_xscale("log")
+axes[1].set_xscale("log")
+
+axes[0].set_ylabel('Train time (s)')
+axes[0].set_xlabel('N')
+
+plt.legend(loc="upper center", bbox_to_anchor=(0.5, -0.1))
 plt.tight_layout()
 # %%

@@ -31,6 +31,6 @@ hydra:
       "clusters": "srf_gpu_01",
       "wckey": "wck_${oc.env:USER}",
       "gres": "gpu:${num_gpus}",
-      # "nodelist": "zizgpu01.cpu.stats.ox.ac.uk"
+      "nodelist": "zizgpu02.cpu.stats.ox.ac.uk"
       # "nodelist": "zizgpu04.cpu.stats.ox.ac.uk"
     }
