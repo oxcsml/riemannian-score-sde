@@ -357,9 +357,12 @@ def plot_t2(x0s, xts, size, **kwargs):
     return fig
 
 
+import seaborn as sns
+
+
 def plot_tn(x0s, xts, size, **kwargs):
     n = x0s[0].shape[-1]
-    n = min(5, n // 2)
+    n = min(5, n // 4)
 
     fig, axes = plt.subplots(
         n,
@@ -368,12 +371,23 @@ def plot_tn(x0s, xts, size, **kwargs):
         sharex=False,
         sharey=False,
         tight_layout=True,
+        squeeze=False,
     )
+    # cmap = sns.mpl_palette("viridis")
     for k, (x0, xt) in enumerate(zip(x0s, xts)):
+        print(x0.shape)
         for i, x in enumerate([x0, xt]):
             for j in range(n):
                 x_ = proj_t2(x[..., (4 * j) : (4 * (j + 1))])
                 axes[j][i].scatter(x_[..., 0], x_[..., 1], s=0.1)
+                # sns.kdeplot(
+                #     x=np.asarray(x_[..., 0]),
+                #     y=np.asarray(x_[..., 1]),
+                #     ax=axes[j][i],
+                #     cmap=cmap,
+                #     fill=True,
+                #     # levels=15,
+                # )
 
     axes = [item for sublist in axes for item in sublist]
     for ax in axes:
@@ -383,9 +397,6 @@ def plot_tn(x0s, xts, size, **kwargs):
 
     plt.close(fig)
     return fig
-
-
-import seaborn as sns
 
 
 def proj_t1(x):
@@ -422,13 +433,6 @@ def plot(manifold, x0, xt, prob=None, size=10):
         fig = plot_3d(x0, xt, size, prob=prob)
     elif isinstance(manifold, _SpecialOrthogonalMatrices) and manifold.dim == 3:
         fig = plot_so3(x0, xt, size, prob=prob)
-    elif (
-        isinstance(manifold, ProductSameManifold)
-        and isinstance(manifold.manifold, Hypersphere)
-        and manifold.manifold.dim == 1
-        and manifold.dim == 2
-    ):
-        fig = plot_t2(x0, xt, size, prob=prob)
     elif (
         isinstance(manifold, ProductSameManifold)
         and isinstance(manifold.manifold, Hypersphere)

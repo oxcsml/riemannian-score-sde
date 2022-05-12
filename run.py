@@ -74,7 +74,7 @@ def run(cfg):
                 eval_time = timer()
                 evaluate(train_state, "val", step)
                 logger.log_metrics({"val/time_per_it": (timer() - eval_time)}, step)
-                generate_plots(train_state, "eval", step=step)
+                # generate_plots(train_state, "eval", step=step)
                 train_time = timer()
 
         logger.log_metrics({"train/total_time": total_train_time}, step)
@@ -137,8 +137,10 @@ def run(cfg):
         z = next(dataset)[1]
         unique_z = [None] if z is None else jnp.unique(z).reshape((-1, 1))
         xs = []
-        shape = (int(cfg.batch_size * M / len(unique_z)), *y0.shape[1:])
+        shape = (min(int(cfg.batch_size * M / len(unique_z)), 2000), *y0.shape[1:])
+
         for k, z in enumerate(unique_z):
+            log.info(f"Generating {shape} samples")
             y = sampler(next_rng, shape, z, N=100, eps=cfg.eps)
             xs.append(transform(y))
             log.info(
@@ -151,6 +153,7 @@ def run(cfg):
             # if plt is not None:
             #     logger.log_plot(f"pdf_{k}", plt, cfg.steps)
 
+        log.info("Plotting")
         plt = plot(data_manifold, x0, xs)  # prob=jnp.exp(likelihood_fn(x)
         if plt is not None:
             logger.log_plot(f"x0_backw", plt, cfg.steps if step is None else step)
@@ -276,8 +279,9 @@ def run(cfg):
         train_state, success = train(train_state)
     if (cfg.mode == "test") or (cfg.mode == "all" and success):
         log.info("Stage : Test")
+        evaluate(train_state, "val")
         evaluate(train_state, "test")
-        generate_plots(train_state, "test")
+        # generate_plots(train_state, "test")
         success = True
     logger.save()
     logger.finalize("success" if success else "failure")
