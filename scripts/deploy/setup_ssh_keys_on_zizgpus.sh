@@ -9,8 +9,12 @@
 dir_path="`dirname \"$0\"`"
 source $dir_path/config.sh
 
-for NODE_ID in '1' '2' '3' '4'
+ssh-keygen -q -t rsa -b 2048 -N "" -f ~/.ssh/$rsa_key <<< y
+
+for NODE_ID in '1' '2' '3' '5'
 do
-	srun --partition=ziz-gpu0$NODE_ID-debug ssh-keygen -q -t rsa -b 2048 -N "" -f ~/.ssh/$rsa_key <<< y
-	srun --pty --partition=ziz-gpu0$NODE_ID-debug ssh-copy-id -i ~/.ssh/$rsa_key ziz.stats.ox.ac.uk
+	srun  --clusters=srf_gpu_01 --partition=zizgpu0$NODE_ID-debug ssh-keygen -q -t rsa -b 2048 -N "" -f ~/.ssh/$rsa_key <<< y
+	srun --pty --clusters=srf_gpu_01 --partition=zizgpu0$NODE_ID-debug ssh-copy-id -i ~/.ssh/$rsa_key ziz.stats.ox.ac.uk
+	# srun --pty --clusters=srf_gpu_01 --partition=zizgpu0$NODE_ID-debug scp ziz.stats.ox.ac.uk:~/.ssh/$rsa_key.pub ~/.ssh/
+	# srun --clusters=srf_gpu_01 --partition=zizgpu0$NODE_ID-debug cat ~/.ssh/$rsa_key.pub >> ~/.ssh/authorized_keys
 done

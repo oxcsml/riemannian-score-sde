@@ -43,7 +43,7 @@ def get_exact_div_fn(fn):
         t = jnp.expand_dims(t.reshape(-1), axis=-1)
         # x = jnp.expand_dims(x.reshape((-1, x_shape[-1])), 1)
         # t = jnp.expand_dims(t.reshape((-1, t_shape[-1])), 1)
-        x = jnp.expand_dims(x, 1) # NOTE: need leading batch dim after vmap
+        x = jnp.expand_dims(x, 1)  # NOTE: need leading batch dim after vmap
         if z is not None:
             z = jnp.expand_dims(z, 1)
         t = jnp.expand_dims(t, 1)
@@ -51,7 +51,7 @@ def get_exact_div_fn(fn):
         # jac = jac.reshape([*x_shape[:-1], x_shape[-1], x_shape[-1]])
 
         jac = jac.reshape([x_shape[0], dim, dim])
-        return jnp.trace(jac, axis1=-1, axis2=-2)#.reshape(x_shape[:-1])
+        return jnp.trace(jac, axis1=-1, axis2=-2)  # .reshape(x_shape[:-1])
 
     return div_fn
 

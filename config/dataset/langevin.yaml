@@ -1,8 +1,7 @@
-_target_: riemannian_score_sde.datasets.simple.Wrapped
+_target_: riemannian_score_sde.datasets.simple.Langevin
 _convert_: partial
-mean: unif
-scale: 100
-K: 4
+scale: 10
+K: 1
 batch_dims:
   - ${batch_size}
 manifold: ${manifold}

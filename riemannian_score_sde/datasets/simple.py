@@ -1,5 +1,8 @@
 import geomstats.backend as gs
-from geomstats.geometry.special_orthogonal import SpecialOrthogonal
+from geomstats.geometry.special_orthogonal import (
+    SpecialOrthogonal,
+    _SpecialOrthogonal3Vectors,
+)
 from geomstats.algebra_utils import from_vector_to_diagonal_matrix
 import jax
 import jax.numpy as jnp
@@ -24,7 +27,7 @@ class Uniform:
 
 
 class Wrapped:
-    def __init__(self, scale, K, batch_dims, manifold, seed, conditional, **kwargs):
+    def __init__(self, scale, K, batch_dims, manifold, seed, conditional, mean, **kwargs):
         self.K = K
         self.batch_dims = batch_dims
         self.manifold = manifold
@@ -32,21 +35,17 @@ class Wrapped:
         rng, next_rng = jax.random.split(rng)
         self.rng = rng
         self.conditional = conditional
-        if "mean" in kwargs:
-            self.mean = kwargs["mean"]
+        if mean == "unif":
+            self.mean = self.manifold.random_uniform(state=next_rng, n_samples=K)
+        elif mean == "anti":
+            v = jnp.array([[jnp.pi, 0.0, 0.0]])
+            self.mean = _SpecialOrthogonal3Vectors().matrix_from_tait_bryan_angles(v)
+        elif mean == "id":
+            self.mean = self.manifold.identity
         else:
-            if K == 1:
-                self.mean = self.manifold.random_uniform(state=next_rng, n_samples=K)[
-                    None, :
-                ]
-            else:
-                self.mean = self.manifold.random_uniform(state=next_rng, n_samples=K)
-            # self.mean = self.manifold.identity
-        # precision = jax.random.gamma(key=next_rng, a=scale, shape=(K,))
-        # TODO: WHy expanding 2 dimes here?
-        # self.precision = jnp.expand_dims(precision, (-1, -2))
-        # self.precision = jnp.expand_dims(precision, (-1,))
-        self.scale = scale
+            raise ValueError("Mean value: {mean}")
+        precision = jax.random.gamma(key=next_rng, a=scale, shape=(K,))
+        self.precision = jnp.expand_dims(precision, (-1, -2))
 
     def __iter__(self):
         return self
@@ -77,42 +76,53 @@ class Langevin:
     https://arxiv.org/pdf/0712.4166.pdf
     """
 
-    def __init__(self, beta, k, batch_dims, manifold, seed, **kwargs):
-        self.beta = beta
+    def __init__(self, scale, K, batch_dims, manifold, seed, conditional, **kwargs):
         self.batch_dims = batch_dims
         self.manifold = manifold
         rng = jax.random.PRNGKey(seed)
         rng, next_rng = jax.random.split(rng)
         self.rng = rng
+        self.conditional = conditional
         if "mean" in kwargs:
             self.mean = kwargs["mean"]
         else:
-            self.mean = self.manifold.random_uniform(state=next_rng, n_samples=k)
+            self.mean = self.manifold.random_uniform(state=next_rng, n_samples=K)
+        self.precision = jax.random.gamma(key=next_rng, a=scale, shape=(K,))
 
     def __iter__(self):
         return self
 
     def __next__(self):
+        n_samples = np.prod(self.batch_dims)
+        ks = jnp.arange(self.mean.shape[0])
         rng, next_rng = jax.random.split(self.rng)
         self.rng = rng
-        n_samples = np.prod(self.batch_dims)
-
-        _, C = gs.random.choice(state=next_rng, a=self.mean, n=n_samples)
+        _, k = gs.random.choice(state=next_rng, a=ks, n=n_samples)
+        C = self.mean[k]
+        kappa = self.precision[k]
         C_tr = gs.transpose(C, axes=(0, 2, 1))
         _, D, _ = jnp.linalg.svd(C)
         D = from_vector_to_diagonal_matrix(D)
 
         cond = jnp.zeros(n_samples)
-        samples = jnp.zeros(n_samples, self.manifold.n, self.manifold.n)
-
+        samples = jnp.zeros((n_samples, self.manifold.n, self.manifold.n))
+        i = 0
         while not cond.all():
             X = self.manifold.random_uniform(state=next_rng, n_samples=n_samples)
-            thresh = gs.exp(gs.trace(C_tr @ X - D, axis1=1, axis2=2))
+            thresh = gs.exp(kappa * gs.trace(C_tr @ X - D, axis1=1, axis2=2))
             rng, next_rng = jax.random.split(rng)
             _, u = gs.random.rand(state=next_rng, size=n_samples)
             mask = u < thresh
             mask = gs.expand_dims(mask, axis=(-1, -2))
             samples = (1 - mask) * samples + mask * X
             cond = (1 - mask) * cond + mask * mask
+            # print("iter", i)
+            # print("mask", mask.mean().item())
+            # print("cond", cond.mean().item())
+            i += 1
+        print("iter", i)
 
-        return (samples, None)
+        if self.conditional:
+            return samples, jnp.expand_dims(k, -1)
+        else:
+            return (samples, None)

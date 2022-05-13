@@ -40,9 +40,7 @@ def get_dsm_loss_fn(
 
         rng, step_rng = random.split(rng)
         # uniformly sample from SDE timeframe
-        t = random.uniform(
-            step_rng, (x_0.shape[0],), minval=sde.t0 + eps, maxval=sde.tf
-        )
+        t = random.uniform(step_rng, (x_0.shape[0],), minval=sde.t0 + eps, maxval=sde.tf)
         rng, step_rng = random.split(rng)
 
         # sample p(x_t | x_0)
@@ -116,9 +114,7 @@ def get_ism_loss_fn(
         x_0, z = batch["data"], batch["context"]
 
         rng, step_rng = random.split(rng)
-        t = random.uniform(
-            step_rng, (x_0.shape[0],), minval=sde.t0 + eps, maxval=sde.tf
-        )
+        t = random.uniform(step_rng, (x_0.shape[0],), minval=sde.t0 + eps, maxval=sde.tf)
 
         rng, step_rng = random.split(rng)
         x_t = sde.marginal_sample(step_rng, x_0, t)
@@ -166,7 +162,7 @@ def get_moser_loss_fn(
         def mu(x):
             prob_base = jnp.exp(pushforward.base.log_prob(x))
             # x = x.reshape(-1, *x.shape)
-            t = jnp.zeros((*x.shape[:-1],))  # NOTE: How to deal with that?
+            t = jnp.zeros((x.shape[0], 1))  # NOTE: How to deal with that?
             epsilon = div_noise(step_rng, x.shape, hutchinson_type)
             div_drift = div_fn(x, t, z, epsilon)
             # div_drift = jnp.squeeze(div_drift)
