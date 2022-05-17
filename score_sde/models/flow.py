@@ -34,8 +34,7 @@ def div_noise(
         epsilon = jax.random.normal(rng, shape)
     elif hutchinson_type == "Rademacher":
         epsilon = (
-            jax.random.randint(rng, shape, minval=0, maxval=2).astype(jnp.float32) * 2
-            - 1
+            jax.random.randint(rng, shape, minval=0, maxval=2).astype(jnp.float32) * 2 - 1
         )
     elif hutchinson_type == "None":
         epsilon = None
@@ -116,9 +115,7 @@ class PushForward:
             x = self.base.sample(rng, shape) if x is None else x
             flow = self.flow.get_forward(model_w_dicts, train)
             # flow = jax.jit(flow)
-            y, nfe = flow(
-                rng, x, z, reverse=reverse, **kwargs
-            )  # NOTE: flow is reversed
+            y, nfe = flow(rng, x, z, reverse=reverse, **kwargs)  # NOTE: flow is reversed
             # log_prob = self.base.log_prob(x)
             # log_prob += inv_logdets.reshape(log_prob.shape)
             return y  # , jnp.clip(log_prob, -1e38, 1e38)

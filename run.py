@@ -73,9 +73,9 @@ def run(cfg):
                 total_train_time += timer() - train_time
                 save(ckpt_path, train_state)
                 eval_time = timer()
-                evaluate(train_state, "val", step)
-                logger.log_metrics({"val/time_per_it": (timer() - eval_time)}, step)
-                # generate_plots(train_state, "eval", step=step)
+                # evaluate(train_state, "val", step)
+                # logger.log_metrics({"val/time_per_it": (timer() - eval_time)}, step)
+                # generate_plots(train_state, "val", step=step)
                 train_time = timer()
 
         logger.log_metrics({"train/total_time": total_train_time}, step)
@@ -121,11 +121,14 @@ def run(cfg):
 
         if stage == "test":
             default_z = z[0] if z is not None else None
-            Z, _, _, _ = compute_normalization(
-                likelihood_fn, data_manifold, z=default_z
-            )
-            log.info(f"Z = {Z:.2f}")
-            logger.log_metrics({f"{stage}/Z": Z}, step)
+            try:
+                Z, _, _, _ = compute_normalization(
+                    likelihood_fn, data_manifold, z=default_z
+                )
+                log.info(f"Z = {Z:.2f}")
+                logger.log_metrics({f"{stage}/Z": Z}, step)
+            except:
+                pass
 
     def generate_plots(train_state, stage, step=None):
         log.info("Generating plots")
@@ -187,7 +190,8 @@ def run(cfg):
             x = transform.inv(x0[0])
             zT = sampler(rng, None, z, x=x, N=100, eps=cfg.eps)
             plt = plot_ref(model_manifold, zT)
-            logger.log_plot(f"xT", plt, cfg.steps)
+            if plt is not None:
+                logger.log_plot(f"xT", plt, cfg.steps)
 
     ### Main
     # jax.config.update("jax_enable_x64", True)
@@ -310,7 +314,6 @@ def run(cfg):
         train_state, success = train(train_state)
     if (cfg.mode == "test") or (cfg.mode == "all" and success):
         log.info("Stage : Test")
-        evaluate(train_state, "val")
         evaluate(train_state, "test")
         # generate_plots(train_state, "test")
         success = True

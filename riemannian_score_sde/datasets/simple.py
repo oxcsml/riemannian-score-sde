@@ -27,7 +27,7 @@ class Uniform:
 
 
 class Wrapped:
-    def __init__(self, scale, K, batch_dims, manifold, seed, conditional, mean, **kwargs):
+    def __init__(self, scale, K, batch_dims, manifold, seed, conditional, **kwargs):
         self.K = K
         self.batch_dims = batch_dims
         self.manifold = manifold
@@ -35,17 +35,21 @@ class Wrapped:
         rng, next_rng = jax.random.split(rng)
         self.rng = rng
         self.conditional = conditional
-        if mean == "unif":
-            self.mean = self.manifold.random_uniform(state=next_rng, n_samples=K)
-        elif mean == "anti":
-            v = jnp.array([[jnp.pi, 0.0, 0.0]])
-            self.mean = _SpecialOrthogonal3Vectors().matrix_from_tait_bryan_angles(v)
-        elif mean == "id":
-            self.mean = self.manifold.identity
+        if "mean" in kwargs:
+            self.mean = kwargs["mean"]
         else:
-            raise ValueError("Mean value: {mean}")
-        precision = jax.random.gamma(key=next_rng, a=scale, shape=(K,))
-        self.precision = jnp.expand_dims(precision, (-1, -2))
+            if K == 1:
+                self.mean = self.manifold.random_uniform(state=next_rng, n_samples=K)[
+                    None, :
+                ]
+            else:
+                self.mean = self.manifold.random_uniform(state=next_rng, n_samples=K)
+            # self.mean = self.manifold.identity
+        # precision = jax.random.gamma(key=next_rng, a=scale, shape=(K,))
+        # TODO: WHy expanding 2 dimes here?
+        # self.precision = jnp.expand_dims(precision, (-1, -2))
+        # self.precision = jnp.expand_dims(precision, (-1,))
+        self.scale = scale
 
     def __iter__(self):
         return self
