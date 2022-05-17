@@ -314,6 +314,7 @@ def run(cfg):
         train_state, success = train(train_state)
     if (cfg.mode == "test") or (cfg.mode == "all" and success):
         log.info("Stage : Test")
+        # evaluate(train_state, "val")
         evaluate(train_state, "test")
         # generate_plots(train_state, "test")
         success = True
