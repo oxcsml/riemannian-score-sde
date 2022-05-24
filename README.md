@@ -21,7 +21,14 @@ pip install -e .
 - `requirements_slurm.txt` contains extra dependencies for using the job scheduling functionality of hydra.
 - `requirements_dev.txt` contains some handy development packages.
 
-## Run experiments
+## Code structure
+
+The bulk of the code for this project can be found in 3 places
+- The `score_sde` package contains code to run SDEs on Euclidean space.
+- The `riemannian_score_sde` package contains code needed to extend the code in `score_sde` to Riemannian manifolds.
+- An extended version of [geomstats](https://github.com/oxcsml/geomstats/tree/jax_backend) that adds `jax` support, and a number of other extensions.
+
+## Reproducing experiments
 Experiment configuration is handled by [hydra](https://hydra.cc/docs/intro/), a highly flexible `ymal` based configuration package. Base configs can be found in `config`, and parameters are overridden in the command line. Sweeps over parameters can also be managed with a single command.
 
 Jobs scheduled on a cluster using a number of different plugins. We use Slurm, and configs for this can be found in `config/server` (note these are reasonably general but have some setup-specific parts). Other systems can easily be substituted by creating a new server configuration.
