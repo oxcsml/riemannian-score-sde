@@ -1,32 +1,32 @@
 import os
+import socket
 import logging
 from functools import partial
 from timeit import default_timer as timer
-import socket
-
-from hydra.utils import instantiate, get_class, call
-from omegaconf import OmegaConf
 
 import jax
-from jax import numpy as jnp
+import optax
 import numpy as np
 import haiku as hk
-import optax
 from tqdm import tqdm
+from jax import numpy as jnp
 from score_sde.models.flow import SDEPushForward, MoserFlow
 
+from omegaconf import OmegaConf
+from hydra.utils import instantiate, get_class, call
+
+from score_sde.losses import get_ema_loss_step_fn
 from score_sde.utils import TrainState, save, restore
+from score_sde.models import get_likelihood_fn_w_transform
+from score_sde.utils.normalization import compute_normalization
 from score_sde.utils.loggers_pl import LoggerCollection, Logger
 from score_sde.utils.vis import plot, earth_plot, plot_ref, plot_so3b
-from score_sde.models import get_likelihood_fn_w_transform
 from score_sde.datasets import (
     random_split,
     DataLoader,
     TensorDataset,
     get_data_per_context,
 )
-from score_sde.utils.normalization import compute_normalization
-from score_sde.losses import get_ema_loss_step_fn
 
 log = logging.getLogger(__name__)
 
@@ -147,41 +147,25 @@ def run(cfg):
         sampler = pushforward.get_sample(model_w_dicts, train=False)
         likelihood_fn = pushforward.get_log_prob(model_w_dicts, train=False)
 
-        # if isinstance(pushforward, MoserFlow):
-        #     likelihood_fn = get_likelihood_fn_w_transform(
-        #         partial(likelihood_fn, rng), transform
-        #     )
-        #     _, prob, lambda_x, N = compute_normalization(likelihood_fn, data_manifold)
-        #     plt = plot_so3b(prob, lambda_x, N)
-        #     logger.log_plot(f"prob", plt, cfg.steps)
-        #     likelihood_fn = pushforward.get_log_prob(model_w_dicts, train=False)
+        z = next(dataset)[1]
+        unique_z = [None] if z is None else jnp.unique(z).reshape((-1, 1))
+        xs = []
+        shape = (int(cfg.batch_size * M / len(unique_z)), *y0.shape[1:])
+        for k, z in enumerate(unique_z):
+            y = sampler(
+                next_rng,
+                shape,
+                z,
+                N=100,
+                eps=cfg.eps,
+            )
+            xs.append(transform(y))
+            log.info(
+                f"Prop samples in M: {100 * data_manifold.belongs(xs[-1], atol=1e-4).mean().item()}"
+            )
 
-        # if not isinstance(pushforward, MoserFlow):
-        if True:
-            z = next(dataset)[1]
-            unique_z = [None] if z is None else jnp.unique(z).reshape((-1, 1))
-            xs = []
-            shape = (int(cfg.batch_size * M / len(unique_z)), *y0.shape[1:])
-            for k, z in enumerate(unique_z):
-                y = sampler(
-                    next_rng,
-                    shape,
-                    z,
-                    N=100,
-                    eps=cfg.eps,
-                    # corrector="LangevinCorrector",
-                    # n_steps=100,
-                )
-                xs.append(transform(y))
-                log.info(
-                    f"Prop samples in M: {100 * data_manifold.belongs(xs[-1], atol=1e-4).mean().item()}"
-                )
-
-                likelihood_fn = get_likelihood_fn_w_transform(likelihood_fn, transform)
-                likelihood_fn = partial(likelihood_fn, rng, z=z)
-                # plt = earth_plot(cfg, likelihood_fn, train_ds, test_ds, N=500, samples=x)
-                # if plt is not None:
-                #     logger.log_plot(f"pdf_{k}", plt, cfg.steps)
+            likelihood_fn = get_likelihood_fn_w_transform(likelihood_fn, transform)
+            likelihood_fn = partial(likelihood_fn, rng, z=z)
 
             plt = plot(data_manifold, x0, xs)  # prob=jnp.exp(likelihood_fn(x)
             logger.log_plot(f"x0_backw", plt, cfg.steps)
