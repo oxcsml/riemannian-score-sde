@@ -258,6 +258,7 @@ class CNF:
                 y, nfe = odeint(ode_func, init, ts, z, params, states, **ode_kwargs)
                 z = y[-1, ..., :-1].reshape(shape)
                 delta_logp = y[-1, ..., -1]
+                print(f"nfe: {nfe}")
                 return z, delta_logp, nfe
             else:
 

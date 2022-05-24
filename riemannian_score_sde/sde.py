@@ -124,6 +124,9 @@ class VPSDE(VPSDEBase):
         super().__init__(tf, t0, beta_0, beta_f)
         self.manifold = manifold
 
+    def rescale_t(self, t):
+        return 0.5 * t**2 * (self.beta_f - self.beta_0) + t * self.beta_0
+
     def marginal_sample(self, rng, x, t):
         mean, std = self.marginal_prob(x, t)
         z = jax.random.normal(rng, x.shape)

@@ -31,7 +31,6 @@ class DataLoader:
 
     def __len__(self):
         bs = self.batch_dims
-        # N = floor(self.data.shape[0] / bs)
         N = floor(len(self.dataset) / bs)
         return N if self.drop_last else N + 1
 

@@ -2,5 +2,5 @@ _target_: riemannian_score_sde.losses.get_moser_loss_fn
 alpha_m: 100
 alpha_p: 0
 K: 10000
-hutchinson_type: Rademacher
+hutchinson_type: None
 eps: 1e-5

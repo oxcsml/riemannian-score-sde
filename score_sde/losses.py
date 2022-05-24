@@ -73,7 +73,7 @@ def get_dsm_loss_fn(
 
         if not like_w:
             losses = jnp.square(batch_mul(score, std) + z)
-            # losses = 1/std^2 * DSM(x_t, x_0)
+            # losses = std^2 * DSM(x_t, x_0)
             losses = reduce_op(losses.reshape((losses.shape[0], -1)), axis=-1)
         else:
             g2 = sde.coefficients(jnp.zeros_like(x_0), t)[1] ** 2
@@ -97,6 +97,7 @@ def get_ism_loss_fn(
     eps: float = 1e-3,
 ):
     sde = pushforward.sde
+
     def loss_fn(
         rng: jax.random.KeyArray, params: dict, states: dict, batch: dict
     ) -> Tuple[float, dict]:
@@ -144,7 +145,6 @@ def get_logp_loss_fn(
     train: bool = True,
     **kwargs
 ):
-
     def loss_fn(
         rng: jax.random.KeyArray, params: dict, states: dict, batch: dict
     ) -> Tuple[float, dict]:
@@ -152,7 +152,7 @@ def get_logp_loss_fn(
 
         model_w_dicts = (model, params, states)
         log_prob = pushforward.get_log_prob(model_w_dicts, train=train)
-        losses = - log_prob(rng, x_0)[0]
+        losses = -log_prob(rng, x_0)[0]
         loss = jnp.mean(losses)
 
         # return loss, new_model_state
