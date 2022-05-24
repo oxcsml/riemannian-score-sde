@@ -1,5 +1,5 @@
-# score-sde
-
+# Riemannian Score-Based Generative Modelling
+[![Paper - Openreview](https://img.shields.io/badge/Paper-Openreview-8D2912)](https://openreview.net/forum?id=oDRQGo8I7P) [![Paper - Arxiv](https://img.shields.io/badge/Paper-Arxiv-B4371A)](https://arxiv.org/abs/2202.02763)
 ## Install
 This repo requires a modified version of [geomstats](https://github.com/geomstats/geomstats) that adds jax functionality, and a number of other modifications. This can be found [here](https://github.com/oxcsml/geomstats.git ) on the branch `jax_backend`.
 
@@ -45,9 +45,9 @@ We run experiments on 4 natural disaster experiments against a number of baselin
 | Stereographic Score-Based | ${-3.80_{\pm 0.27}}$    | $\bm{-0.19_{\pm 0.05}}$ | ${0.59_{\pm 0.07}}$    | $\bm{-1.28_{\pm 0.12}}$ |
 | Riemannian Score-Based    | ${-4.92_{\pm 0.25}}$    | $\bm{-0.19_{\pm 0.07}}$ | $\bm{0.48_{\pm 0.09}}$ | $\bm{-1.33_{\pm 0.06}}$ |
 
-
-| Volcano                 | Earthquake              | Flood                  | Fire                    |
-|:------------------------|:------------------------|:-----------------------|:------------------------|
+Examples of densities learned by RSGMs on the datasets:
+| Volcano--- | Earthquake | Flood----- | Fire------ |
+|:-|:-|:-|:-|
 | ![Volcano density](images/pdf_volcanoe_310122.png) | ![Earthquake density](images/pdf_earthquake_310122.png) | ![Flood density](images/pdf_flood_310122.png) | ![Fire density](images/pdf_fire_310122.png) |
 
 To run the full sweeps over parameters used in the paper run:
@@ -55,7 +55,6 @@ To run the full sweeps over parameters used in the paper run:
 `RSGM ISM loss`:
 ```
 python main.py -m \
-    server=[SERVER] \
     experiment=volcano,earthquake,fire,flood \
     model=rsgm \
     generator=div_free,ambient \
@@ -64,67 +63,105 @@ python main.py -m \
     flow.beta_0=0.001 \
     flow.beta_f=2,3,5 \
     steps=300000,600000 \
-    eps=1e-3 \
-    seed=0,1,2,3,4 \
-    n_jobs=8
+    seed=0,1,2,3,4
 ```
 `RSGM DSM loss`:
 ```
 python main.py -m \
-    server=[SERVER] \
     experiment=volcano,earthquake,fire,flood \
     model=rsgm \
     generator=div_free,ambient \
     loss=dsm0 \
     loss.thresh=0.0,0.2,0.3,0.5,0.8,1.0 \
     loss.n_max=-1,0,1,3,5,10,50 \
-    flow.N=200 \
     flow.beta_0=0.001 \
     flow.beta_f=2,3,5 \
-    eps=1e-3 \
-    seed=0,1,2,3,4 \
-    n_jobs=8
+    seed=0,1,2,3,4
 ```
 `Stereo RSGMs:`
 ```
 python main.py -m \
-    server=[SERVER] \
     experiment=volcanoe,earthquake,fire,flood \
     model=sgm_stereo \
     generator=ambient \
     loss=ism \
     flow.beta_0=0.001 \
     flow.beta_f=4,6,8 \
-    eps=1e-3 \
-    seed=0,1,2,3,4 \
-    n_jobs=8
+    seed=0,1,2,3,4
 ```
 `Moser flows`:
 ```
 python main.py -m \
-    server=[SERVER] \
     experiment=volcanoe,earthquake,fire,flood \
     model=moser \
     loss.hutchinson_type=None \
     loss.K=20000 \
     loss.alpha_m=100 \
-    seed=0,1,2,3,4 \
-    n_jobs=8
+    seed=0,1,2,3,4
 ```
 `CNF`:
 ```
 python main.py -m \
-    server=[SERVER] \
     experiment=volcanoe,earthquake,fire,flood \
     model=cnf \
     generator=div_free,ambient \
     steps=100000 \
     flow.hutchinson_type=None \
     optim.learning_rate=1e-4 \
-    seed=0,1,2,3,4 \
-    n_jobs=8
+    seed=0,1,2,3,4
 ```
 
-### SO(3) toy
-`python main.py experiment=so3 dataset=wrapped`
+### High dimension torus example
+To demonstrate the scaling of our method to high dimension manifolds we train RSGMs on products of circles to give high dimension toruses. We compare to the performance of Moser flows, the next most scalable method.
+![Comparative graphs](images/high-dim.png)
 
+The commands to run the experiments shown in the plots are:
+`RSGMs`:
+```
+python main.py -m \
+    experiment=tn \
+    n=1,2,5,10,20,50,100,200 \
+    architecture.hidden_shapes=[512,512,512] \
+    loss=ism,ssm \
+    seed=0,1,2
+```
+`Moser flows`:
+```
+python main.py -m \
+    experiment=tn \
+    n=1,2,5,10,20,50,100,200 \
+    model=moser \
+    loss.hutchinson_type=None,Rademacher \
+    loss.K=1000,5000,20000 \
+    loss.alpha_m=1 \
+    architecture.hidden_shapes=[512,512,512] \
+    seed=0,1,2
+```
+
+
+### SO(3) toy
+To demonstrate that RSGMs can handle conditional modelling well, we train ... 
+
+`RSGMs, Stereo RSGMs`
+```
+python main.py -m \
+    experiment=so3 \
+    model=rsgm,sgm_exp \
+    dataset.K=16,32,64 \
+    steps=100000 \
+    optim.learning_rate=5e-4,2e-4 \
+    flow.beta_f=2,4,6,8,10 \
+    seed=0,1,2,3,4
+```
+`Moser flows`
+```
+python main.py -m \
+    experiment=so3 \
+    model=moser \
+    dataset.K=16,32,64 \
+    steps=100000 \
+    optim.learning_rate=5e-4,2e-4 \
+    loss.K=1000,10000 \
+    loss.alpha_m=1,10,100 \
+    seed=0,1,2,3,4
+```
