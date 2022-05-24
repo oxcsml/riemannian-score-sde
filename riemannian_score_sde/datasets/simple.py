@@ -1,4 +1,5 @@
 import geomstats.backend as gs
+from geomstats.geometry.lie_group import LieGroup
 from geomstats.geometry.special_orthogonal import (
     SpecialOrthogonal,
     _SpecialOrthogonal3Vectors,
@@ -27,7 +28,9 @@ class Uniform:
 
 
 class Wrapped:
-    def __init__(self, scale, K, batch_dims, manifold, seed, conditional, **kwargs):
+    def __init__(
+        self, scale, K, batch_dims, manifold, seed, conditional, mean, **kwargs
+    ):
         self.K = K
         self.batch_dims = batch_dims
         self.manifold = manifold
@@ -35,21 +38,23 @@ class Wrapped:
         rng, next_rng = jax.random.split(rng)
         self.rng = rng
         self.conditional = conditional
-        if "mean" in kwargs:
-            self.mean = kwargs["mean"]
+        if mean == "unif":
+            self.mean = self.manifold.random_uniform(state=next_rng, n_samples=K)
+        elif mean == "anti" and isinstance(self.manifold, _SpecialOrthogonal3Vectors):
+            v = jnp.array([[jnp.pi, 0.0, 0.0]])
+            self.mean = _SpecialOrthogonal3Vectors().matrix_from_tait_bryan_angles(v)
+        elif mean == "id" and isinstance(self.manifold, LieGroup):
+            self.mean = self.manifold.identity
         else:
-            if K == 1:
-                self.mean = self.manifold.random_uniform(state=next_rng, n_samples=K)[
-                    None, :
-                ]
-            else:
-                self.mean = self.manifold.random_uniform(state=next_rng, n_samples=K)
-            # self.mean = self.manifold.identity
-        # precision = jax.random.gamma(key=next_rng, a=scale, shape=(K,))
-        # TODO: WHy expanding 2 dimes here?
-        # self.precision = jnp.expand_dims(precision, (-1, -2))
-        # self.precision = jnp.expand_dims(precision, (-1,))
-        self.scale = scale
+            raise ValueError(f"Mean value: {mean}")
+
+        if scale == "random":
+            precision = jax.random.gamma(key=next_rng, a=100.0, shape=(K,))
+        elif scale == "fixed":
+            precision = jnp.ones((K,)) * (1 / 0.2**2)
+        else:
+            raise ValueError(f"Scale value: {scale}")
+        self.precision = jnp.expand_dims(precision, (-1, -2))
 
     def __iter__(self):
         return self
@@ -61,8 +66,7 @@ class Wrapped:
         self.rng = rng
         _, k = gs.random.choice(state=next_rng, a=ks, n=n_samples)
         mean = self.mean[k]
-        # scale = 1 / jnp.sqrt(self.precision[k])
-        scale = self.scale
+        scale = 1 / jnp.sqrt(self.precision[k])
         tangent_vec = self.manifold.random_normal_tangent(
             state=next_rng, base_point=mean, n_samples=n_samples
         )[1]
