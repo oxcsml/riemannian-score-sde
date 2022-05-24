@@ -17,9 +17,9 @@ from hydra.utils import instantiate, get_class, call
 
 from score_sde.losses import get_ema_loss_step_fn
 from score_sde.utils import TrainState, save, restore
+from score_sde.utils.loggers_pl import LoggerCollection
 from score_sde.models import get_likelihood_fn_w_transform
 from score_sde.utils.normalization import compute_normalization
-from score_sde.utils.loggers_pl import LoggerCollection, Logger
 from score_sde.utils.vis import plot, earth_plot, plot_ref, plot_so3b
 from score_sde.datasets import (
     random_split,
@@ -191,8 +191,6 @@ def run(cfg):
     loggers = [instantiate(logger_cfg) for logger_cfg in cfg.logger.values()]
     logger = LoggerCollection(loggers)
     logger.log_hyperparams(OmegaConf.to_container(cfg, resolve=True))
-    Logger.instance().set_logger(logger)
-    # Logger.get() -> returns global logger anywhere from here
 
     # TODO: should sample random seed given a run id?
     rng = jax.random.PRNGKey(cfg.seed)

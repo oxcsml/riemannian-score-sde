@@ -32,3 +32,12 @@ logs_dir: logs
 
 logdir: ${work_dir}/results
 # rundir: ${dataset.name}/${model.name}
+
+# perform actions in the val loop during training
+train_val: true
+train_plot: true
+
+# perform certain metrics in test mode
+test_val: true
+test_test: true
+test_plot: true

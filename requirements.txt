@@ -4,11 +4,3 @@ jax[cuda11_cudnn805]
 dm-haiku
 optax
 fsspec[http]>=2021.05.0, !=2021.06.0
-hydra_core==1.1.1
-hydra_colorlog==1.1
-autograd  # TODO: to remove by fixing geomstats jax backend dependency
-# submitit
-git+https://github.com/emilemathieu/submitit.git#egg=submitit
-# hydra-submitit-launcher
-git+https://github.com/emilemathieu/hydra.git#egg=hydra-submitit-launcher&subdirectory=plugins/hydra_submitit_launcher
-hydra-joblib-launcher==1.1.5
