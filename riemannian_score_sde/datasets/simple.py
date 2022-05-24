@@ -29,7 +29,16 @@ class Uniform:
 
 class Wrapped:
     def __init__(
-        self, scale, K, batch_dims, manifold, seed, conditional, mean, **kwargs
+        self,
+        scale,
+        scale_type,
+        K,
+        batch_dims,
+        manifold,
+        seed,
+        conditional,
+        mean,
+        **kwargs,
     ):
         self.K = K
         self.batch_dims = batch_dims
@@ -48,10 +57,10 @@ class Wrapped:
         else:
             raise ValueError(f"Mean value: {mean}")
 
-        if scale == "random":
-            precision = jax.random.gamma(key=next_rng, a=100.0, shape=(K,))
-        elif scale == "fixed":
-            precision = jnp.ones((K,)) * (1 / 0.2**2)
+        if scale_type == "random":
+            precision = jax.random.gamma(key=next_rng, a=scale, shape=(K,))
+        elif scale_type == "fixed":
+            precision = jnp.ones((K,)) * (1 / scale**2)
         else:
             raise ValueError(f"Scale value: {scale}")
         self.precision = jnp.expand_dims(precision, (-1, -2))
