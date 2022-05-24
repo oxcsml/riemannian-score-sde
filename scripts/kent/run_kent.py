@@ -4,7 +4,7 @@ import os, sys
 import hydra
 import pickle
 
-sys.path.append('/Users/jamesthornton/Documents/diffusions/score-sde')
+
 
 from scripts.kent.kent_model import KentMixture, to_cartesian_coords
 from score_sde.datasets.split import random_split
