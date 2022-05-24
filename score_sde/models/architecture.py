@@ -18,13 +18,11 @@ class Concat(hk.Module):
         )
 
     def __call__(self, x, t):
-        t = jnp.array(t)
         if len(t.shape) == 0:
             t = t * jnp.ones(x.shape[:-1])
 
         if len(t.shape) == len(x.shape) - 1:
             t = jnp.expand_dims(t, axis=-1)
-
         return self._layer(jnp.concatenate([x, t], axis=-1))
 
 

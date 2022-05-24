@@ -22,12 +22,13 @@ def batch_mul(a, b):
 def get_estimate_div_fn(fn: ScoreFunction):
     """Create the divergence function of `fn` using the Hutchinson-Skilling trace estimator."""
 
-    def div_fn(x: jnp.ndarray, t: float, eps: jnp.ndarray):
-        grad_fn = lambda data: jnp.sum(fn(data, t) * eps)
-        grad_fn_eps = jax.grad(grad_fn)(x)
+    def div_fn(x: jnp.ndarray, t: float, z: jnp.ndarray, eps: jnp.ndarray):
+        eps = eps.reshape(eps.shape[0], -1)
+        grad_fn = lambda x: jnp.sum(fn(x, t, z) * eps)
+        grad_fn_eps = jax.grad(grad_fn)(x).reshape(x.shape[0], -1)
         # grad_fn = lambda x, t, eps: jnp.sum(fn(x, t) * eps)
         # grad_fn_eps = jax.vmap(jax.grad(grad_fn, argnums=0))(x, t, eps)
-        return jnp.sum(grad_fn_eps * eps, axis=tuple(range(1, len(x.shape))))
+        return jnp.sum(grad_fn_eps * eps, axis=tuple(range(1, len(eps.shape))))
 
     return div_fn
 
@@ -35,21 +36,22 @@ def get_estimate_div_fn(fn: ScoreFunction):
 def get_exact_div_fn(fn):
     "flatten all but the last axis and compute the true divergence"
 
-    def div_fn(
-        x: jnp.ndarray,
-        t: float,
-    ):
-        if len(t.shape) == len(x.shape) - 1:
-            # Assume t is just missing the last dim of x
-            t = jnp.expand_dims(t, axis=-1)
-
+    def div_fn(x: jnp.ndarray, t: float, z: jnp.ndarray):
         x_shape = x.shape
-        t_shape = t.shape
-        x = jnp.expand_dims(x.reshape((-1, x_shape[-1])), 1)
-        t = jnp.expand_dims(t.reshape((-1, t_shape[-1])), 1)
-        jac = jax.vmap(jax.jacrev(fn, argnums=0))(x, t)
-        jac = jac.reshape([*x_shape[:-1], x_shape[-1], x_shape[-1]])
-        return jnp.trace(jac, axis1=-1, axis2=-2).reshape(x_shape[:-1])
+        dim = np.prod(x_shape[1:])
+        # x = x.reshape((x.shape[0], -1))  # vec(x)
+        t = jnp.expand_dims(t.reshape(-1), axis=-1)
+        # x = jnp.expand_dims(x.reshape((-1, x_shape[-1])), 1)
+        # t = jnp.expand_dims(t.reshape((-1, t_shape[-1])), 1)
+        x = jnp.expand_dims(x, 1)  # NOTE: need leading batch dim after vmap
+        if z is not None:
+            z = jnp.expand_dims(z, 1)
+        t = jnp.expand_dims(t, 1)
+        jac = jax.vmap(jax.jacrev(fn, argnums=0))(x, t, z)
+        # jac = jac.reshape([*x_shape[:-1], x_shape[-1], x_shape[-1]])
+
+        jac = jac.reshape([x_shape[0], dim, dim])
+        return jnp.trace(jac, axis1=-1, axis2=-2)  # .reshape(x_shape[:-1])
 
     return div_fn
 

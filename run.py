@@ -1,26 +1,32 @@
 import os
+import socket
 import logging
 from functools import partial
 from timeit import default_timer as timer
-import socket
-
-from hydra.utils import instantiate, get_class, call
-from omegaconf import OmegaConf
 
 import jax
-from jax import numpy as jnp
+import optax
 import numpy as np
 import haiku as hk
-import optax
 from tqdm import tqdm
+from jax import numpy as jnp
+from score_sde.models.flow import SDEPushForward, MoserFlow
 
-from score_sde.utils import TrainState, save, restore
-from score_sde.utils.loggers_pl import LoggerCollection, Logger
-from score_sde.utils.vis import plot, earth_plot
-from score_sde.models import get_likelihood_fn_w_transform
-from score_sde.datasets import random_split, DataLoader, TensorDataset
-from score_sde.utils.tmp import compute_normalization
+from omegaconf import OmegaConf
+from hydra.utils import instantiate, get_class, call
+
 from score_sde.losses import get_ema_loss_step_fn
+from score_sde.utils import TrainState, save, restore
+from score_sde.utils.loggers_pl import LoggerCollection
+from score_sde.models import get_likelihood_fn_w_transform
+from score_sde.utils.normalization import compute_normalization
+from score_sde.utils.vis import plot, earth_plot, plot_ref, plot_so3b
+from score_sde.datasets import (
+    random_split,
+    DataLoader,
+    TensorDataset,
+    get_data_per_context,
+)
 
 log = logging.getLogger(__name__)
 
@@ -48,7 +54,8 @@ def run(cfg):
         train_time = timer()
         total_train_time = 0
         for step in t:
-            batch = {"data": transform.inv(next(train_ds))}
+            data, z = next(train_ds)
+            batch = {"data": transform.inv(data), "context": z}
             rng, next_rng = jax.random.split(rng)
             (rng, train_state), loss = train_step_fn((next_rng, train_state), batch)
             if jnp.isnan(loss).any():
@@ -66,8 +73,11 @@ def run(cfg):
                 total_train_time += timer() - train_time
                 save(ckpt_path, train_state)
                 eval_time = timer()
-                evaluate(train_state, "val", step)
-                logger.log_metrics({"val/time_per_it": (timer() - eval_time)}, step)
+                if cfg.train_val:
+                    evaluate(train_state, "val", step)
+                    logger.log_metrics({"val/time_per_it": (timer() - eval_time)}, step)
+                if cfg.train_plot:
+                    generate_plots(train_state, "val", step=step)
                 train_time = timer()
 
         logger.log_metrics({"train/total_time": total_train_time}, step)
@@ -79,70 +89,101 @@ def run(cfg):
         dataset = eval_ds if stage == "val" else test_ds
 
         model_w_dicts = (model, train_state.params_ema, train_state.model_state)
-        likelihood_fn = pushforward.get_log_prob(model_w_dicts, train=False)
+        likelihood_fn_wo_tr = pushforward.get_log_prob(model_w_dicts, train=False)
+        likelihood_fn_wo_tr = partial(likelihood_fn_wo_tr, rng)
         # TODO: merge transorm as part of PushForward
-        likelihood_fn = get_likelihood_fn_w_transform(likelihood_fn, transform)
+        likelihood_fn = get_likelihood_fn_w_transform(likelihood_fn_wo_tr, transform)
 
         logp = 0.0
+        nfe = 0.0
         N = 0
 
         if hasattr(dataset, "__len__"):
-            for x in dataset:
-                logp_step = likelihood_fn(rng, x)
+            for batch in dataset:
+                logp_step, nfe_step = likelihood_fn(*batch)
                 logp += logp_step.sum()
+                nfe += nfe_step
                 N += logp_step.shape[0]
         else:
             # TODO: handle infinite datasets more elegnatly
-            samples = 10
+            dataset.batch_dims = cfg.eval_batch_size
+            samples = round(20_000 / cfg.eval_batch_size)
             for i in range(samples):
-                x = next(dataset)
-                logp_step = likelihood_fn(rng, x)
+                batch = next(dataset)
+                logp_step, nfe_step = likelihood_fn(*batch)
+                print(f"logp_step.sum(): {logp_step.sum()/logp_step.shape[0]:.2f}")
                 logp += logp_step.sum()
+                nfe += nfe_step
                 N += logp_step.shape[0]
+            dataset.batch_dims = cfg.batch_size
         logp /= N
+        nfe /= len(dataset) if hasattr(dataset, "__len__") else samples
 
         logger.log_metrics({f"{stage}/logp": logp}, step)
         log.info(f"{stage}/logp = {logp:.3f}")
+        logger.log_metrics({f"{stage}/nfe": nfe}, step)
+        log.info(f"{stage}/nfe = {nfe:.1f}")
+
         if stage == "test":
-            Z = compute_normalization(likelihood_fn)
-            log.info(f"Z = {Z:.2f}")
-            logger.log_metrics({f"{stage}/Z": Z}, step)
+            default_z = z[0] if z is not None else None
+            try:
+                Z, _, _, _ = compute_normalization(
+                    likelihood_fn, data_manifold, z=default_z
+                )
+                log.info(f"Z = {Z:.2f}")
+                logger.log_metrics({f"{stage}/Z": Z}, step)
+            except:
+                pass
 
     def generate_plots(train_state, stage, step=None):
         log.info("Generating plots")
         rng = jax.random.PRNGKey(cfg.seed)
         dataset = eval_ds if stage == "eval" else test_ds
 
-        x0 = next(dataset)
-        z0 = transform.inv(x0)
+        M = 32 if isinstance(pushforward, SDEPushForward) else 8
+        x0, y0 = get_data_per_context(dataset, transform, M)
         ## p_0 (backward)
 
-        model_w_dicts = (model, train_state.params_ema, train_state.model_state)
-        sampler = pushforward.get_sample(model_w_dicts, train=False)
         rng, next_rng = jax.random.split(rng)
-        z = sampler(next_rng, z0.shape, N=100, eps=cfg.eps)
-        x = transform(z)
-        log.info(
-            f"Prop samples in M: {100 * data_manifold.belongs(x, atol=1e-4).mean().item()}"
-        )
-
         model_w_dicts = (model, train_state.params_ema, train_state.model_state)
+
+        sampler = pushforward.get_sample(model_w_dicts, train=False)
         likelihood_fn = pushforward.get_log_prob(model_w_dicts, train=False)
-        # TODO: merge transorm as part of PushForward
-        likelihood_fn = get_likelihood_fn_w_transform(likelihood_fn, transform)
-        likelihood_fn = partial(likelihood_fn, rng)
 
-        plt = plot(None, x, jnp.exp(likelihood_fn(x)), None)
-        logger.log_plot("x0_backw", plt, cfg.steps)
-        # prob = jnp.exp(dataset.log_prob(x0)) if hasattr(dataset, "log_prob") else None
-        # plt = plot(None, x0, prob, None)
-        # logger.log_plot("x0_true", plt, cfg.steps)
+        z = next(dataset)[1]
+        unique_z = [None] if z is None else jnp.unique(z).reshape((-1, 1))
+        xs = []
+        shape = (int(cfg.batch_size * M / len(unique_z)), *y0.shape[1:])
+        for k, z in enumerate(unique_z):
+            y = sampler(
+                next_rng,
+                shape,
+                z,
+                N=100,
+                eps=cfg.eps,
+            )
+            xs.append(transform(y))
+            log.info(
+                f"Prop samples in M: {100 * data_manifold.belongs(xs[-1], atol=1e-4).mean().item()}"
+            )
 
-        plt = earth_plot(cfg, likelihood_fn, train_ds, test_ds, N=500, samples=x)
-        if plt is not None:
-            logger.log_plot("pdf", plt, cfg.steps)
+            likelihood_fn = get_likelihood_fn_w_transform(likelihood_fn, transform)
+            likelihood_fn = partial(likelihood_fn, rng, z=z)
+
+            plt = plot(data_manifold, x0, xs)  # prob=jnp.exp(likelihood_fn(x)
+            logger.log_plot(f"x0_backw", plt, cfg.steps)
+
+        if isinstance(pushforward, SDEPushForward):
+            # sampler = jax.jit(get_pc_sampler(pushforward.sde, N=100))
+            sampler = pushforward.get_sample(model_w_dicts, train=False, reverse=False)
+            x = transform.inv(x0[0])
+            zT = sampler(rng, None, z, x=x, N=100, eps=cfg.eps)
+            plt = plot_ref(model_manifold, zT)
+            if plt is not None:
+                logger.log_plot(f"xT", plt, cfg.steps)
 
     ### Main
+    # jax.config.update("jax_enable_x64", True)
     log.info("Stage : Startup")
     log.info(f"Jax devices: {jax.devices()}")
     run_path = os.getcwd()
@@ -153,8 +194,6 @@ def run(cfg):
     loggers = [instantiate(logger_cfg) for logger_cfg in cfg.logger.values()]
     logger = LoggerCollection(loggers)
     logger.log_hyperparams(OmegaConf.to_container(cfg, resolve=True))
-    Logger.instance().set_logger(logger)
-    # Logger.get() -> returns global logger anywhere from here
 
     # TODO: should sample random seed given a run id?
     rng = jax.random.PRNGKey(cfg.seed)
@@ -188,14 +227,14 @@ def run(cfg):
             ),
             DataLoader(
                 eval_ds,
-                batch_dims=cfg.batch_size,
+                batch_dims=cfg.eval_batch_size,
                 rng=next_rng,
                 shuffle=True,
                 drop_last=False,
             ),
             DataLoader(
                 test_ds,
-                batch_dims=cfg.batch_size,
+                batch_dims=cfg.eval_batch_size,
                 rng=next_rng,
                 shuffle=True,
                 drop_last=False,
@@ -207,11 +246,9 @@ def run(cfg):
     else:
         train_ds, eval_ds, test_ds = dataset, dataset, dataset
 
-    z = transform.inv(next(train_ds))
-
     log.info("Stage : Instantiate model")
 
-    def model(x, t):
+    def model(x, t, z):
         output_shape = get_class(cfg.generator._target_).output_shape(model_manifold)
         score = instantiate(
             cfg.generator,
@@ -220,12 +257,22 @@ def run(cfg):
             output_shape,
             manifold=model_manifold,
         )
-        return score(x, t)
+        if z is not None:
+            t_expanded = jnp.expand_dims(t.reshape(-1), -1)
+            if z.shape[0] != x.shape[0]:
+                z = jnp.repeat(jnp.expand_dims(z, 0), x.shape[0], 0)
+            z = jnp.concatenate([t_expanded, z], axis=-1)
+        else:
+            z = t
+        return score(x, z)
 
     model = hk.transform_with_state(model)
 
     rng, next_rng = jax.random.split(rng)
-    params, state = model.init(rng=next_rng, x=z, t=0)
+    t = jnp.zeros((cfg.batch_size, 1))
+    data, z = next(train_ds)
+    y = transform.inv(data)
+    params, state = model.init(rng=next_rng, x=y, t=t, z=z)
 
     log.info("Stage : Instantiate optimiser")
 
@@ -248,14 +295,19 @@ def run(cfg):
             params_ema=params,
             rng=next_rng,  # TODO: we should actually use this for reproducibility
         )
+        save(ckpt_path, train_state)
 
     if cfg.mode == "train" or cfg.mode == "all":
         log.info("Stage : Training")
         train_state, success = train(train_state)
     if (cfg.mode == "test") or (cfg.mode == "all" and success):
         log.info("Stage : Test")
-        evaluate(train_state, "test")
-        generate_plots(train_state, "test")
+        if cfg.test_val:
+            evaluate(train_state, "val")
+        if cfg.test_test:
+            evaluate(train_state, "test")
+        if cfg.test_plot:
+            generate_plots(train_state, "test")
         success = True
     logger.save()
     logger.finalize("success" if success else "failure")

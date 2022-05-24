@@ -4,5 +4,5 @@ defaults:
   - /transform: id
   - /flow: brownian
   - /pushf: sde
-  - /loss: dsm0
-  - /generator: div_free
+  - /loss: dsmv
+  # - /generator: div_free

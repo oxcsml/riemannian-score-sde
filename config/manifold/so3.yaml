@@ -1,0 +1,4 @@
+_target_: geomstats.geometry.special_orthogonal.SpecialOrthogonal
+n: 3
+point_type: matrix
+# point_type: vector

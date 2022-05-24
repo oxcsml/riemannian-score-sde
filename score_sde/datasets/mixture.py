@@ -31,7 +31,7 @@ class GaussianMixture:
             normal_key, shape=self.batch_dims + self.means.shape[1:]
         )
 
-        return samples  # jnp.expand_dims(samples, axis=-1)
+        return (samples, None)  # jnp.expand_dims(samples, axis=-1)
 
 
 class vMFMixture:
@@ -68,4 +68,4 @@ class vMFMixture:
         diag = jnp.diag_indices(np.prod(self.batch_dims))
         samples = samples[diag]
         # samples = samples.reshape([*self.batch_dims, samples.shape[-1]])
-        return samples
+        return (samples, None)

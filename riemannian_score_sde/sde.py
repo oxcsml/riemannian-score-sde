@@ -8,6 +8,7 @@ from score_sde.utils import batch_mul
 
 class UniformDistribution:
     """Uniform density on compact manifold"""
+
     def __init__(self, manifold):
         self.manifold = manifold
 
@@ -15,7 +16,7 @@ class UniformDistribution:
         return self.manifold.random_uniform(state=rng, n_samples=shape[0])
 
     def log_prob(self, z):
-        return -jnp.ones([*z.shape[:-1]]) * self.manifold.metric.log_volume
+        return -jnp.ones([z.shape[0]]) * self.manifold.log_volume
 
 
 class Brownian(SDE):
@@ -32,6 +33,9 @@ class Brownian(SDE):
         normed_t = (t - self.t0) / (self.tf - self.t0)
         return self.beta_0 + normed_t * (self.beta_f - self.beta_0)
 
+    def rescale_t(self, t):
+        return 0.5 * t**2 * (self.beta_f - self.beta_0) + t * self.beta_0
+
     def coefficients(self, x, t):
         beta_t = self.beta_t(t)
         drift = jnp.zeros_like(x)
@@ -42,7 +46,7 @@ class Brownian(SDE):
         """Should not rely on closed-form marginal probability"""
         # NOTE: this is a Euclidean approx
         log_mean_coeff = (
-            -0.25 * t ** 2 * (self.beta_f - self.beta_0) - 0.5 * t * self.beta_0
+            -0.25 * t**2 * (self.beta_f - self.beta_0) - 0.5 * t * self.beta_0
         )
         # mean = batch_mul(jnp.exp(log_mean_coeff), x)
         std = jnp.sqrt(1 - jnp.exp(2.0 * log_mean_coeff))
@@ -50,30 +54,29 @@ class Brownian(SDE):
 
     def marginal_sample(self, rng, x, t, return_hist=False):
         from score_sde.sampling import get_pc_sampler
+
         # TODO: remove from class
 
-        out = self.manifold.random_walk(rng, x, t)
+        out = self.manifold.random_walk(rng, x, self.rescale_t(t))
         if return_hist or out is None:
-            sampler = get_pc_sampler(
-                self,
-                self.N,
-                return_hist=return_hist
-            )
+            sampler = get_pc_sampler(self, self.N, return_hist=return_hist)
             out = sampler(rng, x, tf=t)
         return out
 
     def grad_marginal_log_prob(self, x0, x, t, **kwargs):
-        s = 2 * (0.25 * t ** 2 * (self.beta_f - self.beta_0) + 0.5 * t * self.beta_0)
+        s = self.rescale_t(t)
         logp_grad = self.manifold.grad_marginal_log_prob(x0, x, s, **kwargs)
         return None, logp_grad
         # TODO: Appears that only Varhadan works as well
-        # return None, self.varhadan_exp(x0, x, jnp.zeros_like(t), t)[0]
+        # return None, self.varhadan_exp(x0, x, jnp.zeros_like(t), t)[1]
 
     def varhadan_exp(self, xs, xt, s, t):
-        rescaled_t = lambda t: 2 * (0.25 * t ** 2 * (self.beta_f - self.beta_0) + 0.5 * t * self.beta_0)
-        delta_t = rescaled_t(t) - rescaled_t(s)
-        grad = self.manifold.metric.log(xs, xt) / jnp.expand_dims(delta_t, -1)
-        return grad, delta_t
+        delta_t = self.rescale_t(t) - self.rescale_t(s)
+        axis_to_expand = tuple(range(-1, -len(xt.shape), -1))  # (-1) or (-1, -2)
+        delta_t = jnp.expand_dims(delta_t, axis=axis_to_expand)
+        # grad = self.manifold.metric.log(xs, xt) / delta_t
+        grad = self.manifold.log(xs, xt) / delta_t
+        return delta_t, grad
 
     def sample_limiting_distribution(self, rng, shape):
         return self.limiting.sample(rng, shape)
@@ -121,6 +124,9 @@ class VPSDE(VPSDEBase):
         super().__init__(tf, t0, beta_0, beta_f)
         self.manifold = manifold
 
+    def rescale_t(self, t):
+        return 0.5 * t**2 * (self.beta_f - self.beta_0) + t * self.beta_0
+
     def marginal_sample(self, rng, x, t):
         mean, std = self.marginal_prob(x, t)
         z = jax.random.normal(rng, x.shape)
@@ -129,7 +135,7 @@ class VPSDE(VPSDEBase):
     def grad_marginal_log_prob(self, x0, x, t, **kwargs):
         mean, std = self.marginal_prob(x0, t)
         std = jnp.expand_dims(std, -1)
-        score = - 1 / (std ** 2) * (x - mean)
+        score = -1 / (std**2) * (x - mean)
         logp = None
         return logp, score
 
