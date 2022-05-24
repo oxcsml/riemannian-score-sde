@@ -73,9 +73,9 @@ def run(cfg):
                 total_train_time += timer() - train_time
                 save(ckpt_path, train_state)
                 eval_time = timer()
-                # evaluate(train_state, "val", step)
-                # logger.log_metrics({"val/time_per_it": (timer() - eval_time)}, step)
-                # generate_plots(train_state, "val", step=step)
+                evaluate(train_state, "val", step)
+                logger.log_metrics({"val/time_per_it": (timer() - eval_time)}, step)
+                generate_plots(train_state, "val", step=step)
                 train_time = timer()
 
         logger.log_metrics({"train/total_time": total_train_time}, step)
@@ -308,15 +308,16 @@ def run(cfg):
             params_ema=params,
             rng=next_rng,  # TODO: we should actually use this for reproducibility
         )
+        save(ckpt_path, train_state)
 
     if cfg.mode == "train" or cfg.mode == "all":
         log.info("Stage : Training")
         train_state, success = train(train_state)
     if (cfg.mode == "test") or (cfg.mode == "all" and success):
         log.info("Stage : Test")
-        # evaluate(train_state, "val")
+        evaluate(train_state, "val")
         evaluate(train_state, "test")
-        # generate_plots(train_state, "test")
+        generate_plots(train_state, "test")
         success = True
     logger.save()
     logger.finalize("success" if success else "failure")
