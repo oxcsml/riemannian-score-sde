@@ -3,7 +3,7 @@ base:
   _target_: riemannian_score_sde.sde.UniformDistribution
   manifold: ${manifold}  #NOTE: Should be model_manifold
 eps: 1e-5
-diffeq: False
+diffeq: True
 # flow:
 #   _target_: score_sde.models.CNF
 #   get_drift_fn:

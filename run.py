@@ -104,13 +104,16 @@ def run(cfg):
                 N += logp_step.shape[0]
         else:
             # TODO: handle infinite datasets more elegnatly
-            samples = 10
+            dataset.batch_dims = cfg.eval_batch_size
+            samples = round(20_000 / cfg.eval_batch_size)
             for i in range(samples):
                 batch = next(dataset)
                 logp_step, nfe_step = likelihood_fn(*batch)
+                print(f"logp_step.sum(): {logp_step.sum()/logp_step.shape[0]:.2f}")
                 logp += logp_step.sum()
                 nfe += nfe_step
                 N += logp_step.shape[0]
+            dataset.batch_dims = cfg.batch_size
         logp /= N
         nfe /= len(dataset) if hasattr(dataset, "__len__") else samples
 
@@ -185,7 +188,8 @@ def run(cfg):
             x = transform.inv(x0[0])
             zT = sampler(rng, None, z, x=x, N=100, eps=cfg.eps)
             plt = plot_ref(model_manifold, zT)
-            logger.log_plot(f"xT", plt, cfg.steps)
+            if plt is not None:
+                logger.log_plot(f"xT", plt, cfg.steps)
 
     ### Main
     # jax.config.update("jax_enable_x64", True)
@@ -234,14 +238,14 @@ def run(cfg):
             ),
             DataLoader(
                 eval_ds,
-                batch_dims=cfg.batch_size,
+                batch_dims=cfg.eval_batch_size,
                 rng=next_rng,
                 shuffle=True,
                 drop_last=False,
             ),
             DataLoader(
                 test_ds,
-                batch_dims=cfg.batch_size,
+                batch_dims=cfg.eval_batch_size,
                 rng=next_rng,
                 shuffle=True,
                 drop_last=False,
