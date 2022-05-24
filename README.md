@@ -36,7 +36,21 @@ To run a toy experiment on the sphere run:
 `python main.py experiment=s2_toy`
 This should validate that the code is installed correctly and the the RSGM models are training properly.
 ### Earth datasets
-We run experiments on 4 natural disaster experiments against a number of baselines. To run the full sweeps over parameters used in the paper run:
+We run experiments on 4 natural disaster experiments against a number of baselines.
+|                           | Volcano                 | Earthquake              | Flood                  | Fire                    |
+|:--------------------------|:------------------------|:------------------------|:-----------------------|:------------------------|
+| Mixture of Kent | $-0.80_{\pm 0.47}$ | $0.33_{\pm 0.05}$ | $0.73_{\pm 0.07}$ | $-1.18_{\pm 0.06}$ |
+| Riemannian CNF            | $\bm{-6.05_{\pm 0.61}}$ | ${0.14_{\pm 0.23}}$     | ${1.11_{\pm 0.19}}$    | $\bm{-0.80_{\pm 0.54}}$ |
+| Moser Flow                | ${-4.21_{\pm 0.17}}$    | $\bm{-0.16_{\pm 0.06}}$ | $\bm{0.57_{\pm 0.10}}$ | $\bm{-1.28_{\pm 0.05}}$ |
+| Stereographic Score-Based | ${-3.80_{\pm 0.27}}$    | $\bm{-0.19_{\pm 0.05}}$ | ${0.59_{\pm 0.07}}$    | $\bm{-1.28_{\pm 0.12}}$ |
+| Riemannian Score-Based    | ${-4.92_{\pm 0.25}}$    | $\bm{-0.19_{\pm 0.07}}$ | $\bm{0.48_{\pm 0.09}}$ | $\bm{-1.33_{\pm 0.06}}$ |
+
+
+| Volcano                 | Earthquake              | Flood                  | Fire                    |
+|:------------------------|:------------------------|:-----------------------|:------------------------|
+| ![Volcano density](images/pdf_volcanoe_310122.png) | ![Earthquake density](images/pdf_earthquake_310122.png) | ![Flood density](images/pdf_flood_310122.png) | ![Fire density](images/pdf_fire_310122.png) |
+
+To run the full sweeps over parameters used in the paper run:
 
 `RSGM ISM loss`:
 ```
