@@ -26,6 +26,7 @@ flow:
 
 splits: [0.8, 0.1, 0.1]
 batch_size: 512
+eval_batch_size: 2048
 warmup_steps: 100
 steps: 100000
 val_freq: 10000
