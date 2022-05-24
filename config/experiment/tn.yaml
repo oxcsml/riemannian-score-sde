@@ -17,6 +17,7 @@ n: 1
 
 dataset:
   scale: 0.2
+  scale_type: fixed
   # conditional: true
   # K: 4
 
