@@ -31,7 +31,7 @@ The main training and testing script can be found in `run.py`, and is dispatched
 ### Logging
 By default we log to CSV files and to [Weights and biases](wandb.ai). To use weights and biases, you will need to have an appropriate `WANDB_API_KEY` set in your environment, and to modify the `entity` and `project` entries in the `config/logger/wandb.yaml` file. The top level local logging directory can be set via the `logs_dir` variable.
 
-### S^2 toy
+### $\mathcal{S}^2$ toy
 To run a toy experiment on the sphere run:
 `python main.py experiment=s2_toy`
 This should validate that the code is installed correctly and the the RSGM models are training properly.
@@ -139,7 +139,7 @@ python main.py -m \
 ```
 
 
-### SO(3) toy
+### $SO(3)$ toy
 To demonstrate that RSGMs can handle conditional modelling well, we train ... 
 
 `RSGMs, Stereo RSGMs`
