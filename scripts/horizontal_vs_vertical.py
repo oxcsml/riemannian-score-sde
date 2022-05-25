@@ -21,6 +21,16 @@ from score_sde.utils import batch_mul
 from riemannian_score_sde.sde import VPSDE
 from score_sde.sampling import get_pc_sampler
 
+# cmap_name = "RdBu"
+cmap_name = "plasma_r"
+cmap_name = "viridis_r"
+
+# plt.rcParams["text.usetex"] = True
+# plt.rcParams["font.family"] = ["Computer Modern Roman"]
+plt.rcParams.update(
+    {"text.usetex": True, "font.family": "sans-serif", "font.sans-serif": ["Helvetica"]}
+)
+
 #%%
 class Normal:
     def __init__(self, mean=0, scale=1):
@@ -60,12 +70,12 @@ p_dict = {"moser": ps_moser, "sgm": ps_sgm}
 name_dict = {"moser": "Moser flow", "sgm": "Score-based generative model"}
 
 fig, axis = plt.subplots(1, 2, figsize=(15, 5), sharey=True, sharex=True)
-colors = sns.color_palette("RdBu", len(ts))
+colors = sns.color_palette(cmap_name, len(ts))
 fontsize = 20
 
 for i, (ax, method) in enumerate(zip(axis, ["moser", "sgm"])):
     for k, t in enumerate(ts):
-        ax.plot(xs, p_dict[method][k], c=colors[k], label=f"t={t:.1f}", lw=3)
+        ax.plot(xs, p_dict[method][k], c=colors[k], label=f"t={t:.1f}", lw=3, alpha=0.5)
 
     # ax.set_xlabel("x", fontsize=fontsize)
     if i == 0:
@@ -173,8 +183,7 @@ for i, (ax, model) in enumerate(zip(axis, p_dict.keys())):
             )
         sq_norm = jnp.sqrt(sq_norm)
         label = r"$\mathbb{E}[p_0]$" + f"={a:}"
-        colors = sns.color_palette("Blues", len(p0_means))
-        # colors = sns.color_palette("crest", len(p0_means))
+        colors = sns.color_palette(cmap_name, len(p0_means))
         ax.plot(ts[1:-1], sq_norm[1:-1], c=colors[k], label=label, lw=3)
     ax.set_yscale("log")
     if i == 0:
@@ -210,7 +219,7 @@ for i, (ax, model) in enumerate(zip(axis, p_dict.keys())):
 
     indices = jnp.arange(N)[(jnp.arange(N) % 100) == 0]
     indices = jnp.concatenate([indices, jnp.array([N])])
-    colors = sns.color_palette("RdBu", len(indices))
+    colors = sns.color_palette(cmap_name, len(indices))
     for k, idx in enumerate(indices):
         ax.hist(
             np.array(xt[idx]),

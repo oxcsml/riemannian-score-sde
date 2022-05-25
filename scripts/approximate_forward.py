@@ -24,6 +24,8 @@ from riemannian_score_sde.sde import VPSDE, Brownian
 from score_sde.models.flow import PushForward, CNF
 from score_sde.sampling import get_pc_sampler
 
+cmap_name = "plasma_r"
+cmap_name = "viridis_r"
 #%%
 rng = random.PRNGKey(1)
 B = 512 * 4
@@ -97,8 +99,7 @@ Ns = np.array([1, 2, 5, 50, 100, 1000])
 # Ns = np.array([2, 5, 10, 20, 50, 100])
 
 fig, ax = plt.subplots(1, 1, figsize=(10, 6), sharey=True, sharex=True)
-colors = sns.color_palette("Blues", len(Ns))
-# colors = sns.color_palette("crest", len(Ns))
+colors = sns.color_palette(cmap_name, len(Ns))
 fontsize = 30
 
 for i, N in enumerate(Ns):
