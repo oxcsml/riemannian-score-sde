@@ -5,6 +5,7 @@
 
 defaults:
   - /manifold: nsphere
+  - /generator: div_free
   - /model: rsgm
   - /architecture: concat
   - /embedding: none

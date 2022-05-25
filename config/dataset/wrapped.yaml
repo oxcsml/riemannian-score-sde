@@ -1,0 +1,10 @@
+_target_: riemannian_score_sde.datasets.simple.Wrapped
+_convert_: partial
+scale_type: random
+scale: 100
+K: 1
+batch_dims:
+  - ${batch_size}
+manifold: ${manifold}
+seed: ${seed}
+conditional: false

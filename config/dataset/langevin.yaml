@@ -1,0 +1,9 @@
+_target_: riemannian_score_sde.datasets.simple.Langevin
+_convert_: partial
+scale: 10
+K: 1
+batch_dims:
+  - ${batch_size}
+manifold: ${manifold}
+seed: ${seed}
+conditional: false

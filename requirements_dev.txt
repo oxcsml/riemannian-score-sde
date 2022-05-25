@@ -2,5 +2,3 @@ black
 ipykernel
 tensorflow
 tensorflow_datasets
-seaborn
-wandb

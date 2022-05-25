@@ -53,7 +53,7 @@ We run experiments on 4 natural disaster experiments against a number of baselin
 | Riemannian Score-Based (ours)    |  -4.92 ± 0.25 |  * -0.19 ± 0.07 |  * 0.48 ± 0.09 |  * -1.33 ± 0.06 |
 
 Examples of densities learned by RSGMs on the datasets:
-| Volcano--- | Earthquake | Flood----- | Fire------ |
+| Volcano | Earthquake | Flood | Fire |
 |:-|:-|:-|:-|
 | ![Volcano density](images/pdf_volcanoe_310122.png) | ![Earthquake density](images/pdf_earthquake_310122.png) | ![Flood density](images/pdf_flood_310122.png) | ![Fire density](images/pdf_fire_310122.png) |
 

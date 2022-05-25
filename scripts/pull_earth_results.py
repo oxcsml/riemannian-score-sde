@@ -59,6 +59,7 @@ config_cols = [k for k in runs_df.columns if k.startswith("config")]
 def make_method(row):
     if "moser" in row["group"]:
         return "Moser Flow"
+
     elif "stereo" in row["group"]:
         return "Stereo SGM"
     elif "cnf" in row["group"]:
@@ -109,6 +110,7 @@ def make_table_from_metric(
         sem = stats.sem(data)
         t2 = stats.t.ppf(1 - alpha, len(data) - 1) - stats.t.ppf(alpha, len(data) - 1)
         return sem * (t2 / 2)
+        # return np.std(data)
 
     def lower_ci(group):
         data = group.to_numpy()
@@ -124,12 +126,24 @@ def make_table_from_metric(
         t = stats.t.ppf(1 - alpha, len(data) - 1)
         return mean + sem * t
 
+    def count(group):
+        data = group.to_numpy()
+        return np.prod(data.shape)
+
     results = (
         results.groupby(by=["group", "method", "dataset"])
         .agg(
             {
-                metric: ["mean", "std", "sem", lower_ci, upper_ci, half_ci],
-                val_metric: ["mean", "std", "sem", lower_ci, upper_ci, half_ci],
+                metric: ["mean", "std", "sem", lower_ci, upper_ci, half_ci, count],
+                val_metric: [
+                    "mean",
+                    "std",
+                    "sem",
+                    lower_ci,
+                    upper_ci,
+                    half_ci,
+                    count,
+                ],
             }
         )
         .reset_index()
@@ -185,10 +199,10 @@ def make_table_from_metric(
     if latex:
         table["result"] = table.apply(lambda row: "$" + row["result"] + "$", axis=1)
 
+    table["count"] = table[(metric, "count")]
+
     cols = (
-        ["method", "dataset", "group"]
-        if show_group
-        else ["method", "dataset", "result"]
+        ["method", "dataset", "group"] if show_group else ["method", "dataset", "count"]
     )
 
     table_flat = table[cols].pivot(index="method", columns="dataset")
@@ -218,6 +232,7 @@ test_table = make_table_from_metric(
     "test/logp", runs_df, val_metric="val/logp", drop_nans=True
 )
 test_table
+
 # %%
 test_table = make_table_from_metric("test/logp", runs_df, val_metric="test/logp")
 test_table
@@ -227,7 +242,7 @@ make_table_from_metric("val/logp", runs_df, show_group=True).to_csv("best_config
 
 print(
     make_table_from_metric(
-        "val/logp", results, pm_metric="sem", latex=True, bold=True
+        "test/logp", runs_df, val_metric="val/logp", drop_nans=True
     ).to_latex(escape=False)
 )
 

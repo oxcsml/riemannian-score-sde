@@ -6,13 +6,24 @@ import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 import seaborn as sns
 
+# plt.rcParams["text.usetex"] = True
+# plt.rcParams["font.family"] = ["Computer Modern Roman"]
+# plt.rcParams.update({"font.size": 20})
+
 import geomstats.backend as gs
 import geomstats.visualization as visualization
 from geomstats.geometry.hypersphere import Hypersphere
+from geomstats.geometry.euclidean import Euclidean
+from geomstats.geometry.special_orthogonal import (
+    _SpecialOrthogonalMatrices,
+    _SpecialOrthogonal3Vectors,
+)
+from geomstats.geometry.product_manifold import ProductSameManifold
 
 import jax
 from jax import numpy as jnp
 import numpy as np
+from scipy.stats import norm
 
 try:
     plt.switch_backend("MACOSX")
@@ -117,7 +128,7 @@ def get_spherical_grid(N, eps=0.0):
     return xs, lat, lon
 
 
-def plot(x0, xt, prob, grad, x0prob=None, size=10, dpi=300, out="out.jpg", color="red"):
+def plot_3d(x0s, xts, size, prob):
     fig = plt.figure(figsize=(size, size))
     ax = fig.add_subplot(111, projection="3d")
     ax = remove_background(ax)
@@ -129,18 +140,19 @@ def plot(x0, xt, prob, grad, x0prob=None, size=10, dpi=300, out="out.jpg", color
     sphere.draw(ax, color="red", marker=".")
     # sphere_plot(ax)
     # sphere.plot_heatmap(ax, pdf, n_points=16000, alpha=0.2, cmap=cmap)
-    if x0 is not None:
-        cax = ax.scatter(x0[:, 0], x0[:, 1], x0[:, 2], s=50, color="green")
-    if xt is not None:
-        x, y, z = xt[:, 0], xt[:, 1], xt[:, 2]
-        c = prob if prob is not None else np.ones([*xt.shape[:-1]])
-        cax = ax.scatter(x, y, z, s=50, vmin=0.0, vmax=2.0, c=c, cmap=cmap)
-    if grad is not None:
-        u, v, w = grad[:, 0], grad[:, 1], grad[:, 2]
-        quiver = ax.quiver(
-            x, y, z, u, v, w, length=0.2, lw=2, normalize=False, cmap=cmap
-        )
-        quiver.set_array(c)
+    for k, (x0, xt) in enumerate(zip(x0s, xts)):
+        if x0 is not None:
+            cax = ax.scatter(x0[:, 0], x0[:, 1], x0[:, 2], s=50, color="green")
+        if xt is not None:
+            x, y, z = xt[:, 0], xt[:, 1], xt[:, 2]
+            c = prob if prob is not None else np.ones([*xt.shape[:-1]])
+            cax = ax.scatter(x, y, z, s=50, vmin=0.0, vmax=2.0, c=c, cmap=cmap)
+        # if grad is not None:
+        #     u, v, w = grad[:, 0], grad[:, 1], grad[:, 2]
+        #     quiver = ax.quiver(
+        #         x, y, z, u, v, w, length=0.2, lw=2, normalize=False, cmap=cmap
+        #     )
+        #     quiver.set_array(c)
 
     plt.colorbar(cax)
     # plt.savefig(out, dpi=dpi, bbox_inches="tight", transparent=True)
@@ -148,28 +160,10 @@ def plot(x0, xt, prob, grad, x0prob=None, size=10, dpi=300, out="out.jpg", color
     return fig
 
 
-def setup_sphere_plot(size=10, dpi=300, elev=0, azim=45):
-    fig = plt.figure(figsize=(size, size))
-    ax = fig.add_subplot(111, projection="3d")
-    ax = remove_background(ax)
-    fig.subplots_adjust(left=-0.2, bottom=-0.2, right=1.2, top=1.2, wspace=0, hspace=0)
-    # ax.view_init(elev=30, azim=45)
-    ax.view_init(elev=elev, azim=azim)
-    sphere = visualization.Sphere()
-    sphere.draw(ax, color="red", marker=".")
-
-    return fig, ax
-
-
-def scatter_earth(x, ax=None, s=50, color="green"):
-    if ax is None:
-        ax = setup_sphere_plot()
-    cax = ax.scatter(x[:, 0], x[:, 1], -x[:, 2], s=s, color=color)
-
-
 def earth_plot(cfg, log_prob, train_ds, test_ds, N, azimuth=None, samples=None):
     """generate earth plots with model density or integral paths aka streamplot"""
     has_cartopy = importlib.find_loader("cartopy")
+    print("has_cartopy", has_cartopy)
     if not has_cartopy:
         return
 
@@ -276,3 +270,321 @@ def earth_plot(cfg, log_prob, train_ds, test_ds, N, azimuth=None, samples=None):
             figs.append(fig)
 
     return figs
+
+
+def plot_so3(x0s, xts, size, **kwargs):
+    colors = sns.color_palette("husl", len(x0s))
+    # colors = sns.color_palette("tab10")
+    fig, axes = plt.subplots(
+        2,
+        3,
+        # figsize=(1.2 * size, 0.6 * size),
+        figsize=(2 * size, 1 * size),
+        sharex=False,
+        sharey="col",
+        tight_layout=True,
+    )
+    # x_labels = [r"$\alpha$", r"$\beta$", r"$\gamma$"]
+    x_labels = [r"$\phi$", r"$\theta$", r"$\psi$"]
+    y_labels = ["Target", "Model"]
+    # bins = round(math.sqrt(len(w[:, 0])))
+    bins = 100
+
+    for k, (x0, xt) in enumerate(zip(x0s, xts)):
+        # print(k, x0.shape, xt.shape)
+        for i, x in enumerate([x0, xt]):
+            w = _SpecialOrthogonal3Vectors().tait_bryan_angles_from_matrix(x)
+            # w = _SpecialOrthogonal3Vectors().rotation_vector_from_matrix(x)
+            w = np.array(w)
+            for j in range(3):
+                axes[i, j].hist(
+                    w[:, j],
+                    bins=bins,
+                    density=True,
+                    alpha=0.3,
+                    color=colors[k],
+                    label=f"Component #{k}",
+                )
+                if j == 1:
+                    axes[i, j].set(xlim=(-math.pi / 2, math.pi / 2))
+                    axes[i, j].set_xticks([-math.pi / 2, 0, math.pi / 2])
+                    axes[i, j].set_xticklabels(
+                        [r"$-\pi/2$", "0", r"$\pi/2$"], color="k"
+                    )
+                else:
+                    axes[i, j].set(xlim=(-math.pi, math.pi))
+                    axes[i, j].set_xticks([-math.pi, 0, math.pi])
+                    axes[i, j].set_xticklabels([r"$-\pi$", "0", r"$\pi$"], color="k")
+                if j == 0:
+                    axes[i, j].set_ylabel(y_labels[i], fontsize=30)
+                # if i == 0 and j == 0:
+                # axes[i, j].legend(loc="best", fontsize=20)
+                if i == 0:
+                    axes[i, j].get_xaxis().set_visible(False)
+                if i == 1:
+                    axes[i, j].set_xlabel(x_labels[j], fontsize=30)
+                axes[i, j].tick_params(axis="both", which="major", labelsize=20)
+
+    plt.close(fig)
+    return fig
+
+
+def proj_t2(x):
+    return jnp.mod(
+        jnp.stack(
+            [jnp.arctan2(x[..., 0], x[..., 1]), jnp.arctan2(x[..., 2], x[..., 3])],
+            axis=-1,
+        ),
+        jnp.pi * 2,
+    )
+
+
+def plot_t2(x0s, xts, size, **kwargs):
+    fig, axes = plt.subplots(
+        1,
+        2,
+        figsize=(0.6 * size, 0.6 * size),
+        sharex=False,
+        sharey=False,
+        tight_layout=True,
+    )
+
+    for k, (x0, xt) in enumerate(zip(x0s, xts)):
+        for i, x in enumerate([x0, xt]):
+            x = proj_t2(x)
+            axes[i].scatter(x[..., 0], x[..., 1], s=0.1)
+
+    for ax in axes:
+        ax.set_xlim([0, 2 * jnp.pi])
+        ax.set_ylim([0, 2 * jnp.pi])
+        ax.set_aspect("equal")
+
+    plt.close(fig)
+    return fig
+
+
+import seaborn as sns
+
+
+def plot_tn(x0s, xts, size, **kwargs):
+    n = x0s[0].shape[-1]
+    n = min(5, n // 4)
+
+    fig, axes = plt.subplots(
+        n,
+        2,
+        figsize=(0.6 * size, 0.6 * size * n / 2),
+        sharex=False,
+        sharey=False,
+        tight_layout=True,
+        squeeze=False,
+    )
+    # cmap = sns.mpl_palette("viridis")
+    for k, (x0, xt) in enumerate(zip(x0s, xts)):
+        print(x0.shape)
+        for i, x in enumerate([x0, xt]):
+            for j in range(n):
+                x_ = proj_t2(x[..., (4 * j) : (4 * (j + 1))])
+                axes[j][i].scatter(x_[..., 0], x_[..., 1], s=0.1)
+                # sns.kdeplot(
+                #     x=np.asarray(x_[..., 0]),
+                #     y=np.asarray(x_[..., 1]),
+                #     ax=axes[j][i],
+                #     cmap=cmap,
+                #     fill=True,
+                #     # levels=15,
+                # )
+
+    axes = [item for sublist in axes for item in sublist]
+    for ax in axes:
+        ax.set_xlim([0, 2 * jnp.pi])
+        ax.set_ylim([0, 2 * jnp.pi])
+        ax.set_aspect("equal")
+
+    plt.close(fig)
+    return fig
+
+
+def proj_t1(x):
+    return jnp.mod(jnp.arctan2(x[..., 0], x[..., 1]), 2 * np.pi)
+
+
+def plot_t1(x0s, xts, size, **kwargs):
+    fig, axes = plt.subplots(
+        1,
+        2,
+        figsize=(0.6 * size, 0.6 * size),
+        sharex=False,
+        sharey=True,
+        tight_layout=True,
+    )
+
+    for k, (x0, xt) in enumerate(zip(x0s, xts)):
+        for i, x in enumerate([x0, xt]):
+            x = proj_t1(x)
+            sns.kdeplot(x, ax=axes[i])
+            plt.scatter(jnp.zeros_like(x), x, marker="|")
+
+    for ax in axes:
+        ax.set_xlim([0, 2 * jnp.pi])
+
+    plt.close(fig)
+    return fig
+
+
+def plot_so3_uniform(x, size=10):
+    colors = sns.color_palette("husl", len(x))
+    fig, axes = plt.subplots(
+        1,
+        3,
+        # figsize=(1.2 * size, 0.6 * size),
+        figsize=(2 * size, 0.5 * size),
+        sharex=False,
+        sharey=True,
+        tight_layout=True,
+    )
+    x_labels = [r"$\phi$", r"$\theta$", r"$\psi$"]
+    # bins = round(math.sqrt(len(w[:, 0])))
+    bins = 100
+    w = _SpecialOrthogonal3Vectors().tait_bryan_angles_from_matrix(x)
+    w = np.array(w)
+
+    for j in range(3):
+        if j == 1:
+            grid = np.linspace(-np.pi / 2, np.pi / 2, 100)
+            axes[j].set_xticks([grid[0], 0, grid[-1]])
+            axes[j].set_xticklabels([r"$-\pi/2$", "0", r"$\pi/2$"], color="k")
+            y = np.sin(grid + math.pi / 2) / 2
+        else:
+            grid = np.linspace(-np.pi, np.pi, 100, endpoint=True)
+            axes[j].set_xticks([grid[0], 0, grid[-1]])
+            axes[j].set_xticklabels([r"$-\pi$", "0", r"$\pi$"], color="k")
+            y = 1 / (2 * np.pi) * np.ones_like(grid)
+        axes[j].hist(
+            w[:, j],
+            bins=bins,
+            density=True,
+            alpha=0.3,
+            color=colors[0],
+            label=r"$x_{t_f}$",
+        )
+        axes[j].set(xlim=(grid[0], grid[-1]))
+        axes[j].set_xlabel(x_labels[j], fontsize=30)
+        axes[j].tick_params(axis="both", which="major", labelsize=20)
+        axes[j].plot(grid, y, alpha=0.5, lw=4, color="black", label=r"$p_{ref}$")
+        if j == 0:
+            axes[j].legend(loc="best", fontsize=20)
+
+    plt.close(fig)
+    return fig
+
+
+def plot_so3b(prob, lambda_x, N, size=10):
+    fig, axes = plt.subplots(
+        1,
+        3,
+        # figsize=(1.2 * size, 0.6 * size),
+        figsize=(2 * size, 0.5 * size),
+        sharex=False,
+        sharey=True,
+        tight_layout=True,
+    )
+    x_labels = [r"$\phi$", r"$\theta$", r"$\psi$"]
+    prob = prob.reshape(N, N // 2, N)
+    lambda_x = lambda_x.reshape(N, N // 2, N)
+
+    for j in range(3):
+        if j == 1:
+            grid = np.linspace(-np.pi / 2, np.pi / 2, N // 2)
+            axes[j].set_xticks([grid[0], 0, grid[-1]])
+            axes[j].set_xticklabels([r"$-\pi/2$", "0", r"$\pi/2$"], color="k")
+        else:
+            grid = np.linspace(-np.pi, np.pi, N)
+            axes[j].set_xticks([grid[0], 0, grid[-1]])
+            axes[j].set_xticklabels([r"$-\pi$", "0", r"$\pi$"], color="k")
+
+        y = jnp.mean(prob * lambda_x, axis=jnp.delete(jnp.arange(3), j))
+
+        axes[j].set(xlim=(grid[0], grid[-1]))
+        axes[j].set_xlabel(x_labels[j], fontsize=30)
+        axes[j].tick_params(axis="both", which="major", labelsize=20)
+        axes[j].plot(grid, y, alpha=0.5, lw=4, color="black", label=r"$p_{ref}$")
+        if j == 0:
+            axes[j].legend(loc="best", fontsize=20)
+
+    plt.close(fig)
+    return fig
+
+
+def plot_normal(x, size=10):
+    colors = sns.color_palette("husl", len(x))
+    fig, axes = plt.subplots(
+        1,
+        3,
+        # figsize=(1.2 * size, 0.6 * size),
+        figsize=(2 * size, 0.5 * size),
+        sharex=False,
+        sharey=True,
+        tight_layout=True,
+    )
+    bins = 100
+    w = np.array(x)
+    for j in range(w.shape[-1]):
+        grid = np.linspace(-3, 3, 100)
+        y = norm().pdf(grid)
+        axes[j].hist(
+            w[:, j],
+            bins=bins,
+            density=True,
+            alpha=0.3,
+            color=colors[0],
+            label=r"$x_{t_f}$",
+        )
+        axes[j].set(xlim=(grid[0], grid[-1]))
+        axes[j].set_xlabel(rf"$e_{j+1}$", fontsize=30)
+        axes[j].tick_params(axis="both", which="major", labelsize=20)
+        axes[j].plot(grid, y, alpha=0.5, lw=4, color="black", label=r"$p_{ref}$")
+        if j == 0:
+            axes[j].legend(loc="best", fontsize=20)
+
+    plt.close(fig)
+    return fig
+
+
+def plot(manifold, x0, xt, prob=None, size=10):
+    if isinstance(manifold, Euclidean) and manifold.dim == 3:
+        fig = plot_3d(x0, xt, size, prob=prob)
+    elif isinstance(manifold, Hypersphere) and manifold.dim == 2:
+        fig = plot_3d(x0, xt, size, prob=prob)
+    elif isinstance(manifold, _SpecialOrthogonalMatrices) and manifold.dim == 3:
+        fig = plot_so3(x0, xt, size, prob=prob)
+    elif (
+        isinstance(manifold, ProductSameManifold)
+        and isinstance(manifold.manifold, Hypersphere)
+        and manifold.manifold.dim == 1
+        and manifold.dim == 1
+    ) or (isinstance(manifold, Hypersphere) and manifold.dim == 1):
+        fig = plot_t1(x0, xt, size, prob=prob)
+    elif (
+        isinstance(manifold, ProductSameManifold)
+        and isinstance(manifold.manifold, Hypersphere)
+        and manifold.manifold.dim == 1
+    ):
+        fig = plot_tn(x0, xt, size, prob=prob)
+    else:
+        print("Only plotting over R^3, S^2, S1/T1, T2, TN and SO(3) is implemented.")
+        return None
+    return fig
+
+
+def plot_ref(manifold, xt, size=10):
+    if isinstance(manifold, Euclidean) and manifold.dim == 3:
+        fig = plot_normal(xt, size)
+    elif isinstance(manifold, Hypersphere) and manifold.dim == 2:
+        fig = None
+    elif isinstance(manifold, _SpecialOrthogonalMatrices) and manifold.dim == 3:
+        fig = plot_so3_uniform(xt, size)
+    else:
+        print("Only plotting over R^3, S^2 and SO(3) is implemented.")
+        return None
+    return fig
