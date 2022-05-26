@@ -22,7 +22,7 @@ pip install -e geomstats
 pip install -e .
 ```
 
-- `requirements.txt` contains the core requirements for running the code in the `score_sde` and `riemmanian_score_sde` packages. NOTE: you ma need to alter the jax versions here to match your setup.
+- `requirements.txt` contains the core requirements for running the code in the `score_sde` and `riemmanian_score_sde` packages. NOTE: you may need to alter the jax versions here to match your setup.
 - `requirements_exps.txt` contains extra dependencies needed for running our experiments, and using the `run.py` file provided for training / testing models. 
 - `requirements_slurm.txt` contains extra dependencies for using the job scheduling functionality of hydra.
 - `requirements_dev.txt` contains some handy development packages.
@@ -34,13 +34,30 @@ The bulk of the code for this project can be found in 3 places
 - The `riemannian_score_sde` package contains code needed to extend the code in `score_sde` to Riemannian manifolds.
 - An extended version of [geomstats](https://github.com/oxcsml/geomstats/tree/jax_backend) that adds `jax` support, and a number of other extensions.
 
-Most of the models used in this paper can be though of as a pushforward of a simple density under some continuous-time transformation into a more complex density. In code, this is represented by a `score_sde.models.flow.PushForward`, containing a base distribution, and in the simplest case, a time dependant vector field that defines the flow of the density through time.
+Most of the models used in this paper can be though of as a pushforward of a simple density under some continuous-time transformation into a more complex density. In code, this is represented by a `score_sde.models.flow.PushForward`, containing a base distribution, and in the simplest case, a time dependent vector field that defines the flow of the density through time.
 
-A `Continuous Normalizing Flow (CNF) [score_sde.models.flow.PushForward]` takes sampled from the pushforward distribution by evolving samples from the base measure under the action of the vector field. The log-likelihood is computed by adding the integral of the divergence of the vector field along the sample path to the log-likelihood of the point under the base measure. Models are trained by optimising this log-likelihood of the training data.
+A `Continuous Normalizing Flow (CNF) [score_sde.models.flow.PushForward]`
+samples from the pushforward distribution by evolving samples from the base
+measure under the action of the vector field. The log-likelihood is computed by
+adding the integral of the divergence of the vector field along the sample path
+to the log-likelihood of the point under the base measure. Models are trained by
+optimising this log-likelihood of the training data.
 
-`Moser flows [score_sde.models.flow.MoserFlow]` alleviate the expensive likelihood computation in training using an alternative, cheaper, method of computing the likelihood. This unfortunately requires a condition on the pushforward vector field, which is enforced by a regularisation term in the loss. This unfortunately make the cheaper likelihood computation unreliable, and the sampling must still be done with expensive ODE solutions.
+`Moser flows [score_sde.models.flow.MoserFlow]` alleviate the expensive
+likelihood computation in training using an alternative, cheaper, method of
+computing the likelihood. This unfortunately requires a condition on the
+pushforward vector field, which is enforced by a regularisation term in the
+loss. As a result the cheaper likelihood computation unreliable, and the
+sampling must still be done with expensive ODE solutions.
 
-`Score-based Generative Models (SGMs) [score_sde.models.flow.SDEPushForward]` instead consider a pushforward defined by the reversals of a noising Stochastic Differential Equation (SDE). Instead of relying on likelihood based training, these models are trained using cheaper score matching. Samples are taken by rolling out an SDE instead of an ODE. The likelihood is computed by converting the SDE to the corresponding likelihood ODE. While identical in nature to the likelihood ODE of CNFs/Moser flows, these are typically easier to solve computationally due the the learned vector fields being less stiff.
+`Score-based Generative Models (SGMs) [score_sde.models.flow.SDEPushForward]`
+instead consider a pushforward defined by the time-reversal of a noising
+Stochastic Differential Equation (SDE). Instead of relying on likelihood based
+training, these models are trained using score matching. The likelihood is
+computed by converting the SDE to the corresponding likelihood ODE. While
+identical in nature to the likelihood ODE of CNFs/Moser flows, these are
+typically easier to solve computationally due the learned vector fields
+being less stiff.
 
 Other core pieces of code include:
 
@@ -65,7 +82,7 @@ By default we log to CSV files and to [Weights and biases](wandb.ai). To use wei
 ### $S^2 toy
 To run a toy experiment on the sphere run:
 `python main.py experiment=s2_toy`
-This should validate that the code is installed correctly and the the RSGM models are training properly.
+This should validate that the code is installed correctly and the RSGM models are training properly.
 ### Earth datasets
 We run experiments on 4 natural disaster experiments against a number of baselines.
 |                           | Volcano                 | Earthquake              | Flood                  | Fire                    |

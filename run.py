@@ -106,7 +106,8 @@ def run(cfg):
                 N += logp_step.shape[0]
         else:
             # TODO: handle infinite datasets more elegnatly
-            dataset.batch_dims = cfg.eval_batch_size
+            dataset.batch_dims = [cfg.eval_batch_size]
+            print('config batch size: {}'.format(cfg.batch_size))
             samples = round(20_000 / cfg.eval_batch_size)
             for i in range(samples):
                 batch = next(dataset)
@@ -115,7 +116,7 @@ def run(cfg):
                 logp += logp_step.sum()
                 nfe += nfe_step
                 N += logp_step.shape[0]
-            dataset.batch_dims = cfg.batch_size
+            dataset.batch_dims = [cfg.batch_size]
         logp /= N
         nfe /= len(dataset) if hasattr(dataset, "__len__") else samples
 

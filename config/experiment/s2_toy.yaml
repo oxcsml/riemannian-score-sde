@@ -7,12 +7,8 @@ name: s2_toy
 
 defaults:
   - /manifold: nsphere
-  # - /sde: brownian
-  # - /transform: id
-  - /model: dsm
+  - /model: rsgm
   - /dataset: vmf
-  # - /loss: dsm
-  # - /generator: div_free
   - /architecture: concat
   - /embedding: none
 
@@ -24,6 +20,7 @@ sde:
   tf: 1
 
 batch_size: 512
+eval_batch_size: 512
 warmup_steps: 100
 steps: 5000
 val_freq: 500 # !!float inf
