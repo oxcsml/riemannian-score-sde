@@ -30,7 +30,7 @@ pip install -e .
 ## Code structure
 
 The bulk of the code for this project can be found in 3 places
-- The `score_sde` package contains code to run SDEs on Euclidean space.
+- The `score_sde` package contains code to run SDEs on Euclidean space. This code is modified from the code from the paper [Score-Based Generative Modeling through Stochastic Differential Equations](https://github.com/yang-song/score_sde).
 - The `riemannian_score_sde` package contains code needed to extend the code in `score_sde` to Riemannian manifolds.
 - An extended version of [geomstats](https://github.com/oxcsml/geomstats/tree/jax_backend) that adds `jax` support, and a number of other extensions.
 
