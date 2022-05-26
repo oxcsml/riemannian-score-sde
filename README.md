@@ -22,7 +22,7 @@ pip install -e geomstats
 pip install -e .
 ```
 
-- `requirements.txt` contains the core requirements for running the code in the `score_sde` and `riemmanian_score_sde` packages. NOTE: you ma need to alter the jax versions here to match your setup.
+- `requirements.txt` contains the core requirements for running the code in the `score_sde` and `riemmanian_score_sde` packages. NOTE: you may need to alter the jax versions here to match your setup.
 - `requirements_exps.txt` contains extra dependencies needed for running our experiments, and using the `run.py` file provided for training / testing models. 
 - `requirements_slurm.txt` contains extra dependencies for using the job scheduling functionality of hydra.
 - `requirements_dev.txt` contains some handy development packages.
@@ -34,7 +34,7 @@ The bulk of the code for this project can be found in 3 places
 - The `riemannian_score_sde` package contains code needed to extend the code in `score_sde` to Riemannian manifolds.
 - An extended version of [geomstats](https://github.com/oxcsml/geomstats/tree/jax_backend) that adds `jax` support, and a number of other extensions.
 
-Most of the models used in this paper can be though of as a pushforward of a simple density under some continuous-time transformation into a more complex density. In code, this is represented by a `score_sde.models.flow.PushForward`, containing a base distribution, and in the simplest case, a time dependant vector field that defines the flow of the density through time.
+Most of the models used in this paper can be though of as a pushforward of a simple density under some continuous-time transformation into a more complex density. In code, this is represented by a `score_sde.models.flow.PushForward`, containing a base distribution, and in the simplest case, a time dependent vector field that defines the flow of the density through time.
 
 A `Continuous Normalizing Flow (CNF) [score_sde.models.flow.PushForward]`
 samples from the pushforward distribution by evolving samples from the base
