@@ -1,5 +1,5 @@
 # Riemannian Score-Based Generative Modelling
-[![Paper - Openreview](https://img.shields.io/badge/Paper-Openreview-8D2912)](https://openreview.net/forum?id=oDRQGo8I7P) [![Paper - Arxiv](https://img.shields.io/badge/Paper-Arxiv-B4371A)](https://arxiv.org/abs/2202.02763)
+[![Paper - Openreview](https://img.shields.io/badge/Paper-Openreview-8D2912)](https://openreview.net/forum?id=oDRQGo8I7P)
 
 This repo requires a modified version of [geomstats](https://github.com/geomstats/geomstats) that adds jax functionality, and a number of other modifications. This can be found [here](https://github.com/oxcsml/geomstats.git ) on the branch `jax_backend`.
 
