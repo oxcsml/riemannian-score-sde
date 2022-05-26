@@ -5,4 +5,4 @@ defaults:
   - /flow: brownian
   - /pushf: sde
   - /loss: dsmv
-  # - /generator: div_free
+  - /generator: div_free
