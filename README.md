@@ -22,7 +22,7 @@ pip install -e geomstats
 pip install -e .
 ```
 
-- `requirements.txt` contains the core requirements for running the code in the `score_sde` and `riemmanian_score_sde` packages. NOTE: you ma need to alter the jax versions here to match your setup.
+- `requirements.txt` contains the core requirements for running the code in the `score_sde` and `riemmanian_score_sde` packages. NOTE: you may need to alter the jax versions here to match your setup.
 - `requirements_exps.txt` contains extra dependencies needed for running our experiments, and using the `run.py` file provided for training / testing models. 
 - `requirements_slurm.txt` contains extra dependencies for using the job scheduling functionality of hydra.
 - `requirements_dev.txt` contains some handy development packages.
