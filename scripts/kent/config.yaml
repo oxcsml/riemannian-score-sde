@@ -1,0 +1,13 @@
+
+defaults:
+  - override hydra/launcher: joblib
+
+data_folder: /Users/jamesthornton/Documents/diffusions/score-sde/data
+seed: 0
+dataset: volerup
+initializations: 20
+n_components: 20
+iterations: 100
+output_dir: '/Users/jamesthornton/Documents/diffusions/score-sde/scripts/kent/output'
+
+#  ../../../miniconda3/envs/diffusions/bin/python scripts/kent/run_kent.py -m seed=1,2,3,4,5 dataset=fire,flood,quakes_all,volerup n_components=5,10,15,20,25 iterations=50,100,150
