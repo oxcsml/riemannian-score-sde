@@ -34,7 +34,7 @@ The bulk of the code for this project can be found in 3 places
 - The `riemannian_score_sde` package contains code needed to extend the code in `score_sde` to Riemannian manifolds.
 - An extended version of [geomstats](https://github.com/oxcsml/geomstats/tree/jax_backend) that adds `jax` support, and a number of other extensions.
 
-Most of the models used in this paper can be though of as a pushforward of a simple density under some continuous-time transformation into a more complex density. In code, this is represented by a `score_sde.models.flow.PushForward`, containing a base distribution, and in the simplest case, a time dependant vector field that defines the flow of the density through time.
+Most of the models used in this paper can be though of as a pushforward of a simple density under some continuous-time transformation into a more complex density. In code, this is represented by a `score_sde.models.flow.PushForward`, containing a base distribution, and in the simplest case, a time dependent vector field that defines the flow of the density through time.
 
 A `Continuous Normalizing Flow (CNF) [score_sde.models.flow.PushForward]` takes sampled from the pushforward distribution by evolving samples from the base measure under the action of the vector field. The log-likelihood is computed by adding the integral of the divergence of the vector field along the sample path to the log-likelihood of the point under the base measure. Models are trained by optimising this log-likelihood of the training data.
 
