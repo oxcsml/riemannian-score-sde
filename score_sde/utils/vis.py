@@ -110,10 +110,21 @@ def latlon_from_cartesian(points):
 
     lat = -jnp.arcsin(z / r)
     lon = jnp.arctan2(y, x)
-    lon = jnp.where(lon > 0, lon - math.pi, lon + math.pi)
+    # lon = jnp.where(lon > 0, lon - math.pi, lon + math.pi)
     return jnp.concatenate(
         [jnp.expand_dims(lat, -1), jnp.expand_dims(lon, -1)], axis=-1
     )
+
+
+def cartesian_from_latlong(points):
+    lat = points[..., 0]
+    lon = points[..., 1]
+
+    x = jnp.cos(lat) * jnp.cos(lon)
+    y = jnp.cos(lat) * jnp.sin(lon)
+    z = jnp.sin(lat)
+
+    return jnp.stack([x, y, z], axis=-1)
 
 
 def get_spherical_grid(N, eps=0.0):
