@@ -27,6 +27,9 @@ class Uniform:
         return (samples, None)
 
 
+from jax.scipy.stats.norm import pdf as normal_pdf
+
+
 class Wrapped:
     def __init__(
         self,
@@ -63,7 +66,7 @@ class Wrapped:
             precision = jnp.ones((K,)) * (1 / scale**2)
         else:
             raise ValueError(f"Scale value: {scale}")
-        self.precision = jnp.expand_dims(precision, (-1, -2))
+        self.precision = jnp.expand_dims(precision, (-1))
 
     def __iter__(self):
         return self
@@ -85,6 +88,17 @@ class Wrapped:
             return samples, jnp.expand_dims(k, -1)
         else:
             return (samples, None)
+
+    def log_prob(self, samples):
+        def single_log_prob(samples, mean, precision):
+            pos = self.manifold.log(samples, mean)
+            ll = normal_pdf(pos, scale=1 / jnp.sqrt(precision))
+            return ll.prod(axis=-1)
+
+        ll = jax.vmap(single_log_prob, (None, 0, 0), (0))(
+            samples, self.mean, self.precision
+        )
+        return ll.mean(axis=0)
 
 
 class Langevin:
