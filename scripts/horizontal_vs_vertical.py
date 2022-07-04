@@ -27,9 +27,9 @@ cmap_name = "viridis_r"
 
 # plt.rcParams["text.usetex"] = True
 # plt.rcParams["font.family"] = ["Computer Modern Roman"]
-plt.rcParams.update(
-    {"text.usetex": True, "font.family": "sans-serif", "font.sans-serif": ["Helvetica"]}
-)
+# plt.rcParams.update(
+#     {"text.usetex": True, "font.family": "sans-serif", "font.sans-serif": ["Helvetica"]}
+# )
 
 #%%
 class Normal:

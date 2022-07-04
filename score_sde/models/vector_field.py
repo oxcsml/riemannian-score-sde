@@ -222,7 +222,7 @@ class LieAlgebraGenerator(VectorFieldGenerator):
         return manifold.dim
 
     def _generators(self, x):
-        return self.manifold.lie_algebra.basis  # / jnp.sqrt(2)
+        return self.manifold.lie_algebra.basis
 
     def __call__(self, x, t):
         x = x.reshape((x.shape[0], self.manifold.dim, self.manifold.dim))
@@ -238,34 +238,3 @@ class LieAlgebraGenerator(VectorFieldGenerator):
         # is_tangent = self.manifold.is_tangent(out, x, atol=1e-3).all()
         # out = self.manifold.to_tangent(out, x)
         return out.reshape((x.shape[0], -1))
-
-    def div_split(self, x, t, hutchinson_type):
-        """Returns div(X) = Xi(fi) + fi div(Xi)"""
-        fi_fn, Xi_fn = self.decomposition
-        Xi = Xi_fn(x)
-        assert hutchinson_type == "None"
-        # print("Xi", Xi.shape)
-        # print("x", x.shape)
-        # print("t", t.shape)
-        # fi = fi_fn(x.reshape((x.shape[0], -1)), t)
-        # print("fi", fi.shape)
-        out = 0.0
-        for k in range(self.manifold.dim):
-            fn = lambda x, t: fi_fn(x, t)[..., k]
-            grad_fn = jax.vmap(jax.grad(fn, argnums=0))
-            grad = grad_fn(x.reshape((x.shape[0], -1)), t).reshape(x.shape)
-            print("grad", grad.shape)
-            grad = self.manifold.compose(self.manifold.inverse(x), grad)
-            grad = self.manifold.to_tangent(grad, self.manifold.identity)
-            is_tangent = self.manifold.is_tangent(grad, self.manifold.identity).all()
-            print("is_tangent", is_tangent.item())
-            out_k = self.manifold.metric.inner_product(grad, Xi[..., k])
-            # out_k = Matrices.frobenius_product(grad, Xi[..., k])
-            print("out_k", out_k[5])
-            out_k2 = self.manifold.vee(grad)[..., k]
-            print("out_k2", out_k2[5])
-            out_k3 = jnp.inner(self.manifold.vee(grad), self.manifold.vee(Xi[..., k]))
-            print("out_k3", out_k3[5])
-            out += out_k
-
-        return out

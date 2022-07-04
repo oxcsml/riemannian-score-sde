@@ -24,7 +24,7 @@ from riemannian_score_sde.sde import VPSDE, Brownian
 from score_sde.models.flow import PushForward, CNF
 from score_sde.sampling import get_pc_sampler
 
-cmap_name = "plasma_r"
+# cmap_name = "plasma_r"
 cmap_name = "viridis_r"
 #%%
 rng = random.PRNGKey(1)
