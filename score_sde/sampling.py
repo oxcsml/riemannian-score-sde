@@ -19,15 +19,13 @@
 """Various sampling methods."""
 import abc
 import functools
-from scipy import integrate
 from typing import Callable, Tuple
 
 import jax
-import haiku
 import jax.numpy as jnp
 import jax.random as random
 
-from score_sde.sde import SDE, RSDE, VPSDE, subVPSDE  # , VESDE
+from score_sde.sde import SDE, RSDE
 from riemannian_score_sde.sde import ReverseBrownian
 from score_sde.utils import register_category, batch_mul
 
@@ -149,11 +147,7 @@ class EulerMaruyamaManifoldPredictor(Predictor):
 
         tangent_vector = tangent_vector.reshape(shape)
         x = self.sde.manifold.exp(tangent_vec=tangent_vector, base_point=x)
-        # x = self.sde.manifold.projection(x)
-        # x = self.sde.manifold.projection(x + tangent_vector)
-        # TODO: Retraction as an option
-        # x = self.sde.manifold.projection(x + self.sde.manifold.metric.metric_matrix() @ tangent_vector)
-        return x, x  # x_mean
+        return x, x
 
 
 @register_corrector

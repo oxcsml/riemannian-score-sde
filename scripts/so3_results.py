@@ -17,6 +17,9 @@ import seaborn as sns
 
 api = wandb.Api()
 
+# cmap_name = "plasma_r"
+cmap_name = "viridis_r"
+
 # helpers
 
 
@@ -346,28 +349,25 @@ table.style.to_latex(
 # ************************************************************ #
 
 criteria = [
-    "`name` == 'SO3'",
-    "`dataset/conditional` == False",
-    "`steps` == 100000",
-    "`warmup_steps` == 100",
+    # "`name` == 'SO3'",
+    # "`dataset/conditional` == False",
+    # "`warmup_steps` == 100",
+    # "`steps` == 100000",
+    # "`dataset` == 32",
+    # "`flow/beta_f` == 6",
+    "`name` == 'ablation'",
     # "`optim/learning_rate` == 0.0002",
-    "`flow/beta_f` == 6",
-    # "`flow/N` > 1",
-    "`loss` == 'dsm'",
-    # "`loss` == 'ism'",
-    "`dataset` == 32",
+    "`flow/N` > 1",
+    # "`loss` == 'dsm' & `loss/n_max` == 20 & `loss/thresh` == 0.5",
+    "`loss` == 'ism'",
     # "`method` == 'RSGM'",
 ]
 criteria = ["all"] if criteria == [] else criteria
 results = query(runs_df, " & ".join(criteria))
+results = results[results.group != "ablation_loss=ism,model=rsgm"]
 
-results.loc[:, "Log-likelihood"] = results.loc[:, "test/logp"]
-results.loc[:, "Number discretization steps in forward process"] = results.loc[
-    :, "flow/N"
-]
-
-x_metric = "Number discretization steps in forward process"
-metric = "Log-likelihood"
+x_metric = "flow/N"
+metric = "test/logp"
 val_metric = metric
 group_by = [x_metric, "method"]
 
@@ -376,11 +376,27 @@ data, group_max_idx = select_hyperparms(results, group_by, metric, val_metric)
 data = data.reset_index(level=(0, 1))
 data = data.sort_values(by=[x_metric])
 
-fig, axis = generate_plot(data, metric, x_metric)
-axis.get_legend().remove()
+fig, ax = plt.subplots(1, 1, figsize=(10, 6), sharey=True, sharex=True)
+colors = sns.color_palette(cmap_name, 1)
+fontsize = 30
 
-# fig.tight_layout(pad=-1.5)
-fig_name = f"../doc/images/so3_ablation_N.pdf"
+x = data[x_metric]
+y_low, y_mean, y_up = (
+    data[metric]["lower_ci"],
+    data[metric]["mean"],
+    data[metric]["upper_ci"],
+)
+ax.plot(x, data[metric]["mean"], color=colors[0], lw=5)
+ax.fill_between(x, y_low, y_up, alpha=0.2, facecolor=colors[0])
+ax.tick_params(axis="both", which="major", labelsize=4 / 5 * fontsize)
+ax.set_ylabel("Test log-likelihood", fontsize=fontsize)
+ax.set_xlabel("Discretization steps N", fontsize=fontsize)
+ax.set_xscale("log")
+ax.set_xticks([2, 5, 10, 20, 50, 100, 200], [2, 5, 10, 20, 50, 100, 200])
+
+# fig, axis = generate_plot(data, metric, x_metric)
+
+fig_name = f"../doc/images/s2_ablation_N.pdf"
 fig.savefig(fig_name, bbox_inches="tight", transparent=True)
 
 data
@@ -509,6 +525,7 @@ criteria = [
     "`name` == 'ablation'",
     "`loss` == 'dsm'",
     # "`loss` == 'ism'",
+    "`flow/N` == 100",
 ]
 criteria = ["all"] if criteria == [] else criteria
 results = query(runs_df, " & ".join(criteria))
@@ -563,6 +580,7 @@ fig, axis = plt.subplots(
 axis[-1].figure.set_size_inches(10, 4.3)
 fontsize = 25
 cmap = sns.cm.rocket_r
+# cmap = sns.color_palette(cmap_name, as_cmap=True)
 
 for i, method in enumerate(method_grid):
     g = sns.heatmap(
