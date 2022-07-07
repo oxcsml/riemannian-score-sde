@@ -1,5 +1,4 @@
 _target_: riemannian_score_sde.losses.get_ism_loss_fn
-reduce_mean: true
 like_w: true
 hutchinson_type: None
 eps: ${eps}

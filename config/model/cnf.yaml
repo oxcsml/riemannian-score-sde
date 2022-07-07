@@ -3,6 +3,7 @@
 defaults:
   - /transform: id
   - /flow: cnf
-  - /pushf: cnf
+  - /base: default
+  - /pushf: default
   - /loss: logp
-  # - /generator: div_free
+  - /generator: div_free

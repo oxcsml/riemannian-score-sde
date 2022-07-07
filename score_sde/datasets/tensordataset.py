@@ -17,7 +17,7 @@ class TensorDataset:
 
 
 class DataLoader:
-    def __init__(self, dataset, batch_dims, rng, shuffle=True, drop_last=False):
+    def __init__(self, dataset, batch_dims, rng, shuffle=False, drop_last=False):
         self.dataset = dataset
         assert isinstance(batch_dims, int)
         self.batch_dims = batch_dims
@@ -41,9 +41,7 @@ class DataLoader:
         rng, next_rng = jax.random.split(self.rng)
         self.rng = rng
 
-        indices = jax.random.choice(
-            next_rng, len(self.dataset), shape=(self.batch_dims,)
-        )
+        indices = jax.random.choice(next_rng, len(self.dataset), shape=(self.batch_dims,))
 
         return self.dataset[indices], None
         # return self.data[indices].reshape((self.batch_dims, *self.dataset.shape[1:]))

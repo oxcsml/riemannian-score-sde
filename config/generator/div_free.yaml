@@ -1,1 +1,1 @@
-_target_: score_sde.models.DivFreeGenerator
+_target_: riemannian_score_sde.models.DivFreeGenerator

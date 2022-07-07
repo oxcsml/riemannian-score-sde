@@ -2,7 +2,8 @@
 
 defaults:
   - /transform: id
-  - /flow: moser
+  - /flow: cnf
+  - /base: default
   - /pushf: moser
   - /loss: moser
-  # - override /generator: div_free
+  - /generator: div_free

@@ -22,7 +22,7 @@ from geomstats.geometry.hypersphere import Hypersphere, gegenbauer_polynomials
 from score_sde.utils import batch_mul
 from riemannian_score_sde.sde import VPSDE, Brownian
 from score_sde.models.flow import PushForward, CNF
-from score_sde.sampling import get_pc_sampler
+from riemannian_score_sde.sampling import get_pc_sampler
 
 # cmap_name = "plasma_r"
 cmap_name = "viridis_r"
@@ -90,7 +90,7 @@ def mmd(xs, ys):
 # Get "exact" samples (with N = 1000)
 N = 1000
 rng, next_rng = random.split(rng)
-sampler = get_pc_sampler(sde, N)
+sampler = get_pc_sampler(sde, N, predictor="GRW")
 xt_true = vmap(lambda t: sampler(next_rng, x0b, tf=t))(timesteps)
 assert vmap(partial(manifold.belongs, atol=1e-5))(xt_true).all()
 
@@ -103,7 +103,11 @@ colors = sns.color_palette(cmap_name, len(Ns))
 fontsize = 30
 
 for i, N in enumerate(Ns):
-    xt_approx = vmap(lambda t: get_pc_sampler(sde, N)(next_rng, x0b, tf=t))(timesteps)
+    xt_approx = vmap(
+        lambda t: get_pc_sampler(sde, N, predictor="GRW")(
+            next_rng, x0b, tf=t
+        )
+    )(timesteps)
     assert vmap(partial(manifold.belongs, atol=1e-5))(xt_approx).all()
     dists = mmd(xt_approx, xt_true)
 

@@ -3,6 +3,7 @@
 defaults:
   - /transform: id
   - /flow: brownian
+  - /base: default
   - /pushf: sde
-  - /loss: dsmv
+  - /loss: dsm0
   - /generator: div_free

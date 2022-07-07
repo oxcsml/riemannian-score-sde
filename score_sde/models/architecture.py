@@ -13,9 +13,7 @@ from .mlp import MLP
 class Concat(hk.Module):
     def __init__(self, output_shape, hidden_shapes, act):
         super().__init__()
-        self._layer = MLP(
-            hidden_shapes=hidden_shapes, output_shape=output_shape, act=act
-        )
+        self._layer = MLP(hidden_shapes=hidden_shapes, output_shape=output_shape, act=act)
 
     def __call__(self, x, t):
         if len(t.shape) == 0:
@@ -30,9 +28,7 @@ class Concat(hk.Module):
 class Ignore(hk.Module):
     def __init__(self, output_shape, hidden_shapes, act):
         super().__init__()
-        self._layer = MLP(
-            hidden_shapes=hidden_shapes, output_shape=output_shape, act=act
-        )
+        self._layer = MLP(hidden_shapes=hidden_shapes, output_shape=output_shape, act=act)
 
     def __call__(self, x, t):
         return self._layer(x)
@@ -42,9 +38,7 @@ class Ignore(hk.Module):
 class Sum(hk.Module):
     def __init__(self, output_shape, hidden_shapes, act):
         super().__init__()
-        self._layer = MLP(
-            hidden_shapes=hidden_shapes, output_shape=output_shape, act=act
-        )
+        self._layer = MLP(hidden_shapes=hidden_shapes, output_shape=output_shape, act=act)
         self._hyper_bias = MLP(
             hidden_shapes=[], output_shape=output_shape, act="", bias=False
         )
@@ -58,9 +52,7 @@ class Sum(hk.Module):
 class Squash(hk.Module):
     def __init__(self, output_shape, hidden_shapes, act):
         super().__init__()
-        self._layer = MLP(
-            hidden_shapes=hidden_shapes, output_shape=output_shape, act=act
-        )
+        self._layer = MLP(hidden_shapes=hidden_shapes, output_shape=output_shape, act=act)
         self._hyper = MLP(hidden_shapes=[], output_shape=output_shape, act="")
 
     def __call__(self, x, t):
@@ -72,9 +64,7 @@ class Squash(hk.Module):
 class SquashSum(hk.Module):
     def __init__(self, output_shape, hidden_shapes, act):
         super().__init__()
-        self._layer = MLP(
-            hidden_shapes=hidden_shapes, output_shape=output_shape, act=act
-        )
+        self._layer = MLP(hidden_shapes=hidden_shapes, output_shape=output_shape, act=act)
         self._hyper_bias = MLP(
             hidden_shapes=[], output_shape=output_shape, act="", bias=False
         )
@@ -82,9 +72,7 @@ class SquashSum(hk.Module):
 
     def __call__(self, x, t):
         t = jnp.array(t, dtype=float).reshape(-1, 1)
-        return self._layer(x) * jax.nn.sigmoid(self._hyper_gate(t)) + self._hyper_bias(
-            t
-        )
+        return self._layer(x) * jax.nn.sigmoid(self._hyper_gate(t)) + self._hyper_bias(t)
 
 
 def get_timestep_embedding(timesteps, embedding_dim=128):
@@ -123,13 +111,9 @@ class ConcatEmbed(hk.Module):
 
         self.net = MLP(hidden_shapes=dec_shapes, output_shape=output_shape, act=act)
 
-        self.t_encoder = MLP(
-            hidden_shapes=enc_shapes, output_shape=t_enc_dim, act=act
-        )
+        self.t_encoder = MLP(hidden_shapes=enc_shapes, output_shape=t_enc_dim, act=act)
 
-        self.x_encoder = MLP(
-            hidden_shapes=enc_shapes, output_shape=t_enc_dim, act=act
-        )
+        self.x_encoder = MLP(hidden_shapes=enc_shapes, output_shape=t_enc_dim, act=act)
 
     def __call__(self, x, t):
         t = jnp.array(t, dtype=float).reshape(-1, 1)

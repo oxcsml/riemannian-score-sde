@@ -41,7 +41,6 @@ def get_spherical_grid(N, eps=0.0):
 
 
 def get_so3_grid(N, eps=0.0):
-    print("get_so3_grid", N, eps)
     angle1 = jnp.linspace(-jnp.pi + eps, jnp.pi - eps, N)
     angle2 = jnp.linspace(-jnp.pi / 2 + eps, jnp.pi / 2 - eps, N // 2)
     angle3 = jnp.linspace(-jnp.pi + eps, jnp.pi - eps, N)
@@ -62,7 +61,6 @@ def get_so3_grid(N, eps=0.0):
     norm_v = jnp.linalg.norm(vs, axis=-1, keepdims=True)
     max_norm = jnp.pi - eps
     cond = jnp.expand_dims(norm_v <= max_norm, -1)
-    # print('cond', cond.shape, (1 - cond).sum().item() / xs.shape[0] * 100)
     rescaled_vs = vs * max_norm / norm_v
     rescaled_xs = jax.vmap(_SpecialOrthogonal3Vectors().matrix_from_rotation_vector)(
         rescaled_vs
@@ -87,7 +85,9 @@ def get_euclidean_grid(N, dim):
     return xs, volume, lambda_x
 
 
-def compute_normalization(likelihood_fn, manifold, z=None, N=None, eps=0.0):
+def compute_normalization(
+    likelihood_fn, manifold, context=None, N=None, eps=0.0, return_all=False
+):
     if isinstance(manifold, Euclidean):
         N = N if N is not None else int(jnp.power(1e5, 1 / manifold.dim))
         xs, volume, lambda_x = get_euclidean_grid(N, manifold.dim)
@@ -95,14 +95,22 @@ def compute_normalization(likelihood_fn, manifold, z=None, N=None, eps=0.0):
         N = N if N is not None else 200
         xs, volume, lambda_x = get_spherical_grid(N, eps)
     elif isinstance(manifold, _SpecialOrthogonalMatrices) and manifold.dim == 3:
-        N = N if N is not None else 40
+        N = N if N is not None else 50
         xs, volume, lambda_x = get_so3_grid(N, eps=1e-3)
     else:
         print("Only integration over R^d, S^2 and SO(3) is implemented.")
         return 0.0
-
-    z = z if z is None else jnp.repeat(jnp.expand_dims(z, 0), xs.shape[0], 0)
-    logp, nfe = likelihood_fn(xs, z)
+    context = (
+        context
+        if context is None
+        else jnp.repeat(jnp.expand_dims(context, 0), xs.shape[0], 0)
+    )
+    logp = likelihood_fn(xs, context)
+    if isinstance(logp, tuple):
+        logp, nfe = logp
     prob = jnp.exp(logp)
     Z = (prob * lambda_x).mean() * volume
-    return Z.item(), prob, lambda_x * volume, N
+    if return_all:
+        return Z.item(), prob, lambda_x * volume, N
+    else:
+        return Z.item()

@@ -1,22 +1,10 @@
 import jax
 import jax.numpy as jnp
 
-from score_sde.sde import SDE, RSDE
-from score_sde.sde import VPSDE as VPSDEBase, RSDE as RSDEBase
+from score_sde.sde import SDE, VPSDE as VPSDEBase, RSDE as RSDEBase
 from score_sde.utils import batch_mul
-
-
-class UniformDistribution:
-    """Uniform density on compact manifold"""
-
-    def __init__(self, manifold):
-        self.manifold = manifold
-
-    def sample(self, rng, shape):
-        return self.manifold.random_uniform(state=rng, n_samples=shape[0])
-
-    def log_prob(self, z):
-        return -jnp.ones([z.shape[0]]) * self.manifold.log_volume
+from riemannian_score_sde.sampling import get_pc_sampler
+from riemannian_score_sde.models.distribution import UniformDistribution
 
 
 class Brownian(SDE):
@@ -44,7 +32,7 @@ class Brownian(SDE):
 
     def marginal_prob(self, x, t):
         """Should not rely on closed-form marginal probability"""
-        # NOTE: this is a Euclidean approx
+        # NOTE: this is a Euclidean approx!
         log_mean_coeff = (
             -0.25 * t**2 * (self.beta_f - self.beta_0) - 0.5 * t * self.beta_0
         )
@@ -53,13 +41,14 @@ class Brownian(SDE):
         return jnp.zeros_like(x), std
 
     def marginal_sample(self, rng, x, t, return_hist=False):
-        from score_sde.sampling import get_pc_sampler
-
-        # TODO: remove from class
-
         out = self.manifold.random_walk(rng, x, self.rescale_t(t))
         if return_hist or out is None:
-            sampler = get_pc_sampler(self, self.N, return_hist=return_hist)
+            sampler = get_pc_sampler(
+                self,
+                self.N,
+                predictor="GRW",
+                return_hist=return_hist,
+            )
             out = sampler(rng, x, tf=t)
         return out
 
@@ -67,14 +56,11 @@ class Brownian(SDE):
         s = self.rescale_t(t)
         logp_grad = self.manifold.grad_marginal_log_prob(x0, x, s, **kwargs)
         return None, logp_grad
-        # TODO: Appears that only Varhadan works as well
-        # return None, self.varhadan_exp(x0, x, jnp.zeros_like(t), t)[1]
 
     def varhadan_exp(self, xs, xt, s, t):
         delta_t = self.rescale_t(t) - self.rescale_t(s)
         axis_to_expand = tuple(range(-1, -len(xt.shape), -1))  # (-1) or (-1, -2)
         delta_t = jnp.expand_dims(delta_t, axis=axis_to_expand)
-        # grad = self.manifold.metric.log(xs, xt) / delta_t
         grad = self.manifold.log(xs, xt) / delta_t
         return delta_t, grad
 
@@ -85,38 +71,7 @@ class Brownian(SDE):
         return self.limiting.log_prob(z)
 
     def reverse(self, score_fn):
-        return ReverseBrownian(self, score_fn)
-
-
-class ReverseBrownian(Brownian):
-    """Reverse time SDE, assuming the drift coefficient is spatially homogenous"""
-
-    def __init__(self, sde: SDE, score_fn):
-        super().__init__(manifold=sde.manifold, tf=sde.t0, t0=sde.tf)
-
-        self.sde = sde
-        self.score_fn = score_fn
-
-    def coefficients(self, x, t):
-        forward_drift, diffusion = self.sde.coefficients(x, t)
-        score_fn = self.score_fn(x, t)
-
-        # compute G G^T score_fn
-        if self.sde.full_diffusion_matrix:
-            # if square matrix diffusion coeffs
-            reverse_drift = forward_drift - jnp.einsum(
-                "...ij,...kj,...k->...i", diffusion, diffusion, score_fn
-            )
-        else:
-            # if scalar diffusion coeffs (i.e. no extra dims on the diffusion)
-            reverse_drift = forward_drift - jnp.einsum(
-                "...,...,...i->...i", diffusion, diffusion, score_fn
-            )
-
-        return reverse_drift, diffusion
-
-    def reverse(self):
-        return self.sde
+        return RSDE(self, score_fn)
 
 
 class VPSDE(VPSDEBase):

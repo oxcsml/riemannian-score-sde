@@ -1,5 +1,4 @@
 _target_: riemannian_score_sde.losses.get_dsm_loss_fn
-reduce_mean: true
 like_w: false
 eps: ${eps}
 thresh: 0.1

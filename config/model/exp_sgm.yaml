@@ -2,8 +2,8 @@
 
 defaults:
   - /transform: tanhexp
-  # - /transform: exp
   - /flow: vp
+  - /base: default
   - /pushf: sde
   - /loss: dsm0
-  - override /generator: ambient
+  - /generator: ambient

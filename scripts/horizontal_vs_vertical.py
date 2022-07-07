@@ -19,7 +19,7 @@ import seaborn as sns
 from geomstats.geometry.euclidean import Euclidean
 from score_sde.utils import batch_mul
 from riemannian_score_sde.sde import VPSDE
-from score_sde.sampling import get_pc_sampler
+from riemannian_score_sde.sampling import get_pc_sampler
 
 # cmap_name = "RdBu"
 cmap_name = "plasma_r"
@@ -112,7 +112,7 @@ def get_scores_sgm(rng, a):
     rng, next_rng = random.split(rng)
     x0 = Normal(a, 1).sample(next_rng, (B, d))
 
-    sampler = get_pc_sampler(sde, N, return_hist=True)
+    sampler = get_pc_sampler(sde, N, predictor="GRW", return_hist=True)
     rng, next_rng = random.split(rng)
     _, xt, timesteps = sampler(next_rng, x0, tf=sde.tf)
 

@@ -1,25 +1,8 @@
 import jax
 import jax.numpy as jnp
+import numpy as np
 
 from score_sde.datasets import SubDataset
-
-
-def get_data_per_context(dataset, transform, M=32):
-    xs, x0, z0 = [], [], []
-    for _ in range(M):
-        batch = next(dataset)
-        x0.append(batch[0])
-        z0.append(batch[1])
-    
-    x0 = jnp.concatenate(x0, axis=0)
-    y0 = transform.inv(x0)
-    if z0[0] == None:
-        return [x0], y0
-    else:
-        z0 = jnp.concatenate(z0, axis=0)
-        for z in jnp.unique(z0):
-            xs.append(x0[jnp.nonzero(z0.reshape(-1) == z)])
-        return xs, y0
 
 
 def validate_shuffle_split(n_samples, test_size, train_size, default_test_size=None):

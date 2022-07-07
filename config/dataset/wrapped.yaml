@@ -1,4 +1,4 @@
-_target_: riemannian_score_sde.datasets.simple.Wrapped
+_target_: riemannian_score_sde.datasets.unimodal.Wrapped
 _convert_: partial
 scale_type: random
 scale: 100

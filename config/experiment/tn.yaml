@@ -3,23 +3,23 @@
 name: tn
 
 defaults:
-  - /generator: torus
+  # - /generator: torus
   - /dataset: wrapped
   - /manifold: tn
   - /architecture: concat
   - /embedding: none
   - /model: rsgm
-  # - override /generator: lie_algebra
+  - override /generator: torus
 
 data_dir: /data/ziz/not-backed-up/scratch/score-sde/data/
 
-n: 1
+n: 5
 
 dataset:
   scale: 0.2
   scale_type: fixed
-  # conditional: true
-  # K: 4
+  mean: unif
+  K: 1
 
 flow:
   t0: 0

@@ -1,5 +1,4 @@
-# Riemannian Score-Based Generative Modelling
-[![Paper - Openreview](https://img.shields.io/badge/Paper-Openreview-8D2912)](https://openreview.net/forum?id=oDRQGo8I7P)
+# [Riemannian Score-Based Generative Modelling](https://arxiv.org/abs/2202.02763)
 
 This repo requires a modified version of [geomstats](https://github.com/geomstats/geomstats) that adds jax functionality, and a number of other modifications. This can be found [here](https://github.com/oxcsml/geomstats.git ) on the branch `jax_backend`.
 
@@ -13,7 +12,7 @@ Simple install instructions are:
 ```
 git clone https://github.com/oxcsml/score-sde.git
 cd score-sde
-git clone --single-branch --branch jax_backend https://github.com/oxcsml/geomstats.git 
+git clone https://github.com/oxcsml/geomstats.git 
 virtualenv -p python3.9 venv
 source venv/bin/activate
 pip install -r requirements.txt
@@ -32,8 +31,9 @@ pip install -e .
 The bulk of the code for this project can be found in 3 places
 - The `score_sde` package contains code to run SDEs on Euclidean space. This code is modified from the code from the paper [Score-Based Generative Modeling through Stochastic Differential Equations](https://github.com/yang-song/score_sde).
 - The `riemannian_score_sde` package contains code needed to extend the code in `score_sde` to Riemannian manifolds.
-- An extended version of [geomstats](https://github.com/oxcsml/geomstats/tree/jax_backend) that adds `jax` support, and a number of other extensions.
+- An extended version of [geomstats](https://github.com/oxcsml/geomstats) that adds `jax` support, and a number of other extensions.
 
+### Different classes of models
 Most of the models used in this paper can be though of as a pushforward of a simple density under some continuous-time transformation into a more complex density. In code, this is represented by a `score_sde.models.flow.PushForward`, containing a base distribution, and in the simplest case, a time dependent vector field that defines the flow of the density through time.
 
 A `Continuous Normalizing Flow (CNF) [score_sde.models.flow.PushForward]`
@@ -69,8 +69,16 @@ Other core pieces of code include:
 - `score_sde/ode.py` which provides methods for solving ODEs
 
 and their counterparts in `riemannian_score_sde`.
+
+### Model structure
+Models are decomposed in three blocks:
+- a `base` distribution, with `z ~ base` (a 'prior')
+- a learnable diffeomorphic `flow: z -> y` (the flexible component of the model, potentially stochastic as for SGMs)
+- a `transform` map `y -> x ∈ M` (if the model is *not* defined on the manifold and needs to be 'projected', else  the model is *Riemannian* and `transform=Id`)
+Thus, the generative models are defined as `z -> y -> x`.
+
 ## Reproducing experiments
-Experiment configuration is handled by [hydra](https://hydra.cc/docs/intro/), a highly flexible `ymal` based configuration package. Base configs can be found in `config`, and parameters are overridden in the command line. Sweeps over parameters can also be managed with a single command.
+Experiment configuration is handled by [hydra](https://hydra.cc/docs/intro/), a highly flexible `yaml` based configuration package. Base configs can be found in `config`, and parameters are overridden in the command line. Sweeps over parameters can also be managed with a single command.
 
 Jobs scheduled on a cluster using a number of different plugins. We use Slurm, and configs for this can be found in `config/server` (note these are reasonably general but have some setup-specific parts). Other systems can easily be substituted by creating a new server configuration.
 
@@ -130,7 +138,7 @@ python main.py -m \
 ```
 python main.py -m \
     experiment=volcanoe,earthquake,fire,flood \
-    model=sgm_stereo \
+    model=stereo_sgm \
     generator=ambient \
     loss=ism \
     flow.beta_0=0.001 \
@@ -202,11 +210,24 @@ To demonstrate that RSGMs can handle conditional modelling well, we train RSGMs 
 | Exp-wrapped SGM |  * 0.87 ± 0.04 |  0.5 ± 0.1    |  0.16 ± 0.03    |  0.5 ± 0.0    |  -0.58 ± 0.04    |  0.5 ± 0.0    |
 | RSGM            |  * 0.89 ± 0.03 |  * 0.1 ± 0.0 |  * 0.20 ± 0.03 |  * 0.1 ± 0.0 |  * -0.49 ± 0.02 |  * 0.1 ± 0.0 |
 
-`RSGMs, Stereo RSGMs`
+`RSGMs`
 ```
 python main.py -m \
     experiment=so3 \
-    model=rsgm,sgm_exp \
+    model=rsgm \
+    dataset.K=16,32,64 \
+    steps=100000 \
+    loss=dsmv \
+    generator=lie_algebra \
+    optim.learning_rate=5e-4,2e-4 \
+    flow.beta_f=2,4,6,8,10 \
+    seed=0,1,2,3,4
+```
+`Exp RSGMs`
+```
+python main.py -m \
+    experiment=so3 \
+    model=exp_sgm \
     dataset.K=16,32,64 \
     steps=100000 \
     optim.learning_rate=5e-4,2e-4 \

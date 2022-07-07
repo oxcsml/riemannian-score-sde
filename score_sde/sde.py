@@ -3,23 +3,12 @@ Abstract SDE classes, Reverse SDE, and VE/VP SDEs.
 Modified code from https://github.com/yang-song/score_sde
 """
 from abc import ABC, abstractmethod
-from typing import Tuple, Callable
 
 import jax
 import numpy as np
 import jax.numpy as jnp
 
-
-class NormalDistribution:
-
-    def sample(self, rng, shape):
-        return jax.random.normal(rng, shape)
-
-    def log_prob(self, z):
-        shape = z.shape
-        N = np.prod(shape[1:])
-        logp_fn = lambda z: -N / 2.0 * jnp.log(2 * np.pi) - jnp.sum(z ** 2) / 2.0
-        return jax.vmap(logp_fn)(z)
+from score_sde.models.distribution import NormalDistribution
 
 
 class SDE(ABC):
@@ -32,17 +21,6 @@ class SDE(ABC):
 
         self.t0 = t0
         self.tf = tf
-
-        # if ((N == None) and (dt == None)) or ((N != None) and (dt != None)):
-        #     raise ValueError("Exactly one of dt and N must not be None")
-
-        # if N != None:
-        #     self.N = N
-        #     self.dt = (self.tf - self.t0) / self.N
-
-        # if dt != None:
-        #     self.N = int((self.tf - self.t0) / dt)
-        #     self.dt = (self.tf - self.t0) / self.N
 
     @abstractmethod
     def coefficients(self, x, t):
@@ -96,9 +74,7 @@ class SDE(ABC):
             Time of diffusion
         """
         marginal_log_prob = lambda x0, x, t: self.marginal_log_prob(x0, x, t, **kwargs)
-        logp_grad_fn = jax.value_and_grad(
-            marginal_log_prob, argnums=1, has_aux=False
-        )
+        logp_grad_fn = jax.value_and_grad(marginal_log_prob, argnums=1, has_aux=False)
         logp, logp_grad = jax.vmap(logp_grad_fn)(x0, x, t)
         logp_grad = self.manifold.to_tangent(logp_grad, x)
         return logp, logp_grad
@@ -240,7 +216,7 @@ class VPSDE(SDE):
 
     def marginal_prob(self, x, t):
         log_mean_coeff = (
-            -0.25 * t ** 2 * (self.beta_f - self.beta_0) - 0.5 * t * self.beta_0
+            -0.25 * t**2 * (self.beta_f - self.beta_0) - 0.5 * t * self.beta_0
         )
         mean = jnp.exp(log_mean_coeff)[..., None] * x
         std = jnp.sqrt(1 - jnp.exp(2.0 * log_mean_coeff))
@@ -274,28 +250,26 @@ class subVPSDE(SDE):
         beta_t = self.beta_t(t)
         drift = -0.5 * beta_t[..., None] * x
         discount = 1.0 - jnp.exp(
-            -2 * self.beta_0 * t - (self.beta_f - self.beta_0) * t ** 2
+            -2 * self.beta_0 * t - (self.beta_f - self.beta_0) * t**2
         )
         diffusion = jnp.sqrt(beta_t * discount)
         return drift, diffusion
 
     def marginal_prob(self, x, t):
         log_mean_coeff = (
-            -0.25 * t ** 2 * (self.beta_f - self.beta_0) - 0.5 * t * self.beta_0
+            -0.25 * t**2 * (self.beta_f - self.beta_0) - 0.5 * t * self.beta_0
         )
         mean = jnp.exp(log_mean_coeff)[..., None] * x
         std = 1 - jnp.exp(2.0 * log_mean_coeff)
         return mean, std
 
     def sample_limiting_distribution(self, rng, shape):
-        # TODO: rename from `prior_sampling`
         return jax.random.normal(rng, shape)
 
     def limiting_distribution_logp(self, z):
-        # TODO: rename from `prior_logp`
         shape = z.shape
         N = np.prod(shape[1:])
-        logp_fn = lambda z: -N / 2.0 * jnp.log(2 * np.pi) - jnp.sum(z ** 2) / 2.0
+        logp_fn = lambda z: -N / 2.0 * jnp.log(2 * np.pi) - jnp.sum(z**2) / 2.0
         return jax.vmap(logp_fn)(z)
 
 

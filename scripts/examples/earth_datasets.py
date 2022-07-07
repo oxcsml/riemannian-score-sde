@@ -10,7 +10,7 @@ import jax
 # %%
 
 from riemannian_score_sde.datasets import *
-from score_sde.utils.vis import setup_sphere_plot, scatter_earth
+from riemannian_score_sde.utils.vis import setup_sphere_plot, scatter_earth
 from score_sde.datasets import DataLoader, SubDataset, TensorDataset, random_split
 
 # %%

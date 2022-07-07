@@ -1,5 +1,4 @@
 import abc
-from typing import Sequence
 
 import numpy as np
 import jax
@@ -9,64 +8,6 @@ import jax.numpy as jnp
 from hydra.utils import instantiate
 from geomstats.geometry.hypersphere import Hypersphere
 from geomstats.geometry.base import VectorSpace, EmbeddedManifold
-from geomstats.geometry.matrices import Matrices
-from .flow import div_noise
-
-
-def get_div_fn(fi_fn, Xi, hutchinson_type: str):
-    """Pmapped divergence of the drift function."""
-    if hutchinson_type == "None":
-        return lambda x, t, z, eps: get_exact_div_fn(fi_fn, Xi)(x, t, z)
-    else:
-        return lambda x, t, z, eps: get_estimate_div_fn(fi_fn, Xi)(x, t, z, eps)
-
-
-# def get_estimate_div_fn(fi_fn, Xi=None):
-#     """Create the divergence function of `fn` using the Hutchinson-Skilling trace estimator."""
-
-#     def div_fn(x: jnp.ndarray, t: float, eps: jnp.ndarray):
-#         # grad_fn = lambda data: jnp.sum(fi_fn(data, t) * eps)
-#         # grad_fn_eps = jax.grad(grad_fn)(x)
-#         def grad_fn(data):
-#             fi = fi_fn(data, t)
-#             return jnp.sum(fi * eps), fi
-
-#         (_, fi), grad_fn_eps = jax.value_and_grad(grad_fn, has_aux=True)(x)
-#         # out = grad_fn_eps * G(x) @ Xi * eps
-#         # G = manifold.metric.metric_matrix(x)
-#         # Xi = jnp.einsum('...ij,...jk->...ik', G, Xi)
-#         if Xi is not None:
-#             grad_fn_eps = jnp.einsum("...d,...dn->...n", grad_fn_eps, Xi)
-#         div = jnp.sum(grad_fn_eps * eps, axis=tuple(range(1, len(x.shape))))
-#         return div, fi
-
-#     return div_fn
-
-
-# def get_exact_div_fn(fi_fn, Xi=None):
-#     "flatten all but the last axis and compute the true divergence"
-
-#     def div_fn(
-#         x: jnp.ndarray,
-#         t: float,
-#     ):
-#         if len(t.shape) == len(x.shape) - 1:
-#             # Assume t is just missing the last dim of x
-#             t = jnp.expand_dims(t, axis=-1)
-
-#         x_shape = x.shape
-#         x = jnp.expand_dims(x.reshape((-1, x_shape[-1])), 1)
-#         t = jnp.expand_dims(t.reshape((-1, t.shape[-1])), 1)
-#         jac = jax.vmap(jax.jacrev(fi_fn, argnums=0))(x, t)
-#         jac = jac.reshape([*x_shape[:-1], -1, x_shape[-1]])
-#         # G = manifold.metric.metric_matrix(x)
-#         # Xi = jnp.einsum('...ij,...jk->...ik', G, Xi(x))
-#         if Xi is not None:
-#             jac = jnp.einsum("...nd,...dm->...nm", jac, Xi)
-#         div = jnp.trace(jac, axis1=-1, axis2=-2).reshape(x_shape[:-1])
-#         return div
-
-#     return div_fn
 
 
 def get_exact_div_fn(fi_fn, Xi=None):
@@ -82,7 +23,7 @@ def get_exact_div_fn(fi_fn, Xi=None):
         jac = jac.reshape([x_shape[0], dim, dim])
         if Xi is not None:
             jac = jnp.einsum("...nd,...dm->...nm", jac, Xi)
-        div = jnp.trace(jac, axis1=-1, axis2=-2)  # .reshape(x_shape[:-1])
+        div = jnp.trace(jac, axis1=-1, axis2=-2)
         return div
 
     return div_fn
@@ -117,7 +58,7 @@ class VectorFieldGenerator(hk.Module, abc.ABC):
         fi_fn, Xi_fn = self.decomposition
         fi, Xi = fi_fn(x, t), Xi_fn(x)
         out = jnp.einsum("...n,...dn->...d", fi, Xi)
-        # seems that extra projection is required for generator=eigen
+        # NOTE: seems that extra projection is required for generator=eigen
         # during the ODE solve cf tests/test_lkelihood.py
         out = self.manifold.to_tangent(out, x)
         return out
@@ -125,38 +66,10 @@ class VectorFieldGenerator(hk.Module, abc.ABC):
     def div_generators(self, x):
         """Divergence of the generating vector fields: shape=[..., card=n]"""
 
-    def div_split(self, x, t, hutchinson_type):
-        """Returns div(X) = Xi(fi) + fi div(Xi)"""
-        fi_fn, Xi_fn = self.decomposition
-        Xi = Xi_fn(x)
-        if hutchinson_type == "None":
-            # splitting div is unecessary when computated exactly
-            # term_1 = get_exact_div_fn(fi_fn, Xi)(x, t)
-            out = get_exact_div_fn(self.__call__, None)(x, t)
-        else:
-            shape = [*x.shape[:-1], self.output_shape(self.manifold)]
-            eps = div_noise(hk.next_rng_key(), shape, hutchinson_type)
-            term_1, fi = get_estimate_div_fn(fi_fn, Xi)(x, t, eps)
-            div_Xi = self.div_generators(x)
-            term_2 = jnp.einsum("...n,...n->...", fi, div_Xi)
-            out = term_1 + term_2
-        return out
-
-    def divE(self, x, t, hutchinson_type):
-        """Euclidean divergence cf Rozen et al. 2021"""
-        if hutchinson_type == "None":
-            out = get_exact_div_fn(self.__call__, None)(x, t)
-        else:
-            shape = [*x.shape[:-1], self.output_shape(self.manifold)]
-            eps = div_noise(hk.next_rng_key(), shape, hutchinson_type)
-            out, _ = get_estimate_div_fn(self.__call__, None)(x, t, eps)
-        return out
-
 
 class DivFreeGenerator(VectorFieldGenerator):
     def __init__(self, architecture, embedding, output_shape, manifold):
         super().__init__(architecture, embedding, output_shape, manifold)
-        self.div = self.div_split
 
     @staticmethod
     def output_shape(manifold):
@@ -176,7 +89,6 @@ class EigenGenerator(VectorFieldGenerator):
     def __init__(self, architecture, embedding, output_shape, manifold):
         super().__init__(architecture, embedding, output_shape, manifold)
         assert isinstance(manifold, Hypersphere)
-        self.div = self.div_split
 
     @staticmethod
     def output_shape(manifold):
@@ -195,7 +107,6 @@ class AmbientGenerator(VectorFieldGenerator):
 
     def __init__(self, architecture, embedding, output_shape, manifold):
         super().__init__(architecture, embedding, output_shape, manifold)
-        self.div = self.divE
 
     @staticmethod
     def output_shape(manifold):
@@ -227,13 +138,11 @@ class LieAlgebraGenerator(VectorFieldGenerator):
     def __call__(self, x, t):
         x = x.reshape((x.shape[0], self.manifold.dim, self.manifold.dim))
         fi_fn, Xi_fn = self.decomposition
-        # TODO: what representation to use for NN's input?
         x_input = x.reshape((*x.shape[:-2], -1))
-        # x_input = self.manifold.vee(self.manifold.log(x)) #NOTE: extremly unstable
+        # x_input = self.manifold.vee(self.manifold.log(x)) #NOTE: extremely unstable
         fi, Xi = fi_fn(x_input, t), Xi_fn(x)
         out = jnp.einsum("...i,ijk ->...jk", fi, Xi)
         # is_tangent = self.manifold.lie_algebra.belongs(out, atol=1e-3).all()
-        # print(is_tangent)
         out = self.manifold.compose(x, out)
         # is_tangent = self.manifold.is_tangent(out, x, atol=1e-3).all()
         # out = self.manifold.to_tangent(out, x)

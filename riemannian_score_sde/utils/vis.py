@@ -111,9 +111,7 @@ def latlon_from_cartesian(points):
     lat = -jnp.arcsin(z / r)
     lon = jnp.arctan2(y, x)
     # lon = jnp.where(lon > 0, lon - math.pi, lon + math.pi)
-    return jnp.concatenate(
-        [jnp.expand_dims(lat, -1), jnp.expand_dims(lon, -1)], axis=-1
-    )
+    return jnp.concatenate([jnp.expand_dims(lat, -1), jnp.expand_dims(lon, -1)], axis=-1)
 
 
 def cartesian_from_latlong(points):
@@ -132,9 +130,7 @@ def get_spherical_grid(N, eps=0.0):
     lon = jnp.linspace(-180 + eps, 180 - eps, N)
     Lat, Lon = jnp.meshgrid(lat, lon)
     latlon_xs = jnp.concatenate([Lat.reshape(-1, 1), Lon.reshape(-1, 1)], axis=-1)
-    spherical_xs = (
-        jnp.pi * (latlon_xs / 180.0) + jnp.array([jnp.pi / 2, jnp.pi])[None, :]
-    )
+    spherical_xs = jnp.pi * (latlon_xs / 180.0) + jnp.array([jnp.pi / 2, jnp.pi])[None, :]
     xs = Hypersphere(2).spherical_to_extrinsic(spherical_xs)
     return xs, lat, lon
 
@@ -319,9 +315,7 @@ def plot_so3(x0s, xts, size, **kwargs):
                 if j == 1:
                     axes[i, j].set(xlim=(-math.pi / 2, math.pi / 2))
                     axes[i, j].set_xticks([-math.pi / 2, 0, math.pi / 2])
-                    axes[i, j].set_xticklabels(
-                        [r"$-\pi/2$", "0", r"$\pi/2$"], color="k"
-                    )
+                    axes[i, j].set_xticklabels([r"$-\pi/2$", "0", r"$\pi/2$"], color="k")
                 else:
                     axes[i, j].set(xlim=(-math.pi, math.pi))
                     axes[i, j].set_xticks([-math.pi, 0, math.pi])
@@ -527,11 +521,11 @@ def plot_so3b(prob, lambda_x, N, size=10):
     return fig
 
 
-def plot_normal(x, size=10):
+def plot_normal(x, dim, size=10):
     colors = sns.color_palette("husl", len(x))
     fig, axes = plt.subplots(
         1,
-        3,
+        dim,
         # figsize=(1.2 * size, 0.6 * size),
         figsize=(2 * size, 0.5 * size),
         sharex=False,
@@ -589,8 +583,8 @@ def plot(manifold, x0, xt, prob=None, size=10):
 
 
 def plot_ref(manifold, xt, size=10):
-    if isinstance(manifold, Euclidean) and manifold.dim == 3:
-        fig = plot_normal(xt, size)
+    if isinstance(manifold, Euclidean):
+        fig = plot_normal(xt, manifold.dim, size)
     elif isinstance(manifold, Hypersphere) and manifold.dim == 2:
         fig = None
     elif isinstance(manifold, _SpecialOrthogonalMatrices) and manifold.dim == 3:

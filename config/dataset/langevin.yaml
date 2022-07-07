@@ -1,4 +1,4 @@
-_target_: riemannian_score_sde.datasets.simple.Langevin
+_target_: riemannian_score_sde.datasets.unimodal.Langevin
 _convert_: partial
 scale: 10
 K: 1
