@@ -159,7 +159,8 @@ def run(cfg):
     data_manifold = instantiate(cfg.manifold)
     transform = instantiate(cfg.transform, data_manifold)
     model_manifold = transform.domain
-    flow = instantiate(cfg.flow, manifold=model_manifold)
+    beta_schedule = instantiate(cfg.beta_schedule)
+    flow = instantiate(cfg.flow, manifold=model_manifold, beta_schedule=beta_schedule)
     base = instantiate(cfg.base, model_manifold, flow)
     pushforward = instantiate(cfg.pushf, flow, base, transform=transform)
 

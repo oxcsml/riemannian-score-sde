@@ -89,7 +89,7 @@ class SDE(ABC):
         shape : Tuple
             Shape of the samples to sample.
         """
-        raise NotImplementedError()
+        return self.limiting.sample(rng, shape)
 
     def limiting_distribution_logp(self, z):
         """Compute log-density of the limiting distribution.
@@ -101,7 +101,7 @@ class SDE(ABC):
         Returns:
           log probability density
         """
-        raise NotImplementedError()
+        return self.limiting.log_prob(z)
 
     def discretize(self, x, t, dt):
         """Discretize the SDE in the form: x_{i+1} = x_i + f_i(x_i) + G_i z_i.
@@ -197,80 +197,23 @@ class RSDE(SDE):
 
 
 class VPSDE(SDE):
-    def __init__(self, tf: float, t0: float = 0, beta_0=0.1, beta_f=20):
-        super().__init__(tf, t0)
-        self.beta_0 = beta_0
-        self.beta_f = beta_f
+    def __init__(self, beta_schedule):
+        super().__init__(beta_schedule.tf, beta_schedule.t0)
+        self.beta_schedule = beta_schedule
         self.limiting = NormalDistribution()
 
-    def beta_t(self, t):
-        normed_t = (t - self.t0) / (self.tf - self.t0)
-        return self.beta_0 + normed_t * (self.beta_f - self.beta_0)
-
     def coefficients(self, x, t):
-        beta_t = self.beta_t(t)
+        beta_t = self.beta_schedule.beta_t(t)
         drift = -0.5 * beta_t[..., None] * x
         diffusion = jnp.sqrt(beta_t) * jnp.ones(x.shape[:-1])
 
         return drift, diffusion
 
     def marginal_prob(self, x, t):
-        log_mean_coeff = (
-            -0.25 * t**2 * (self.beta_f - self.beta_0) - 0.5 * t * self.beta_0
-        )
+        log_mean_coeff = self.beta_schedule.log_mean_coeff(t)
         mean = jnp.exp(log_mean_coeff)[..., None] * x
         std = jnp.sqrt(1 - jnp.exp(2.0 * log_mean_coeff))
         return mean, std
-
-    def sample_limiting_distribution(self, rng, shape):
-        return self.limiting.sample(rng, shape)
-
-    def limiting_distribution_logp(self, z):
-        return self.limiting.log_prob(z)
-
-
-class subVPSDE(SDE):
-    def __init__(self, beta_0=0.1, beta_f=20):
-        """Construct the sub-VP SDE that excels at likelihoods.
-
-        Args:
-          beta_0: value of beta(t_0)
-          beta_f: value of beta(t_f)
-          N: number of discretization steps
-        """
-        super().__init__(N)
-        self.beta_0 = beta_0
-        self.beta_f = beta_f
-
-    def beta_t(self, t):
-        normed_t = (t - self.t0) / (self.tf - self.t0)
-        return self.beta_0 + normed_t * (self.beta_f - self.beta_0)
-
-    def coefficients(self, x, t):
-        beta_t = self.beta_t(t)
-        drift = -0.5 * beta_t[..., None] * x
-        discount = 1.0 - jnp.exp(
-            -2 * self.beta_0 * t - (self.beta_f - self.beta_0) * t**2
-        )
-        diffusion = jnp.sqrt(beta_t * discount)
-        return drift, diffusion
-
-    def marginal_prob(self, x, t):
-        log_mean_coeff = (
-            -0.25 * t**2 * (self.beta_f - self.beta_0) - 0.5 * t * self.beta_0
-        )
-        mean = jnp.exp(log_mean_coeff)[..., None] * x
-        std = 1 - jnp.exp(2.0 * log_mean_coeff)
-        return mean, std
-
-    def sample_limiting_distribution(self, rng, shape):
-        return jax.random.normal(rng, shape)
-
-    def limiting_distribution_logp(self, z):
-        shape = z.shape
-        N = np.prod(shape[1:])
-        logp_fn = lambda z: -N / 2.0 * jnp.log(2 * np.pi) - jnp.sum(z**2) / 2.0
-        return jax.vmap(logp_fn)(z)
 
 
 class VESDE(SDE):

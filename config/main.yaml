@@ -9,6 +9,7 @@ defaults:
 
   - optim: adam
   - scheduler: rcosine
+  - beta_schedule: linear
   
   # enable color logging
   - override hydra/hydra_logging: colorlog

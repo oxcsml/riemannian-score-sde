@@ -14,8 +14,9 @@ manifold:
   dim: 2
 
 flow:
-  beta_0: 0.001
-  beta_f: 5
+  beta_schedule:
+    beta_0: 0.001
+    beta_f: 5
 
 splits: [0.8, 0.1, 0.1]
 batch_size: 512

@@ -1,0 +1,5 @@
+_target_: score_sde.schedule.TriangleBetaSchedule
+beta_min: 0.001
+beta_max: 2.
+t0: 0.
+tf: 1.
