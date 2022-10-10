@@ -1,5 +1,2 @@
 _target_: score_sde.models.flow.SDEPushForward
 diffeq: sde
-# base:
-#   _target_: score_sde.models.flow.UniformDistribution
-# sde: ${sde}

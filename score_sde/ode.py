@@ -17,17 +17,19 @@ import operator as op
 import jax
 import jax.numpy as np
 from jax import lax
-from jax import ops
 from jax.util import safe_map, safe_zip
 from jax.flatten_util import ravel_pytree
 from jax.tree_util import tree_map
 from jax import linear_util as lu
+from jax.numpy import index_exp as index
 
 map = safe_map
 zip = safe_zip
 
 _ADAMS_MAX_ORDER = 12
 
+def index_update(x, index, value):
+  return x.at[index].set(value)
 
 def ravel_first_arg(f, unravel):
   return ravel_first_arg_(lu.wrap_init(f), unravel).call_wrapped
@@ -109,9 +111,9 @@ def runge_kutta_step(func, y0, f0, t0, dt):
     ti = t0 + dt * alpha[i-1]
     yi = y0 + dt * np.dot(beta[i-1, :], k)
     ft = func(yi, ti)
-    return ops.index_update(k, jax.ops.index[i, :], ft)
+    return index_update(k, index[i, :], ft)
 
-  k = ops.index_update(np.zeros((7, f0.shape[0])), ops.index[0, :], f0)
+  k = index_update(np.zeros((7, f0.shape[0])), index[0, :], f0)
   k = lax.fori_loop(1, 7, body_fun, k)
 
   y1 = dt * np.dot(c_sol, k) + y0
@@ -134,9 +136,9 @@ def bosh_step(func, y0, f0, t0, dt):
     ti = t0 + dt * alpha[i-1]
     yi = y0 + dt * np.dot(beta[i-1, :], k)
     ft = func(yi, ti)
-    return ops.index_update(k, jax.ops.index[i, :], ft)
+    return index_update(k, index[i, :], ft)
 
-  k = ops.index_update(np.zeros((4, f0.shape[0])), ops.index[0, :], f0)
+  k = index_update(np.zeros((4, f0.shape[0])), index[0, :], f0)
   k = lax.fori_loop(1, 4, body_fun, k)
 
   y1 = dt * np.dot(c_sol, k) + y0
@@ -157,9 +159,9 @@ def heun_step(func, y0, f0, t0, dt):
     ti = t0 + dt * alpha[i-1]
     yi = y0 + dt * np.dot(beta[i-1, :], k)
     ft = func(yi, ti)
-    return ops.index_update(k, jax.ops.index[i, :], ft)
+    return index_update(k, index[i, :], ft)
 
-  k = ops.index_update(np.zeros((2, f0.shape[0])), ops.index[0, :], f0)
+  k = index_update(np.zeros((2, f0.shape[0])), index[0, :], f0)
   k = lax.fori_loop(1, 2, body_fun, k)
 
   y1 = dt * np.dot(c_sol, k) + y0
@@ -181,9 +183,9 @@ def fehlberg_step(func, y0, f0, t0, dt):
     ti = t0 + dt * alpha[i-1]
     yi = y0 + dt * np.dot(beta[i-1, :], k)
     ft = func(yi, ti)
-    return ops.index_update(k, jax.ops.index[i, :], ft)
+    return index_update(k, index[i, :], ft)
 
-  k = ops.index_update(np.zeros((3, f0.shape[0])), ops.index[0, :], f0)
+  k = index_update(np.zeros((3, f0.shape[0])), index[0, :], f0)
   k = lax.fori_loop(1, 3, body_fun, k)
 
   y1 = dt * np.dot(c_sol, k) + y0
@@ -208,9 +210,9 @@ def rk_fehlberg_step(func, y0, f0, t0, dt):
     ti = t0 + dt * alpha[i-1]
     yi = y0 + dt * np.dot(beta[i-1, :], k)
     ft = func(yi, ti)
-    return ops.index_update(k, jax.ops.index[i, :], ft)
+    return index_update(k, index[i, :], ft)
 
-  k = ops.index_update(np.zeros((6, f0.shape[0])), ops.index[0, :], f0)
+  k = index_update(np.zeros((6, f0.shape[0])), index[0, :], f0)
   k = lax.fori_loop(1, 6, body_fun, k)
 
   y1 = dt * np.dot(c_sol, k) + y0
@@ -235,9 +237,9 @@ def cash_karp_step(func, y0, f0, t0, dt):
     ti = t0 + dt * alpha[i-1]
     yi = y0 + dt * np.dot(beta[i-1, :], k)
     ft = func(yi, ti)
-    return ops.index_update(k, jax.ops.index[i, :], ft)
+    return index_update(k, index[i, :], ft)
 
-  k = ops.index_update(np.zeros((6, f0.shape[0])), ops.index[0, :], f0)
+  k = index_update(np.zeros((6, f0.shape[0])), index[0, :], f0)
   k = lax.fori_loop(1, 6, body_fun, k)
 
   y1 = dt * np.dot(c_sol, k) + y0
@@ -262,9 +264,9 @@ def owrenzen_step(func, y0, f0, t0, dt):
     ti = t0 + dt * alpha[i-1]
     yi = y0 + dt * np.dot(beta[i-1, :], k)
     ft = func(yi, ti)
-    return ops.index_update(k, jax.ops.index[i, :], ft)
+    return index_update(k, index[i, :], ft)
 
-  k = ops.index_update(np.zeros((6, f0.shape[0])), ops.index[0, :], f0)
+  k = index_update(np.zeros((6, f0.shape[0])), index[0, :], f0)
   k = lax.fori_loop(1, 6, body_fun, k)
 
   y1 = dt * np.dot(c_sol, k) + y0
@@ -291,9 +293,9 @@ def owrenzen5_step(func, y0, f0, t0, dt):
     ti = t0 + dt * alpha[i-1]
     yi = y0 + dt * np.dot(beta[i-1, :], k)
     ft = func(yi, ti)
-    return ops.index_update(k, jax.ops.index[i, :], ft)
+    return index_update(k, index[i, :], ft)
 
-  k = ops.index_update(np.zeros((8, f0.shape[0])), ops.index[0, :], f0)
+  k = index_update(np.zeros((8, f0.shape[0])), index[0, :], f0)
   k = lax.fori_loop(1, 8, body_fun, k)
 
   y1 = dt * np.dot(c_sol, k) + y0
@@ -353,9 +355,9 @@ def tanyam_step(func, y0, f0, t0, dt):
     ti = t0 + dt * alpha[i-1]
     yi = y0 + dt * np.dot(beta[i-1, :], k)
     ft = func(yi, ti)
-    return ops.index_update(k, jax.ops.index[i, :], ft)
+    return index_update(k, index[i, :], ft)
 
-  k = ops.index_update(np.zeros((10, f0.shape[0])), ops.index[0, :], f0)
+  k = index_update(np.zeros((10, f0.shape[0])), index[0, :], f0)
   k = lax.fori_loop(1, 10, body_fun, k)
 
   y1 = dt * np.dot(c_sol, k) + y0
@@ -370,27 +372,27 @@ def _g_and_explicit_phi(prev_t, next_t, implicit_phi, k):
   beta = 1.
 
   explicit_phi = np.zeros_like(implicit_phi)
-  explicit_phi = jax.ops.index_update(explicit_phi, 0, implicit_phi[0])
+  explicit_phi = index_update(explicit_phi, 0, implicit_phi[0])
 
   c = 1 / np.arange(1, _ADAMS_MAX_ORDER + 2)
 
   g = np.zeros(_ADAMS_MAX_ORDER + 1)
-  g = jax.ops.index_update(g, 0, 1)
+  g = index_update(g, 0, 1)
 
   def body_fun(i, val):
     beta, explicit_phi, c, g = val
 
     beta = (next_t - prev_t[i - 1]) / (curr_t - prev_t[i]) * beta
-    explicit_phi = jax.ops.index_update(explicit_phi, i, implicit_phi[i] * beta)
+    explicit_phi = index_update(explicit_phi, i, implicit_phi[i] * beta)
 
     idxs = np.arange(_ADAMS_MAX_ORDER + 1)
     c_q = np.where(idxs < k - i + 1, c, 0)   # c[:k - i + 1]
     c_q_1 = np.where(idxs < k + 1 - i + 1, np.where(idxs >= 1, c, 0), 0)  # c[1:k + 1 - i + 1]
     # shift so that it lines up with diff1
-    c_q_1 = jax.ops.index_update(c_q_1, jax.ops.index[:-1], c_q_1[1:])
+    c_q_1 = index_update(c_q_1, index[:-1], c_q_1[1:])
     # c[:k - i + 1] - c[1:k + 1 - i + 1]
     c = lax.cond(i == 1, None, lambda _: c_q - c_q_1, None, lambda _: c_q - c_q_1 * dt / (next_t - prev_t[i - 1]))
-    g = jax.ops.index_update(g, i, c[0])
+    g = index_update(g, i, c[0])
 
     val = beta, explicit_phi, c, g
     return val
@@ -398,18 +400,18 @@ def _g_and_explicit_phi(prev_t, next_t, implicit_phi, k):
   beta, explicit_phi, c, g = lax.fori_loop(1, k, body_fun, (beta, explicit_phi, c, g))
 
   # do the c and g update for i = k
-  c = jax.ops.index_update(c, jax.ops.index[:1], c[:1] - c[1:2] * dt / (next_t - prev_t[k - 1]))
-  g = jax.ops.index_update(g, k, c[0])
+  c = index_update(c, index[:1], c[:1] - c[1:2] * dt / (next_t - prev_t[k - 1]))
+  g = index_update(g, k, c[0])
 
   return g, explicit_phi
 
 def _compute_implicit_phi(explicit_phi, f_n, phi_order, k):
   k = lax.min(phi_order + 1, k)
   implicit_phi = np.zeros_like(explicit_phi)
-  implicit_phi = jax.ops.index_update(implicit_phi, 0, f_n)
+  implicit_phi = index_update(implicit_phi, 0, f_n)
   def body_fun(i, val):
     implicit_phi = val
-    implicit_phi = jax.ops.index_update(implicit_phi, i, implicit_phi[i - 1] - explicit_phi[i - 1])
+    implicit_phi = index_update(implicit_phi, i, implicit_phi[i - 1] - explicit_phi[i - 1])
     return implicit_phi
   implicit_phi = lax.fori_loop(1, k, body_fun, implicit_phi)
   return implicit_phi
@@ -486,11 +488,11 @@ def adaptive_adams_step(func, y0, prev_f, prev_t, next_t, prev_phi, order, targe
 
     # shift right and insert at 0
 
-    prev_f = jax.ops.index_update(prev_f, jax.ops.index[1:], prev_f[:-1])
-    prev_f = jax.ops.index_update(prev_f, 0, next_f0)
+    prev_f = index_update(prev_f, index[1:], prev_f[:-1])
+    prev_f = index_update(prev_f, 0, next_f0)
 
-    prev_t = jax.ops.index_update(prev_t, jax.ops.index[1:], prev_t[:-1])
-    prev_t = jax.ops.index_update(prev_t, 0, next_t)
+    prev_t = index_update(prev_t, index[1:], prev_t[:-1])
+    prev_t = index_update(prev_t, 0, next_t)
 
     return p_next, prev_f, prev_t, next_t + dt_next, implicit_phi, next_order, 2
 
@@ -1402,13 +1404,13 @@ def _adams_odeint(func, rtol, atol, mxstep, y0, ts, *args):
   dt = initial_step_size(func_, ts[0], y0, 4, rtol, atol, f0)
 
   prev_f = np.empty((_ADAMS_MAX_ORDER + 1, ode_dim))
-  prev_f = jax.ops.index_update(prev_f, 0, f0)
+  prev_f = index_update(prev_f, 0, f0)
 
   prev_t = np.empty(_ADAMS_MAX_ORDER + 1)
-  prev_t = jax.ops.index_update(prev_t, 0, t0)
+  prev_t = index_update(prev_t, 0, t0)
 
   prev_phi = np.empty((_ADAMS_MAX_ORDER, ode_dim))
-  prev_phi = jax.ops.index_update(prev_phi, 0, f0)
+  prev_phi = index_update(prev_phi, 0, f0)
 
   next_t = t0 + dt
   init_order = 1

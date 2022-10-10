@@ -1,5 +1,5 @@
 _target_: score_sde.models.ConcatEmbed
 enc_shapes: [128]
-dec_shapes: [512, 512, 512, 512]
+dec_shapes: [512, 512, 512, 512, 512]
 t_dim: 64
 act: sin

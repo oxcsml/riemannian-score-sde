@@ -1,4 +1,4 @@
-_target_: score_sde.datasets.vMFMixture
+_target_: riemannian_score_sde.datasets.vMFMixture
 _convert_: partial
 batch_dims:
   - ${batch_size}

@@ -1,4 +1,4 @@
-_target_: score_sde.datasets.DiracDataset
+_target_: riemannian_score_sde.datasets.DiracDataset
 _convert_: partial
 mu: [1., 0., 0.]
 manifold: ${manifold}

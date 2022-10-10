@@ -4,8 +4,6 @@ import jax
 import haiku as hk
 import jax.numpy as jnp
 
-from hydra.utils import instantiate
-
 
 class Embedding(hk.Module, abc.ABC):
     def __init__(self, manifold):

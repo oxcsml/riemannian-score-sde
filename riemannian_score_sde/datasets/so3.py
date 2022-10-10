@@ -16,8 +16,3 @@ class MatrixDataset(CSVDataset):
             jnp.pi * (self.data / 180.0) + jnp.array([jnp.pi / 2, jnp.pi])[None, :]
         )
         self.data = self.manifold.spherical_to_extrinsic(self.intrinsic_data)
-
-
-class VolcanicErruption(SphericalDataset):
-    def __init__(self, data_dir="data", **kwargs):
-        super().__init__(os.path.join(data_dir, "volerup.csv"), skip_header=2)

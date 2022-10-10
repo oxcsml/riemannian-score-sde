@@ -16,8 +16,6 @@
 
 """All functions and modules related to model definition.
 """
-from dataclasses import dataclass
-
 import jax
 import numpy as np
 import jax.numpy as jnp
@@ -25,8 +23,7 @@ import jax.numpy as jnp
 from score_sde.utils.jax import batch_mul
 from score_sde.utils.typing import ParametrisedScoreFunction
 
-from score_sde.sde import SDE, VESDE, VPSDE, subVPSDE
-from riemannian_score_sde.sde import Brownian
+from score_sde.sde import SDE
 
 
 def get_score_fn(
@@ -48,48 +45,22 @@ def get_score_fn(
     Returns:
       A score function.
     """
-    if isinstance(sde, Brownian):
-        def score_fn(x, t, z, std_trick=True, rng=None):
-            model_out, new_state = model.apply(params, state, rng, x=x, t=t, z=z)
-            # NOTE: scaling the output with 1.0 / std helps cf 'Improved Techniques for Training Score-Based Generative Model'
-            score = model_out
-            if std_trick:
-                std = sde.marginal_prob(jnp.zeros_like(x), t)[1]
-                score = batch_mul(model_out, 1.0 / std)
-            if return_state:
-                return score, new_state
-            else:
-                return score
 
-    elif isinstance(sde, (VPSDE, subVPSDE)):
-        def score_fn(x, t, z=None, rng=None):
-            # Scale neural network output by standard deviation and flip sign
-            # For VP-trained models, t=0 corresponds to the lowest noise level
-            # The maximum value of time embedding is assumed to 999 for
-            # continuously-trained models.
-            # TODO: remove t * 999 scaling ?
-            model_out, new_state = model.apply(params, state, rng, x=x, t=t * 999, z=z)
-            std = sde.marginal_prob(jnp.zeros_like(x), t)[1]
-
-            score = batch_mul(-model_out, 1.0 / std)
-            if return_state:
-                return score, new_state
-            else:
-                return score
-
-    # elif isinstance(sde, VESDE):
-
-    #     def score_fn(x, t, rng=None):
-    #         labels = sde.marginal_prob(jnp.zeros_like(x), t)[1]
-    #         score, state = model(x, labels, rng)
-    #         if return_state:
-    #             return score, state
-    #         else:
-    #             return score
-
-    else:
-        raise NotImplementedError(
-            f"SDE class {sde.__class__.__name__} not yet supported."
+    def score_fn(y, t, context, std_trick=True, rng=None):
+        # NOTE: Time scaling from song's code, to remove?
+        # t_emb = t * 999 if isinstance(sde, (VPSDE, subVPSDE)) else t
+        t_emb = t
+        model_out, new_state = model.apply(
+            params, state, rng, y=y, t=t_emb, context=context
         )
+        score = model_out
+        if std_trick:
+            # NOTE: scaling the output with 1.0 / std helps cf 'Improved Techniques for Training Score-Based Generative Model'
+            std = sde.marginal_prob(jnp.zeros_like(y), t)[1]
+            score = batch_mul(model_out, 1.0 / std)
+        if return_state:
+            return score, new_state
+        else:
+            return score
 
     return score_fn

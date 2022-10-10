@@ -1,6 +1,2 @@
 _target_: riemannian_score_sde.sde.Brownian
-beta_0: 0.001
-beta_f: 2.0
-t0: 0.
-tf: 1.
 N: 100

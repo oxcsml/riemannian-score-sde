@@ -12,7 +12,8 @@ import numpy as np
 import haiku as hk
 
 from score_sde.utils import TrainState, save, restore
-from score_sde.sampling import EulerMaruyamaManifoldPredictor, get_pc_sampler
+from score_sde.sampling import get_pc_sampler
+from riemannian_score_sde.sampling import EulerMaruyamaManifoldPredictor
 from score_sde.utils import batch_mul
 
 

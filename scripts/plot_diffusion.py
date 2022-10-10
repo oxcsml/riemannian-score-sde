@@ -17,7 +17,11 @@ import numpy as np
 from score_sde.utils import batch_mul
 from score_sde.datasets import vMFDataset
 from riemannian_score_sde.sde import Brownian
-from score_sde.utils.vis import remove_background, sphere_plot, get_sphere_coords
+from riemannian_score_sde.utils.vis import (
+    remove_background,
+    sphere_plot,
+    get_sphere_coords,
+)
 from scripts.utils import (
     plot_and_save2,
     plot_and_save_video,
@@ -93,9 +97,7 @@ def make_animation(traj, size=20, dpi=300, fps=10, out="out"):
     ax = sphere_plot(ax, color=sphere_color)
     ax.set_box_aspect([1.0, 1.0, 1.0])
     ax = remove_background(ax)
-    fig.subplots_adjust(
-        left=-0.45, bottom=-0.45, right=1.4, top=1.4, wspace=0, hspace=0
-    )
+    fig.subplots_adjust(left=-0.45, bottom=-0.45, right=1.4, top=1.4, wspace=0, hspace=0)
 
     N, K, D = traj.shape
     colours = sns.color_palette("hls", K)
@@ -157,9 +159,7 @@ def make_animation_2(traj, kernel_widths, kernel, size=20, dpi=300, fps=10, out=
 
     ax.set_box_aspect([1.0, 1.0, 1.0])
     ax = remove_background(ax)
-    fig.subplots_adjust(
-        left=-0.45, bottom=-0.45, right=1.4, top=1.4, wspace=0, hspace=0
-    )
+    fig.subplots_adjust(left=-0.45, bottom=-0.45, right=1.4, top=1.4, wspace=0, hspace=0)
 
     N, K, D = traj.shape
     colours = sns.color_palette("hls", K)
@@ -268,9 +268,7 @@ def plot_and_save_frame(
 
     ax.set_box_aspect([1.0, 1.0, 1.0])
     ax = remove_background(ax)
-    fig.subplots_adjust(
-        left=-0.45, bottom=-0.45, right=1.4, top=1.4, wspace=0, hspace=0
-    )
+    fig.subplots_adjust(left=-0.45, bottom=-0.45, right=1.4, top=1.4, wspace=0, hspace=0)
 
     if N is None:
         N, K, D = traj.shape
@@ -371,7 +369,7 @@ def test_s2():
         _, std = sde.marginal_prob(x, 1 - t)
 
         t_ = 1 - t
-        s = -2 * (-0.25 * t_ ** 2 * (sde.beta_f - sde.beta_0) - 0.5 * t_ * sde.beta_0)
+        s = -2 * (-0.25 * t_**2 * (sde.beta_f - sde.beta_0) - 0.5 * t_ * sde.beta_0)
 
         p = np.exp(
             S2.log_heat_kernel(

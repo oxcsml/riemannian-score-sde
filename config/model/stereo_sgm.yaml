@@ -1,0 +1,9 @@
+# @package _global_
+
+defaults:
+  - /transform: stereo
+  - /flow: vp
+  - /base: default
+  - /pushf: sde
+  - /loss: dsm0
+  - /generator: ambient

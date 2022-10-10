@@ -15,14 +15,10 @@ defaults:
 manifold:
   dim: 2
 
-sde:
-  t0: 0
-  tf: 1
-
 batch_size: 512
 eval_batch_size: 512
 warmup_steps: 100
 steps: 5000
-val_freq: 500 # !!float inf
+val_freq: 500
 ema_rate: 0.999
 eps: 1e-3

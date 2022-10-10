@@ -1,6 +1,8 @@
 --find-links https://storage.googleapis.com/jax-releases/jax_releases.html
-jax[cuda11_cudnn805]
+# jax[cuda11_cudnn805]
 # jaxlib==0.1.74+cuda11.cudnn805  # not sure that version will work on other zizgpu0x
+jax==0.3.1+cuda11.cudnn805
+# jaxlib==0.3.0+cuda11.cudnn805  # not sure that version will work on other zizgpu0x
 dm-haiku
 optax
 fsspec[http]>=2021.05.0, !=2021.06.0

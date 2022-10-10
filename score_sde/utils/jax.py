@@ -1,6 +1,5 @@
 import os
 import pickle
-from typing import Callable
 
 import jax
 import numpy as np
@@ -22,12 +21,10 @@ def batch_mul(a, b):
 def get_estimate_div_fn(fn: ScoreFunction):
     """Create the divergence function of `fn` using the Hutchinson-Skilling trace estimator."""
 
-    def div_fn(x: jnp.ndarray, t: float, z: jnp.ndarray, eps: jnp.ndarray):
+    def div_fn(y: jnp.ndarray, t: float, context: jnp.ndarray, eps: jnp.ndarray):
         eps = eps.reshape(eps.shape[0], -1)
-        grad_fn = lambda x: jnp.sum(fn(x, t, z) * eps)
-        grad_fn_eps = jax.grad(grad_fn)(x).reshape(x.shape[0], -1)
-        # grad_fn = lambda x, t, eps: jnp.sum(fn(x, t) * eps)
-        # grad_fn_eps = jax.vmap(jax.grad(grad_fn, argnums=0))(x, t, eps)
+        grad_fn = lambda y: jnp.sum(fn(y, t, context) * eps)
+        grad_fn_eps = jax.grad(grad_fn)(y).reshape(y.shape[0], -1)
         return jnp.sum(grad_fn_eps * eps, axis=tuple(range(1, len(eps.shape))))
 
     return div_fn
@@ -36,22 +33,18 @@ def get_estimate_div_fn(fn: ScoreFunction):
 def get_exact_div_fn(fn):
     "flatten all but the last axis and compute the true divergence"
 
-    def div_fn(x: jnp.ndarray, t: float, z: jnp.ndarray):
-        x_shape = x.shape
-        dim = np.prod(x_shape[1:])
-        # x = x.reshape((x.shape[0], -1))  # vec(x)
+    def div_fn(y: jnp.ndarray, t: float, context: jnp.ndarray):
+        y_shape = y.shape
+        dim = np.prod(y_shape[1:])
         t = jnp.expand_dims(t.reshape(-1), axis=-1)
-        # x = jnp.expand_dims(x.reshape((-1, x_shape[-1])), 1)
-        # t = jnp.expand_dims(t.reshape((-1, t_shape[-1])), 1)
-        x = jnp.expand_dims(x, 1)  # NOTE: need leading batch dim after vmap
-        if z is not None:
-            z = jnp.expand_dims(z, 1)
+        y = jnp.expand_dims(y, 1)  # NOTE: need leading batch dim after vmap
+        if context is not None:
+            context = jnp.expand_dims(context, 1)
         t = jnp.expand_dims(t, 1)
-        jac = jax.vmap(jax.jacrev(fn, argnums=0))(x, t, z)
-        # jac = jac.reshape([*x_shape[:-1], x_shape[-1], x_shape[-1]])
+        jac = jax.vmap(jax.jacrev(fn, argnums=0))(y, t, context)
 
-        jac = jac.reshape([x_shape[0], dim, dim])
-        return jnp.trace(jac, axis1=-1, axis2=-2)  # .reshape(x_shape[:-1])
+        jac = jac.reshape([y_shape[0], dim, dim])
+        return jnp.trace(jac, axis1=-1, axis2=-2)
 
     return div_fn
 

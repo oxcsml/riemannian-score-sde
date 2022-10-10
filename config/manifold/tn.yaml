@@ -3,10 +3,4 @@ manifold:
   _target_: geomstats.geometry.hypersphere.Hypersphere
   dim: 1
 mul: ${n}
-# point_type: matrix
 default_point_type: vector
-
-
-
-# _target_: geomstats.geometry.hypersphere.Hypersphere
-# dim: 1

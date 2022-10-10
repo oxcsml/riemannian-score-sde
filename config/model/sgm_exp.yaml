@@ -1,9 +1,0 @@
-# @package _global_
-
-defaults:
-  - /transform: tanhexp
-  # - /transform: exp
-  - /flow: vp
-  - /pushf: sde
-  - /loss: dsm0
-  - override /generator: ambient

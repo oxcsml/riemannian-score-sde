@@ -1,22 +1,21 @@
 defaults:
   # GENERAL #
   - _self_
-  # - user
 
   - server: local
   - experiment: s2_toy
 
-  # - callbacks: wandb # set this to null if you don't want to use callbacks
   - logger: all
-  # - checkpoint: val_loss
 
   - optim: adam
   - scheduler: rcosine
+  - beta_schedule: linear
   
   # enable color logging
   - override hydra/hydra_logging: colorlog
   - override hydra/job_logging: colorlog
 
+eval_batch_size: ${batch_size}
 now: ${now:%Y-%m-%d}/${now:%H-%M-%S}
 
 resume: false

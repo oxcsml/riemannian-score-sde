@@ -8,7 +8,7 @@ import geomstats.visualization as visualization
 from geomstats.geometry.hypersphere import Hypersphere
 import geomstats.backend as gs
 
-from score_sde.sampling import EulerMaruyamaManifoldPredictor, get_pc_sampler
+from riemannian_score_sde.sampling import get_pc_sampler
 from score_sde.sde import SDE, batch_mul
 from riemannian_score_sde.sde import Brownian
 from score_sde.utils import TrainState, replicate
@@ -114,7 +114,7 @@ def EulerMaruyama(previous_x, traj, dt, timesteps, f_sde, sde, forward=True):
         # logp, logp_grad = value_and_grad_log_marginal_prob(x0, x, t, f_sde)
         tangent_vector = sign * drift * dt + batch_mul(diffusion, jnp.sqrt(dt) * z)
         x = f_sde.manifold.metric.exp(tangent_vec=tangent_vector, base_point=x)
-        vector = diffusion ** 2 * logp_grad if forward else sign * drift
+        vector = diffusion**2 * logp_grad if forward else sign * drift
 
         traj = traj.at[step, :, :3].set(x)
         traj = traj.at[step, :, 3:6].set(vector)
@@ -306,7 +306,7 @@ def main(train=False):
             batch = {"data": next(dataset), "label": None}
 
             # rng = p_train_state.rng[0]
-            # rng = train_state.rng  # TODO: train_state.rng is not updated!
+            # rng = train_state.rng
 
             # next_rng = jax.random.split(rng, num=jax.local_device_count() + 1)
             # rng = next_rng[0]
@@ -319,9 +319,7 @@ def main(train=False):
 
     ### Analysis ###
 
-    score_fn = get_score_fn(
-        sde, score_model, train_state.params, train_state.model_state
-    )
+    score_fn = get_score_fn(sde, score_model, train_state.params, train_state.model_state)
     x0 = next(dataset_init)
     name = f"{sde.T}_{sde.beta_0:.1f}_{sde.beta_1:.1f}"
 
@@ -339,7 +337,7 @@ def main(train=False):
         sde,
         None,
         (batch_size,),
-        predictor=EulerMaruyamaManifoldPredictor,
+        predictor="GRW",
         corrector=None,
         continuous=True,
         forward=True,
@@ -360,7 +358,7 @@ def main(train=False):
         sde,
         score_model,
         (batch_size,),
-        predictor=EulerMaruyamaManifoldPredictor,
+        predictor="GRW",
         corrector=None,
         continuous=True,
         forward=False,

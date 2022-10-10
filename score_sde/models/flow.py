@@ -4,26 +4,27 @@ from typing import Sequence
 import jax
 import numpy as np
 import jax.numpy as jnp
-from scipy import integrate
-
+from jax.nn import relu
 from score_sde.sde import SDE
 from score_sde.models.model import get_score_fn
-from score_sde.sampling import get_pc_sampler
-from score_sde.utils import to_flattened_numpy, from_flattened_numpy
+from score_sde.models.transform import Id
 from score_sde.utils import (
     ParametrisedScoreFunction,
     get_exact_div_fn,
     get_estimate_div_fn,
 )
 from score_sde.ode import odeint
+from score_sde.sampling import get_pc_sampler
 
 
 def get_div_fn(drift_fn, hutchinson_type: str = "None"):
     """Pmapped divergence of the drift function."""
     if hutchinson_type == "None":
-        return lambda x, t, z, eps: get_exact_div_fn(drift_fn)(x, t, z)
+        return lambda y, t, context, eps: get_exact_div_fn(drift_fn)(y, t, context)
     else:
-        return lambda x, t, z, eps: get_estimate_div_fn(drift_fn)(x, t, z, eps)
+        return lambda y, t, context, eps: get_estimate_div_fn(drift_fn)(
+            y, t, context, eps
+        )
 
 
 def div_noise(
@@ -43,143 +44,171 @@ def div_noise(
     return epsilon
 
 
-def get_sde_drift_from_fn(
-    sde: SDE,
-    model: ParametrisedScoreFunction,
-    params,
-    states,
-):
-    def drift_fn(x: jnp.ndarray, t: float, z: jnp.ndarray) -> jnp.ndarray:
+## Drift functions for ODE solver
+
+
+def get_sde_drift_from_fn(sde: SDE, model: ParametrisedScoreFunction, params, states):
+    def drift_fn(y: jnp.ndarray, t: float, context: jnp.ndarray) -> jnp.ndarray:
         """The drift function of the reverse-time SDE."""
-        score_fn = get_score_fn(
-            sde,
-            model,
-            params,
-            states,
-            train=False,
-        )
+        score_fn = get_score_fn(sde, model, params, states, train=False)
         pode = sde.probability_ode(score_fn)
-        return pode.coefficients(x, t, z)[0]
+        return pode.coefficients(y, t, context)[0]
 
     return drift_fn
 
 
 def get_ode_drift_fn(model, params, states):
-    def drift_fn(x: jnp.ndarray, t: float, z: jnp.ndarray) -> jnp.ndarray:
-        model_out, _ = model.apply(params, states, None, x=x, t=t, z=z)
+    def drift_fn(y: jnp.ndarray, t: float, context: jnp.ndarray) -> jnp.ndarray:
+        model_out, _ = model.apply(params, states, None, y=y, t=t, context=context)
         return model_out
 
     return drift_fn
 
 
 def get_moser_drift_fn(base, eps, model, params, states):
-    def drift_fn(x: jnp.ndarray, t: float, z: jnp.ndarray) -> jnp.ndarray:
-        t = t.reshape(*x.shape[:-1], 1)
-        u_fn = lambda x, t, z: model.apply(params, states, None, x=x, t=t, z=z)[0]
+    def drift_fn(y: jnp.ndarray, t: float, context: jnp.ndarray) -> jnp.ndarray:
+        t = t.reshape(*y.shape[:-1], 1)
+        u_fn = lambda y, t, context: model.apply(
+            params, states, None, y=y, t=t, context=context
+        )[0]
         t0 = jnp.zeros_like(t)
-        u = u_fn(x, t0, z)
-        nu = jnp.exp(base.log_prob(x)).reshape(*x.shape[:-1], 1)
-        div_u = get_div_fn(u_fn)(x, t0, z, None).reshape(*x.shape[:-1], 1)
-        mu_plus = jnp.maximum(eps, nu - div_u)  # TODO: 0. or epsilon?
+        u = u_fn(y, t0, context)
+        nu = jnp.exp(base.log_prob(y)).reshape(*y.shape[:-1], 1)
+        div_u = get_div_fn(u_fn)(y, t0, context, None).reshape(*y.shape[:-1], 1)
+        mu_plus = jnp.maximum(eps, nu - div_u)
         out = -u / (t * nu + (1 - t) * mu_plus)  # data -> base
-        # out = u / ((1 - t) * nu + t * mu_plus)  # base -> data
         return out
 
     return drift_fn
 
 
+## Pushforwards probability measures
+
+
 class PushForward:
-    """A density estimator able to evaluate log_prob and generate samples.
+    """
+    A density estimator able to evaluate log_prob and generate samples.
     Requires specifying a base distribution.
+    Generative model: z -> y -> x \in M
     """
 
-    def __init__(self, manifold, flow, base):
+    def __init__(self, flow, base, transform=Id):
         self.flow = flow  # NOTE: Convention is that flow: data -> base
         self.base = base
+        self.transform = transform
 
     def __repr__(self):
         return "PushForward: base:{} flow:{}".format(self.base, self.flow)
 
-    def get_log_prob(self, model_w_dicts, train=False):
-        def log_prob(rng, y, **kwargs):
+    def get_log_prob(self, model_w_dicts, train=False, transform=True, **kwargs):
+        def log_prob(x, rng=None):
+            y = self.transform.inv(x) if transform else x
             flow = self.flow.get_forward(model_w_dicts, train, augmented=True)
-            x, inv_logdets, nfe = flow(rng, y, **kwargs)  # NOTE: flow is not reversed
-            log_prob = self.base.log_prob(x).reshape(-1)
+            z, inv_logdets, nfe = flow(y, rng=rng, **kwargs)  # NOTE: flow is not reversed
+            log_prob = self.base.log_prob(z).reshape(-1)
             log_prob += inv_logdets
+            if transform:
+                log_prob -= self.transform.log_abs_det_jacobian(y, x)
             return jnp.clip(log_prob, -1e38, 1e38), nfe
 
         return log_prob
 
-    def get_sample(self, model_w_dicts, train=False, reverse=True):
-        def sample(rng, shape, z, x=None, **kwargs):
-            x = self.base.sample(rng, shape) if x is None else x
+    def get_sampler(
+        self, model_w_dicts, train=False, reverse=True, transform=True, **kwargs
+    ):
+        def sample(rng, shape, context, z=None):
+            z = self.base.sample(rng, shape) if z is None else z
             flow = self.flow.get_forward(model_w_dicts, train)
-            # flow = jax.jit(flow)
-            y, nfe = flow(rng, x, z, reverse=reverse, **kwargs)  # NOTE: flow is reversed
-            # log_prob = self.base.log_prob(x)
-            # log_prob += inv_logdets.reshape(log_prob.shape)
-            return y  # , jnp.clip(log_prob, -1e38, 1e38)
+            y, nfe = flow(z, context, reverse=reverse, **kwargs)  # NOTE: flow is reversed
+            x = self.transform(y) if transform else y
+            return x
 
         return sample
 
 
 class SDEPushForward(PushForward):
-    def __init__(self, manifold, flow, diffeq):
-        self.manifold = manifold
+    def __init__(self, flow, base, diffeq="sde", transform=Id):
         self.sde = flow
         self.diffeq = diffeq
         flow = CNF(
             t0=self.sde.t0,
             tf=self.sde.tf,
-            hutchinson_type="None",
             get_drift_fn=partial(get_sde_drift_from_fn, self.sde),
         )
-        super(SDEPushForward, self).__init__(manifold, flow, self.sde.limiting)
+        super(SDEPushForward, self).__init__(flow, base, transform)
 
-    def get_sample(self, model_w_dicts, train=False, reverse=True):
-        if self.diffeq == "ode":
-            return super().get_sample(model_w_dicts, train, reverse)
-        elif self.diffeq == "sde":
+    def get_sampler(
+        self, model_w_dicts, train=False, reverse=True, transform=True, **kwargs
+    ):
+        if self.diffeq == "ode":  # via probability flow
+            sample = super().get_sampler(model_w_dicts, train, reverse)
+        elif self.diffeq == "sde":  # via stochastic process
 
-            def sample(rng, shape, z, x=None, **kwargs):
-                x = self.base.sample(rng, shape) if x is None else x
+            def sample(rng, shape, context, z=None):
+                z = self.base.sample(rng, shape) if z is None else z
                 score_fn = get_score_fn(self.sde, *model_w_dicts)
-                score_fn = partial(score_fn, z=z)
+                score_fn = partial(score_fn, context=context)
                 sde = self.sde.reverse(score_fn) if reverse else self.sde
                 sampler = get_pc_sampler(sde, **kwargs)
                 sampler = jax.jit(sampler)
-                return sampler(rng, x)
+                y = sampler(rng, z)
+                x = self.transform(y) if transform else y
+                return x
 
-            return sample
         else:
             raise ValueError(self.diffeq)
+        return sample
 
 
 class MoserFlow(PushForward):
-    def __init__(self, manifold, flow, base, eps, diffeq):
+    """Following https://github.com/noamroze/moser_flow/blob/main/moser.py#L36"""
+
+    def __init__(self, flow, base, eps=1e-5, diffeq=True, transform=Id):
         self.eps = eps
         self.diffeq = diffeq
         flow.get_drift_fn = partial(get_moser_drift_fn, base, self.eps)
-        super(MoserFlow, self).__init__(manifold, flow, base)
+        super(MoserFlow, self).__init__(flow, base, transform)
 
-    def get_log_prob(self, model_w_dicts, train=False):
+    def get_log_prob(self, model_w_dicts, train=False, transform=True, **kwargs):
         if self.diffeq:
-            return super().get_log_prob(model_w_dicts, train)
+            # Evaluating 'true' likelihood via solving augmented ODE as in CNFs
+            return super().get_log_prob(model_w_dicts, train, **kwargs)
         else:
-
-            def log_prob(rng, y, z, **kwargs):
+            # Proxy 'trick' likelihood /!\ does not yield normalised measure /!\
+            def log_prob(x, context):
                 """Use closed-form formula since faster than solving ODE"""
-                x = y
-                drift_fn = get_ode_drift_fn(*model_w_dicts)
-                div_fn = get_div_fn(drift_fn, hutchinson_type="None")
-                t0 = jnp.zeros((x.shape[0], 1))
-                # div_u = div_fn(x, t0, None)
-                div_u = div_fn(x, t0, z, None)
-                base_prob = jnp.exp(self.base.log_prob(x)).reshape(-1)
-                log_prob = jnp.log(jnp.maximum(self.eps, base_prob - div_u))
-                return jnp.clip(log_prob, -1e38, 1e38), 0
+                y = self.transform.inv(x) if transform else x
+                log_prob = self.density(y, context, model_w_dicts, "None", None)
+                if transform:
+                    log_prob -= self.transform.log_abs_det_jacobian(y, x)
+                nfe = 0
+                return jnp.clip(log_prob, -1e38, 1e38), nfe
 
             return log_prob
+
+    def nu(self, x):
+        return jnp.exp(self.base.log_prob(x)).reshape(-1)
+
+    def divergence(self, x, context, model_w_dicts, hutchinson_type, rng):
+        drift_fn = get_ode_drift_fn(*model_w_dicts)
+        div_fn = get_div_fn(drift_fn, hutchinson_type)
+        t = jnp.zeros((x.shape[0], 1))  # since vector field is time independant
+        epsilon = div_noise(rng, x.shape, hutchinson_type)
+        return div_fn(x, t, context, epsilon)
+
+    def signed_mu(self, x, *args):
+        return self.nu(x) - self.divergence(x, *args)
+
+    def mu_minus(self, x, *args):
+        return self.eps - jnp.minimum(self.eps, self.signed_mu(x, *args))
+        # return relu(-self.signed_mu(x, *args) + self.eps)
+
+    def mu_plus(self, x, *args):
+        return jnp.maximum(self.eps, self.signed_mu(x, *args))
+        # return relu(self.signed_mu(x, *args) - self.eps) + self.eps
+
+    def density(self, x, *args):
+        return self.mu_plus(x, *args)
 
 
 class ReverseAugWrapper:
@@ -187,8 +216,10 @@ class ReverseAugWrapper:
         self.module = module
         self.tf = tf
 
-    def __call__(self, x: jnp.ndarray, t: jnp.ndarray, z: jnp.ndarray, *args, **kwargs):
-        states = self.module(x, self.tf - t, z, *args, **kwargs)
+    def __call__(
+        self, y: jnp.ndarray, t: jnp.ndarray, context: jnp.ndarray, *args, **kwargs
+    ):
+        states = self.module(y, self.tf - t, context, *args, **kwargs)
         return jnp.concatenate([-states[..., :-1], states[..., [-1]]], axis=1)
 
 
@@ -197,20 +228,21 @@ class ReverseWrapper:
         self.module = module
         self.tf = tf
 
-    def __call__(self, x: jnp.ndarray, t: jnp.ndarray, z: jnp.ndarray, *args, **kwargs):
-        states = self.module(x, self.tf - t, z, *args, **kwargs)
+    def __call__(
+        self, y: jnp.ndarray, t: jnp.ndarray, context: jnp.ndarray, *args, **kwargs
+    ):
+        states = self.module(y, self.tf - t, context, *args, **kwargs)
         return -states
 
 
 class CNF:
     def __init__(
         self,
-        t0: float,
-        tf: float,
-        hutchinson_type: str = "Rademacher",
+        t0: float = 0,
+        tf: float = 1,
+        hutchinson_type: str = "None",
         rtol: str = 1e-5,
         atol: str = 1e-5,
-        backend: str = "jax",
         get_drift_fn=get_ode_drift_fn,
         **kwargs,
     ):
@@ -220,64 +252,59 @@ class CNF:
         self.ode_kwargs = dict(atol=atol, rtol=rtol)
         self.test_ode_kwargs = dict(atol=1e-5, rtol=1e-5)
         self.hutchinson_type = hutchinson_type
-        self.backend = backend
 
     def get_forward(self, model_w_dicts, train, augmented=False, **kwargs):
         model, params, states = model_w_dicts
 
-        def forward(rng, data, z=None, t0=None, tf=None, reverse=False, **kwargs):
+        def forward(data, context=None, t0=None, tf=None, rng=None, reverse=False):
             hutchinson_type = self.hutchinson_type if train else "None"
 
-            rng, step_rng = jax.random.split(rng)
             shape = data.shape
-            epsilon = div_noise(step_rng, shape, hutchinson_type)
+            epsilon = div_noise(rng, shape, hutchinson_type)
             t0 = self.t0 if t0 is None else t0
             tf = self.tf if tf is None else tf
             eps = kwargs.get("eps", 1e-3)
             ts = jnp.array([t0 + eps, tf])
             ode_kwargs = self.ode_kwargs if train else self.test_ode_kwargs
 
-            if augmented:
+            if augmented:  # Also solving for the change in log-likelihood
 
                 def ode_func(
-                    x: jnp.ndarray, t: jnp.ndarray, z: jnp.ndarray, params, states
+                    y: jnp.ndarray, t: jnp.ndarray, context: jnp.ndarray, params, states
                 ) -> np.array:
-                    sample = x[:, :-1]  # .reshape(shape)
+                    sample = y[:, :-1]
                     vec_t = jnp.ones((sample.shape[0],)) * t
                     drift_fn = self.get_drift_fn(model, params, states)
-                    drift_fn = jax.jit(drift_fn)  # TODO: useless?
-                    drift = drift_fn(sample, vec_t, z)
+                    drift = drift_fn(sample, vec_t, context)
                     div_fn = get_div_fn(drift_fn, hutchinson_type)
-                    div_fn = jax.jit(div_fn)  # TODO: useless?
-                    logp_grad = div_fn(sample, vec_t, z, epsilon).reshape([shape[0], 1])
+                    logp_grad = div_fn(sample, vec_t, context, epsilon).reshape(
+                        [shape[0], 1]
+                    )
                     return jnp.concatenate([drift, logp_grad], axis=1)
 
                 data = data.reshape(shape[0], -1)
                 init = jnp.concatenate([data, np.zeros((shape[0], 1))], axis=1)
                 ode_func = ReverseAugWrapper(ode_func, tf) if reverse else ode_func
-                y, nfe = odeint(ode_func, init, ts, z, params, states, **ode_kwargs)
+                y, nfe = odeint(ode_func, init, ts, context, params, states, **ode_kwargs)
                 z = y[-1, ..., :-1].reshape(shape)
                 delta_logp = y[-1, ..., -1]
-                print(f"nfe: {nfe}")
                 return z, delta_logp, nfe
             else:
 
                 def ode_func(
-                    x: jnp.ndarray, t: jnp.ndarray, z: jnp.ndarray, params, states
+                    y: jnp.ndarray, t: jnp.ndarray, context: jnp.ndarray, params, states
                 ) -> np.array:
-                    sample = x
+                    sample = y
                     vec_t = jnp.ones((sample.shape[0],)) * t
                     drift_fn = self.get_drift_fn(model, params, states)
-                    drift_fn = jax.jit(drift_fn)  # TODO: useless?
-                    drift = drift_fn(sample, vec_t, z)
+                    drift = drift_fn(sample, vec_t, context)
                     return drift
 
                 data = data.reshape(shape[0], -1)
                 init = data
                 ode_func = ReverseWrapper(ode_func, tf) if reverse else ode_func
-                y, nfe = odeint(ode_func, init, ts, z, params, states, **ode_kwargs)
+                y, nfe = odeint(ode_func, init, ts, context, params, states, **ode_kwargs)
                 z = y[-1].reshape(shape)
-                print(f"nfe: {nfe}")
                 return z, nfe
 
         return forward

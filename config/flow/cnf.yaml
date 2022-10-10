@@ -4,7 +4,6 @@ get_drift_fn:
   path: score_sde.models.get_ode_drift_fn
 t0: 0
 tf: 1
-hutchinson_type: Rademacher
+hutchinson_type: None
 rtol: 1e-5
 atol: 1e-5
-backend: jax

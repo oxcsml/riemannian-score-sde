@@ -1,17 +1,3 @@
 _target_: score_sde.models.MoserFlow
-base:
-  _target_: riemannian_score_sde.sde.UniformDistribution
-  manifold: ${manifold}  #NOTE: Should be model_manifold
 eps: 1e-5
 diffeq: True
-# flow:
-#   _target_: score_sde.models.CNF
-#   get_drift_fn:
-#     _target_: hydra.utils.get_method
-#     # path: score_sde.models.get_moser_drift_fn
-#     path: score_sde.models.get_moser_reverse_drift_fn
-#   t0: 0
-#   tf: 1
-#   rtol: 1e-5
-#   atol: 1e-5
-#   backend: scipy

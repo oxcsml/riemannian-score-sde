@@ -60,9 +60,7 @@ def get_dsm_loss_fn(
 
         rng, step_rng = random.split(rng)
         # uniformly sample from SDE timeframe
-        t = random.uniform(
-            step_rng, (x_0.shape[0],), minval=sde.t0 + eps, maxval=sde.tf
-        )
+        t = random.uniform(step_rng, (x_0.shape[0],), minval=sde.t0 + eps, maxval=sde.tf)
         rng, step_rng = random.split(rng)
         z = random.normal(step_rng, x_0.shape)
         mean, std = sde.marginal_prob(x_0, t)
@@ -91,7 +89,6 @@ def get_ism_loss_fn(
     pushforward: SDEPushForward,
     model: ParametrisedScoreFunction,
     train: bool,
-    reduce_mean: bool = True,
     like_w: bool = True,
     hutchinson_type="Rademacher",
     eps: float = 1e-3,
@@ -112,9 +109,7 @@ def get_ism_loss_fn(
         x_0 = batch["data"]
 
         rng, step_rng = random.split(rng)
-        t = random.uniform(
-            step_rng, (x_0.shape[0],), minval=sde.t0 + eps, maxval=sde.tf
-        )
+        t = random.uniform(step_rng, (x_0.shape[0],), minval=sde.t0 + eps, maxval=sde.tf)
 
         rng, step_rng = random.split(rng)
         x_t = sde.marginal_sample(step_rng, x_0, t)
@@ -152,10 +147,9 @@ def get_logp_loss_fn(
 
         model_w_dicts = (model, params, states)
         log_prob = pushforward.get_log_prob(model_w_dicts, train=train)
-        losses = -log_prob(rng, x_0)[0]
+        losses = -log_prob(x_0, rng=rng)[0]
         loss = jnp.mean(losses)
 
-        # return loss, new_model_state
         return loss, states
 
     return loss_fn
@@ -202,9 +196,7 @@ def get_ema_loss_step_fn(
         if train:
             params = train_state.params
             model_state = train_state.model_state
-            (loss, new_model_state), grad = grad_fn(
-                step_rng, params, model_state, batch
-            )
+            (loss, new_model_state), grad = grad_fn(step_rng, params, model_state, batch)
             updates, new_opt_state = optimizer.update(grad, train_state.opt_state)
             new_parmas = optax.apply_updates(params, updates)
 
