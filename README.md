@@ -2,7 +2,7 @@
 
 This repo requires a modified version of [geomstats](https://github.com/geomstats/geomstats) that adds jax functionality, and a number of other modifications. This can be found [here](https://github.com/oxcsml/geomstats.git ) on the branch `jax_backend`.
 
-This repository contains the code for the paper `Riemannian Score-Based Generative Modelling`. This paper theoretically and practically extends score-based generative modelling (SGM) from Euclidean space to any compact Riemannian manifold.
+This repository contains the code for the paper `Riemannian Score-Based Generative Modelling`. This paper theoretically and practically extends score-based generative modelling (SGM) from Euclidean space to any connected and complete Riemannian manifold.
 
 SGMs are a powerful class of generative models that exhibit remarkable empirical performance. Score-based generative modelling consists of a “noising” stage, whereby a diffusion is used to gradually add Gaussian noise to data, and a generative model, which entails a “denoising” process defined by approximating the time-reversal of the diffusion. 
 
