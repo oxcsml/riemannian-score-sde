@@ -1,0 +1,5 @@
+_target_: riemannian_score_sde.datasets.simple.WrapNormDistribution
+batch_dims: ${batch_size}
+manifold: ${manifold}
+scale: 0.15
+mean: [0.8, 0.0]

@@ -4,11 +4,12 @@ import numpy as np
 
 from geomstats.geometry.euclidean import Euclidean
 from geomstats.geometry.hypersphere import Hypersphere
+from geomstats.geometry.hyperbolic import Hyperbolic, PoincareBall, Hyperboloid
 from geomstats.geometry.special_orthogonal import (
     _SpecialOrthogonalMatrices,
     _SpecialOrthogonal3Vectors,
 )
-
+from riemannian_score_sde.utils.vis import make_disk_grid
 
 # def compute_microbatch_split(x, K=1):
 #     """ Checks if batch needs to be broken down further to fit in memory. """
@@ -85,6 +86,28 @@ def get_euclidean_grid(N, dim):
     return xs, volume, lambda_x
 
 
+def make_disk_grid(N, eps=1e-2, dim=2, radius=1.0):
+    h = Hyperbolic(dim=dim, default_coords_type="ball")
+    x = jnp.linspace(-radius, radius, N)
+    xs = dim * [x]
+    xs = jnp.meshgrid(*xs)
+    xs = jnp.concatenate([x.reshape(-1, 1) for x in xs], axis=-1)
+    mask = jnp.linalg.norm(xs, axis=-1) < 1.0 - eps
+    idx = jnp.nonzero(mask)[0]
+    xs = xs[idx]
+    lambda_x = h.metric.lambda_x(xs) ** 2
+    # lambda_x = h.metric.lambda_x(xs) ** 2 * mask
+    volume = (2 * radius) ** dim
+
+    return xs, volume, lambda_x
+
+
+def make_hyp_grid(N, eps=1e-2, dim=2, radius=1.0):
+    xs, volume, lambda_x = make_disk_grid(N, eps=eps, dim=dim, radius=radius)
+    ball_to_extr = Hyperbolic._ball_to_extrinsic_coordinates
+    return ball_to_extr(xs), volume, lambda_x
+
+
 def compute_normalization(
     likelihood_fn, manifold, context=None, N=None, eps=0.0, return_all=False
 ):
@@ -97,8 +120,14 @@ def compute_normalization(
     elif isinstance(manifold, _SpecialOrthogonalMatrices) and manifold.dim == 3:
         N = N if N is not None else 50
         xs, volume, lambda_x = get_so3_grid(N, eps=1e-3)
+    # elif isinstance(manifold, PoincareBall):
+    #     N = N if N is not None else 100
+    #     xs, volume, lambda_x = make_disk_grid(N, dim=manifold.dim)
+    # elif isinstance(manifold, Hyperboloid):
+    #     N = N if N is not None else 100
+    #     xs, volume, lambda_x = make_hyp_grid(N, dim=manifold.dim)
     else:
-        print("Only integration over R^d, S^2 and SO(3) is implemented.")
+        print("Only integration over R^d, S^2, H2 and SO(3) is implemented.")
         return 0.0
     context = (
         context

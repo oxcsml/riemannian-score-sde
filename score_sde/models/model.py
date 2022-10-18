@@ -33,6 +33,8 @@ def get_score_fn(
     state,
     train=False,
     return_state=False,
+    std_trick=True,
+    residual_trick=True,
 ):
     """Wraps `score_fn` so that the model output corresponds to a real time-dependent score function.
     Args:
@@ -46,18 +48,19 @@ def get_score_fn(
       A score function.
     """
 
-    def score_fn(y, t, context, std_trick=True, rng=None):
-        # NOTE: Time scaling from song's code, to remove?
-        # t_emb = t * 999 if isinstance(sde, (VPSDE, subVPSDE)) else t
-        t_emb = t
-        model_out, new_state = model.apply(
-            params, state, rng, y=y, t=t_emb, context=context
-        )
+    def score_fn(y, t, context, rng=None):
+        model_out, new_state = model.apply(params, state, rng, y=y, t=t, context=context)
         score = model_out
+
         if std_trick:
             # NOTE: scaling the output with 1.0 / std helps cf 'Improved Techniques for Training Score-Based Generative Model'
             std = sde.marginal_prob(jnp.zeros_like(y), t)[1]
-            score = batch_mul(model_out, 1.0 / std)
+            score = batch_mul(score, 1.0 / std)
+        if residual_trick:
+            # NOTE: so that if NN = 0 then time reversal = forward
+            fwd_drift = sde.drift(y, t)
+            residual = 2 * fwd_drift / sde.beta_schedule.beta_t(t)[..., None]
+            score += residual
         if return_state:
             return score, new_state
         else:

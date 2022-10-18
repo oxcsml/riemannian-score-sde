@@ -1,0 +1,5 @@
+_target_: score_sde.schedule.QuadraticBetaSchedule
+beta_0: 0.01
+beta_f: 5.
+t0: 0.
+tf: 1.

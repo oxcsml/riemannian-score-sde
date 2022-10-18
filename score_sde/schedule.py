@@ -19,7 +19,7 @@ class BetaSchedule(ABC):
 class LinearBetaSchedule(BetaSchedule):
     def __init__(
         self,
-        tf: float,
+        tf: float = 1,
         t0: float = 0,
         beta_0: float = 0.1,
         beta_f: float = 20,
@@ -30,7 +30,10 @@ class LinearBetaSchedule(BetaSchedule):
         self.beta_f = beta_f
 
     def log_mean_coeff(self, t):
-        return -0.25 * t**2 * (self.beta_f - self.beta_0) - 0.5 * t * self.beta_0
+        normed_t = (t - self.t0) / (self.tf - self.t0)
+        return -0.5 * (
+            0.5 * normed_t**2 * (self.beta_f - self.beta_0) + normed_t * self.beta_0
+        )
 
     def rescale_t(self, t):
         return -2 * self.log_mean_coeff(t)
@@ -45,13 +48,40 @@ class LinearBetaSchedule(BetaSchedule):
         )
 
 
+class QuadraticBetaSchedule(BetaSchedule):
+    def __init__(self, tf, t0=0, beta_0=1.0, beta_f=1.0):
+        self.tf = tf
+        self.t0 = t0
+        self.beta_f = beta_f
+        self.beta_0 = beta_0
+
+    def beta_t(self, t):
+        normed_t = (t - self.t0) / (self.tf - self.t0)
+
+        return self.beta_0 + normed_t**2 * (self.beta_f - self.beta_0)
+
+    def rescale_t(self, t):
+        return -2 * self.log_mean_coeff(t)
+
+    def log_mean_coeff(self, t):
+        normed_t = (t - self.t0) / (self.tf - self.t0)
+        return -0.5 * (
+            normed_t * self.beta_0 + 1 / 3 * normed_t**3 * (self.beta_f - self.beta_0)
+        )
+
+    def reverse(self):
+        return QuadraticBetaSchedule(
+            tf=self.t0, t0=self.tf, beta_f=self.beta_0, beta_0=self.beta_f
+        )
+
+
 class ConstantBetaSchedule(LinearBetaSchedule):
     def __init__(
         self,
-        tf: float,
+        tf: float = 1,
         value: float = 1,
     ):
-        super(ConstantBetaSchedule).__init__(tf=tf, t0=0.0, beta_0=value, beta_f=value)
+        super().__init__(tf=tf, t0=0.0, beta_0=value, beta_f=value)
 
 
 class TriangleBetaSchedule(BetaSchedule):

@@ -1,9 +1,11 @@
 import math
 import importlib
+from functools import partial
 
 import matplotlib.animation as animation
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
+from matplotlib.patches import Circle
 import seaborn as sns
 
 # plt.rcParams["text.usetex"] = True
@@ -13,6 +15,7 @@ import seaborn as sns
 import geomstats.backend as gs
 import geomstats.visualization as visualization
 from geomstats.geometry.hypersphere import Hypersphere
+from geomstats.geometry.hyperbolic import Hyperbolic, PoincareBall, Hyperboloid
 from geomstats.geometry.euclidean import Euclidean
 from geomstats.geometry.special_orthogonal import (
     _SpecialOrthogonalMatrices,
@@ -135,7 +138,7 @@ def get_spherical_grid(N, eps=0.0):
     return xs, lat, lon
 
 
-def plot_3d(x0s, xts, size, prob):
+def plot_3d(x0s, xts, size, prob=None):
     fig = plt.figure(figsize=(size, size))
     ax = fig.add_subplot(111, projection="3d")
     ax = remove_background(ax)
@@ -152,7 +155,7 @@ def plot_3d(x0s, xts, size, prob):
             cax = ax.scatter(x0[:, 0], x0[:, 1], x0[:, 2], s=50, color="green")
         if xt is not None:
             x, y, z = xt[:, 0], xt[:, 1], xt[:, 2]
-            c = prob if prob is not None else np.ones([*xt.shape[:-1]])
+            c = prob(xt) if prob is not None else "blue"
             cax = ax.scatter(x, y, z, s=50, vmin=0.0, vmax=2.0, c=c, cmap=cmap)
         # if grad is not None:
         #     u, v, w = grad[:, 0], grad[:, 1], grad[:, 2]
@@ -522,6 +525,7 @@ def plot_so3b(prob, lambda_x, N, size=10):
 
 
 def plot_normal(x, dim, size=10):
+    x = x[0]  # NOTE: if several context, would only plot the first one
     colors = sns.color_palette("husl", len(x))
     fig, axes = plt.subplots(
         1,
@@ -534,6 +538,7 @@ def plot_normal(x, dim, size=10):
     )
     bins = 100
     w = np.array(x)
+
     for j in range(w.shape[-1]):
         grid = np.linspace(-3, 3, 100)
         y = norm().pdf(grid)
@@ -556,7 +561,108 @@ def plot_normal(x, dim, size=10):
     return fig
 
 
-def plot(manifold, x0, xt, prob=None, size=10):
+def make_disk_grid(N, eps=1e-3, dim=2, radius=1.0):
+    h = Hyperbolic(dim=dim, default_coords_type="ball")
+    radius = radius - eps
+    x = jnp.linspace(-radius, radius, N)
+    xs = dim * [x]
+    xs = jnp.meshgrid(*xs)
+    xs = jnp.concatenate([x.reshape(-1, 1) for x in xs], axis=-1)
+    mask = jnp.linalg.norm(xs, axis=-1) < 1.0 - eps
+    lambda_x = h.metric.lambda_x(xs) ** 2 * mask.astype(float)
+    volume = (2 * radius) ** dim
+
+    return xs, volume, lambda_x
+
+
+def plot_poincare(
+    x0s, xts, size, log_prob=None, coord_map=lambda x: x, grid_plot=False, **kwargs
+):
+    fig, ax = plt.subplots(
+        1,
+        1,
+        figsize=(0.6 * size, 0.6 * size),
+        sharex=False,
+        sharey=True,
+        tight_layout=True,
+    )
+    cmap = sns.cubehelix_palette(
+        light=1.0, dark=0.0, start=0.5, rot=-0.75, reverse=False, as_cmap=True
+    )
+
+    if grid_plot and log_prob is not None:
+        N = 150
+        xs, volume, lambda_x = make_disk_grid(N, eps=1e-2)
+
+        idx = jnp.nonzero(lambda_x)[0]
+        ys = xs[idx]
+        lambda_x = lambda_x[idx]
+        ys = coord_map(ys)
+
+        prob = jnp.exp(log_prob(ys))
+        # prob = jnp.exp(jax.vmap(log_prob)(ys[:, None, :]))
+        print(f"{prob.min():.4f} | {prob.mean():.4f} | {prob.max():.4f}")
+        idx_not_nan = jnp.nonzero(~jnp.isnan(prob))[0]
+        nb = len(jnp.nonzero(jnp.isnan(prob))[0])
+        tot = prob.shape[0]
+        print(f"prop nan in prob: {nb / tot * 100:.1f}%")
+        # prob = prob.at[jnp.isnan(prob) | jnp.isinf(prob)].set(0.0)
+        # prob = jnp.exp(log_prob(xs))
+        # prob = prob.at[jnp.isnan(prob)].set(0.0)
+        # measure = prob * lambda_x
+
+        measure = jnp.zeros((N * N)).at[idx].set(prob * lambda_x)
+        Z = measure[idx_not_nan].mean() * volume
+        print(f"Z={Z.item():.2f}")
+
+        xs = xs.reshape(N, N, 2)
+        measure = measure.reshape(N, N)
+        ax.pcolormesh(
+            xs[:, :, 0],
+            xs[:, :, 1],
+            measure,
+            cmap=cmap,
+            linewidth=0,
+            rasterized=True,
+            shading="gouraud",
+        )
+
+    for k, (x0, xt) in enumerate(zip(x0s, xts)):
+        if xt is not None:
+            if log_prob is not None:
+                prob = jnp.exp(log_prob(coord_map(xt)))
+                nb = len(jnp.nonzero(jnp.isnan(prob))[0])
+                tot = prob.shape[0]
+                print(f"prop nan in prob: {nb / tot * 100:.1f}%")
+                c = prob if nb == 0 else "orange"
+            else:
+                c = "blue"
+            ax.scatter(
+                xt[..., 0], xt[..., 1], alpha=0.3, s=2, c=c, label="model", cmap=cmap
+            )
+        if x0 is not None:
+            ax.scatter(
+                x0[..., 0], x0[..., 1], alpha=1.0, s=2, c="black", label="data", cmap=cmap
+            )
+
+    # if xt is not None or x0 is not None:
+    #     ax.legend(loc="best", fontsize=20)
+
+    ax.set_xlim([-1.01, 1.01])
+    ax.set_ylim([-1.01, 1.01])
+
+    ax.add_patch(Circle((0, 0), 1.0, color="black", fill=False, linewidth=2, zorder=10))
+    ax.set_aspect("equal")
+    ax.axis("off")
+
+    plt.close(fig)
+    return fig
+
+
+def plot(manifold, x0, xt, log_prob=None, size=10):
+    x0 = [None] if x0 is None else x0
+    xt = [None] if xt is None else xt
+    prob = None if log_prob is None else lambda x: jnp.exp(log_prob(x))
     if isinstance(manifold, Euclidean) and manifold.dim == 3:
         fig = plot_3d(x0, xt, size, prob=prob)
     elif isinstance(manifold, Hypersphere) and manifold.dim == 2:
@@ -576,19 +682,37 @@ def plot(manifold, x0, xt, prob=None, size=10):
         and manifold.manifold.dim == 1
     ):
         fig = plot_tn(x0, xt, size, prob=prob)
+    elif isinstance(manifold, PoincareBall) and manifold.dim == 2:
+        fig = plot_poincare(x0, xt, size, log_prob=log_prob)
+    elif isinstance(manifold, Hyperboloid) and manifold.dim == 2:
+        coord_map = Hyperbolic._ball_to_extrinsic_coordinates
+        if x0[0] is not None:
+            x0 = [Hyperbolic._extrinsic_to_ball_coordinates(x) for x in x0]
+        if xt[0] is not None:
+            xt = [Hyperbolic._extrinsic_to_ball_coordinates(x) for x in xt]
+        fig = plot_poincare(x0, xt, size, coord_map=coord_map, log_prob=log_prob)
     else:
-        print("Only plotting over R^3, S^2, S1/T1, T2, TN and SO(3) is implemented.")
+        print("Only plotting over R^3, S^2, S1/T1, T2, TN, H2 and SO(3) is implemented.")
         return None
     return fig
 
 
-def plot_ref(manifold, xt, size=10):
+def plot_ref(manifold, xt, size=10, log_prob=None):
     if isinstance(manifold, Euclidean):
         fig = plot_normal(xt, manifold.dim, size)
     elif isinstance(manifold, Hypersphere) and manifold.dim == 2:
         fig = None
     elif isinstance(manifold, _SpecialOrthogonalMatrices) and manifold.dim == 3:
         fig = plot_so3_uniform(xt, size)
+    elif isinstance(manifold, PoincareBall) and manifold.dim == 2:
+        fig = plot_poincare(xt, [None], size, log_prob=log_prob)
+    elif isinstance(manifold, Hyperboloid) and manifold.dim == 2:
+        coord_map = Hyperbolic._ball_to_extrinsic_coordinates
+        if xt is not None:
+            xt = [Hyperbolic._extrinsic_to_ball_coordinates(x) for x in xt]
+        fig = plot_poincare(
+            xt, [None], size, log_prob=log_prob, coord_map=coord_map, grid_plot=True
+        )
     else:
         print("Only plotting over R^3, S^2 and SO(3) is implemented.")
         return None

@@ -129,6 +129,7 @@ class Wrapped:
             return (samples, None)
 
     def log_prob(self, samples):
+        # TODO: this is wrong, cf WrapNormDistribution in distribution.py
         def single_log_prob(samples, mean, precision):
             pos = self.manifold.log(samples, mean)
             ll = normal_pdf(pos, scale=1 / jnp.sqrt(precision))

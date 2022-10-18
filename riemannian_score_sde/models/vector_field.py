@@ -172,3 +172,35 @@ class TorusGenerator(VectorFieldGenerator):
         return (fields * weights[..., None]).reshape(
             (*x.shape[:-1], self.manifold.dim * 2)
         )
+
+
+class CanonicalGenerator:
+    def __init__(self, architecture, embedding, output_shape=None, manifold=None):
+        self.net = instantiate(architecture, output_shape=output_shape)
+
+    @staticmethod
+    def output_shape(manifold):
+        return manifold.dim
+
+    def __call__(self, x, t):
+        return self.net(x, t)
+
+
+class ParallelTransportGenerator:
+    def __init__(self, architecture, embedding, output_shape=None, manifold=None):
+        self.net = instantiate(architecture, output_shape=output_shape)
+        self.manifold = manifold
+
+    @staticmethod
+    def output_shape(manifold):
+        # return manifold.dim
+        return manifold.identity.shape[-1]
+
+    def __call__(self, x, t):
+        """
+        Rescale since ||s(x, t)||^2_x = s(x, t)^t G(x) s(x, t) = \lambda(x)^2 ||s(x, t)||^2_2
+        with G(x)=\lambda(x)^2 Id
+        """
+        tangent = self.net(x, t)
+        tangent = self.manifold.metric.transpfrom0(x, tangent)
+        return tangent

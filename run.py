@@ -76,8 +76,10 @@ def run(cfg):
 
         model_w_dicts = (model, train_state.params_ema, train_state.model_state)
         likelihood_fn = pushforward.get_log_prob(model_w_dicts, train=False)
+        likelihood_fn = jax.jit(likelihood_fn)
 
         logp, nfe, N = 0.0, 0.0, 0
+        tot = 0
 
         if hasattr(dataset, "__len__"):
             for batch in dataset:
@@ -94,7 +96,9 @@ def run(cfg):
                 logp += logp_step.sum()
                 nfe += nfe_step
                 N += logp_step.shape[0]
+                tot += logp_step.shape[0]
             dataset.batch_dims = [cfg.batch_size]
+
         logp /= N
         nfe /= len(dataset) if hasattr(dataset, "__len__") else samples
 
@@ -123,24 +127,38 @@ def run(cfg):
         sampler = pushforward.get_sampler(model_w_dicts, train=False, **sampler_kwargs)
 
         x0, context = next(dataset)
-        shape = (int(cfg.batch_size * M), *transform.inv(x0).shape[1:])
+        shape = (int(cfg.batch_size * M),)
         rng, next_rng = jax.random.split(rng)
         x = sampler(next_rng, shape, context)
         prop_in_M = data_manifold.belongs(x, atol=1e-4).mean()
-        log.info(f"Prop samples in M: {100 * prop_in_M.item()}")
-        plt = plot(data_manifold, [x0], [x])
-        logger.log_plot(f"x0_backw", plt, cfg.steps)
+        log.info(f"Prop samples in M = {100 * prop_in_M.item():.1f}%")
+
+        # samples from model
+        likelihood_fn = pushforward.get_log_prob(model_w_dicts, train=False)
+        log_prob = jax.jit(lambda x: likelihood_fn(x)[0])
+        plt = plot(data_manifold, None, [x], log_prob=log_prob)
+        if plt is not None:
+            logger.log_plot(f"x0_bwd", plt, step)
+
+        # samples from data
+        if step <= 0:
+            dataset.batch_dims = shape[0]
+            x0 = next(dataset)[0]
+            log_prob = dataset.log_prob if hasattr(dataset, "log_prob") else None
+            plt = plot(data_manifold, None, [x0], log_prob=log_prob)
+            if plt is not None:
+                logger.log_plot(f"x0", plt, step)
+            dataset.batch_dims = cfg.batch_size
 
         ## p_T (forward)
-        if isinstance(pushforward, SDEPushForward):
+        if step <= 0 and isinstance(pushforward, SDEPushForward):
             sampler = pushforward.get_sampler(
                 model_w_dicts, train=False, reverse=False, **sampler_kwargs
             )
-            z = transform.inv(x0)
-            zT = sampler(rng, None, context, z=z)
-            plt = plot_ref(model_manifold, transform.inv(zT))
+            zT = sampler(rng, None, context, z=transform.inv(x0))
+            plt = plot_ref(model_manifold, [transform.inv(zT)], log_prob=base.log_prob)
             if plt is not None:
-                logger.log_plot(f"xT", plt, cfg.steps)
+                logger.log_plot(f"xT_fwd", plt, step)
 
     ### Main
     log.info("Stage : Startup")
@@ -234,16 +252,20 @@ def run(cfg):
         save(ckpt_path, train_state)
 
     if cfg.mode == "train" or cfg.mode == "all":
+        # if train_state.step == 0 and cfg.test_test:
+        #     evaluate(train_state, "test", step=cfg.steps)
+        if train_state.step == 0 and cfg.test_plot:
+            generate_plots(train_state, "test", step=-1)
         log.info("Stage : Training")
         train_state, success = train(train_state)
     if cfg.mode == "test" or (cfg.mode == "all" and success):
         log.info("Stage : Test")
         if cfg.test_val:
-            evaluate(train_state, "val")
+            evaluate(train_state, "val", step=cfg.steps)
         if cfg.test_test:
-            evaluate(train_state, "test")
+            evaluate(train_state, "test", step=cfg.steps)
         if cfg.test_plot:
-            generate_plots(train_state, "test")
+            generate_plots(train_state, "test", step=cfg.steps)
         success = True
     logger.save()
     logger.finalize("success" if success else "failure")

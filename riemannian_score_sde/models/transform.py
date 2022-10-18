@@ -45,7 +45,11 @@ class ExpMap(Transform):
         return self.manifold.vee(x)
 
     def log_abs_det_jacobian(self, x, y):
-        return self.manifold.logdetexp(x, y)
+        # TODO: factor
+        if isinstance(self.manifold, MatrixLieGroup):
+            return self.manifold.logdetexp(x, y)
+        else:
+            return self.manifold.logdetexp(self.base_point, y)
 
 
 class TanhExpMap(ComposeTransform):

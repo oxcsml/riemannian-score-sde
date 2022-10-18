@@ -1,0 +1,47 @@
+# @package _global_
+
+# to execute this experiment run:
+# python main.py experiment=hyperbolic
+
+name: hyperboloid
+
+defaults:
+  - /manifold: hyperbolic
+  - /model: rsgm
+  - /dataset: wrapnormmix
+  - /architecture: concat
+  - /embedding: none
+  - override /generator: ambient
+  - override /flow: langevin
+  - override /loss: ism
+
+mean:
+  _target_: geomstats.geometry.hyperbolic.Hyperbolic._ball_to_extrinsic_coordinates
+  point: 
+    _target_: jax.numpy.array
+    _convert_: all
+    object: [[-0.4, 0.0],[0.4, 0.0],[0.0, -0.4],[0.0, 0.4]]
+
+dataset:
+  mean: ${mean}
+  scale: [[0., 0.15, 0.5],[0., 0.15, 0.5],[0., 0.5, 0.15],[0., 0.5, 0.15]]
+ 
+manifold:
+  dim: 2
+  default_coords_type: extrinsic
+
+beta_schedule:
+  beta_0: 0.01
+  beta_f: 1
+
+flow:
+  ref_scale: 0.5
+  N: 1000
+
+batch_size: 512
+eval_batch_size: 512
+warmup_steps: ${min:1000,${eval:${steps}-1}}
+steps: 50000
+val_freq: 5000 # !!float inf
+ema_rate: 0.999
+eps: 1e-3

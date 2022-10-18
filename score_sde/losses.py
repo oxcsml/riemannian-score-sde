@@ -23,6 +23,7 @@ import jax
 import optax
 import jax.numpy as jnp
 import jax.random as random
+from jax.tree_util import tree_map
 
 from score_sde.utils import batch_mul
 from score_sde.models import get_score_fn, PushForward, SDEPushForward
@@ -200,7 +201,7 @@ def get_ema_loss_step_fn(
             updates, new_opt_state = optimizer.update(grad, train_state.opt_state)
             new_parmas = optax.apply_updates(params, updates)
 
-            new_params_ema = jax.tree_multimap(
+            new_params_ema = tree_map(
                 lambda p_ema, p: p_ema * train_state.ema_rate
                 + p * (1.0 - train_state.ema_rate),
                 train_state.params_ema,

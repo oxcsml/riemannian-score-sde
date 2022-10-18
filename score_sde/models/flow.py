@@ -18,13 +18,24 @@ from score_sde.sampling import get_pc_sampler
 
 
 def get_div_fn(drift_fn, hutchinson_type: str = "None"):
-    """Pmapped divergence of the drift function."""
+    """Euclidean divergence of the drift function."""
     if hutchinson_type == "None":
         return lambda y, t, context, eps: get_exact_div_fn(drift_fn)(y, t, context)
     else:
         return lambda y, t, context, eps: get_estimate_div_fn(drift_fn)(
             y, t, context, eps
         )
+
+
+def get_riemannian_div_fn(func, hutchinson_type: str = "None", manifold=None):
+    """divergence of the drift function.
+    if M is submersion with euclidean ambient metric: div = div_E
+    else (in a char) div f = 1/sqrt(g) \sum_i \partial_i(sqrt(g) f_i)
+    """
+    sqrt_g = lambda x: 1.0 if manifold is None else manifold.metric.lambda_x(x)
+    drift_fn = lambda y, t, context: sqrt_g(y) * func(y, t, context)
+    div_fn = get_div_fn(drift_fn, hutchinson_type)
+    return lambda y, t, context, eps: div_fn(y, t, context, eps) / sqrt_g(y)
 
 
 def div_noise(
@@ -74,7 +85,8 @@ def get_moser_drift_fn(base, eps, model, params, states):
         t0 = jnp.zeros_like(t)
         u = u_fn(y, t0, context)
         nu = jnp.exp(base.log_prob(y)).reshape(*y.shape[:-1], 1)
-        div_u = get_div_fn(u_fn)(y, t0, context, None).reshape(*y.shape[:-1], 1)
+        div_fn = get_riemannian_div_fn(u_fn, "None", base.manifold)
+        div_u = div_fn(y, t0, context, None).reshape(*y.shape[:-1], 1)
         mu_plus = jnp.maximum(eps, nu - div_u)
         out = -u / (t * nu + (1 - t) * mu_plus)  # data -> base
         return out
@@ -134,6 +146,7 @@ class SDEPushForward(PushForward):
             t0=self.sde.t0,
             tf=self.sde.tf,
             get_drift_fn=partial(get_sde_drift_from_fn, self.sde),
+            manifold=flow.manifold,
         )
         super(SDEPushForward, self).__init__(flow, base, transform)
 
@@ -191,7 +204,7 @@ class MoserFlow(PushForward):
 
     def divergence(self, x, context, model_w_dicts, hutchinson_type, rng):
         drift_fn = get_ode_drift_fn(*model_w_dicts)
-        div_fn = get_div_fn(drift_fn, hutchinson_type)
+        div_fn = get_riemannian_div_fn(drift_fn, hutchinson_type, self.base.manifold)
         t = jnp.zeros((x.shape[0], 1))  # since vector field is time independant
         epsilon = div_noise(rng, x.shape, hutchinson_type)
         return div_fn(x, t, context, epsilon)
@@ -244,6 +257,7 @@ class CNF:
         rtol: str = 1e-5,
         atol: str = 1e-5,
         get_drift_fn=get_ode_drift_fn,
+        manifold=None,
         **kwargs,
     ):
         self.get_drift_fn = get_drift_fn
@@ -252,6 +266,7 @@ class CNF:
         self.ode_kwargs = dict(atol=atol, rtol=rtol)
         self.test_ode_kwargs = dict(atol=1e-5, rtol=1e-5)
         self.hutchinson_type = hutchinson_type
+        self.manifold = manifold
 
     def get_forward(self, model_w_dicts, train, augmented=False, **kwargs):
         model, params, states = model_w_dicts
@@ -276,7 +291,9 @@ class CNF:
                     vec_t = jnp.ones((sample.shape[0],)) * t
                     drift_fn = self.get_drift_fn(model, params, states)
                     drift = drift_fn(sample, vec_t, context)
-                    div_fn = get_div_fn(drift_fn, hutchinson_type)
+                    div_fn = get_riemannian_div_fn(
+                        drift_fn, hutchinson_type, self.manifold
+                    )
                     logp_grad = div_fn(sample, vec_t, context, epsilon).reshape(
                         [shape[0], 1]
                     )

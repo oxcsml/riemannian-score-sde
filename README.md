@@ -227,7 +227,7 @@ python main.py -m \
 ```
 python main.py -m \
     experiment=so3 \
-    model=exp_sgm \
+    model=tanhexp_sgm \
     dataset.K=16,32,64 \
     steps=100000 \
     optim.learning_rate=5e-4,2e-4 \

@@ -8,9 +8,9 @@ import jax.numpy as jnp
 import jax.random as random
 
 from score_sde.utils import batch_mul
-from score_sde.models import get_score_fn, PushForward, SDEPushForward, MoserFlow
+from score_sde.models import get_score_fn, SDEPushForward, MoserFlow
 from score_sde.utils import ParametrisedScoreFunction, TrainState
-from score_sde.models import div_noise, get_div_fn, get_ode_drift_fn
+from score_sde.models import div_noise, get_riemannian_div_fn
 
 
 def get_dsm_loss_fn(
@@ -119,13 +119,13 @@ def get_ism_loss_fn(
         rng, step_rng = random.split(rng)
         epsilon = div_noise(step_rng, y_0.shape, hutchinson_type)
         drift_fn = lambda y, t, context: score_fn(y, t, context, rng=step_rng)[0]
-        div_fn = get_div_fn(drift_fn, hutchinson_type)
+        div_fn = get_riemannian_div_fn(drift_fn, hutchinson_type, sde.manifold)
         div_score = div_fn(y_t, t, context, epsilon)
         sq_norm_score = sde.manifold.metric.squared_norm(score, y_t)
         losses = 0.5 * sq_norm_score + div_score
 
         if like_w:
-            g2 = sde.coefficients(jnp.zeros_like(y_0), t)[1] ** 2
+            g2 = sde.beta_schedule.beta_t(t)
             losses = losses * g2
 
         loss = jnp.mean(losses)

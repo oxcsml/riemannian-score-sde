@@ -31,7 +31,7 @@ class EulerMaruyamaManifoldPredictor(Predictor):
         if len(diffusion.shape) > 1 and diffusion.shape[-1] == diffusion.shape[-2]:
             # if square matrix diffusion coeffs
             tangent_vector = drift + jnp.einsum(
-                "...ij,j,...->...i", diffusion, z, jnp.sqrt(jnp.abs(dt))
+                "...ij,...j,...->...i", diffusion, z, jnp.sqrt(jnp.abs(dt))
             )
         else:
             # if scalar diffusion coeffs (i.e. no extra dims on the diffusion)

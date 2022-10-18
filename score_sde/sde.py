@@ -7,22 +7,48 @@ from abc import ABC, abstractmethod
 import jax
 import numpy as np
 import jax.numpy as jnp
-
-from score_sde.models.distribution import NormalDistribution
+from score_sde.utils import get_exact_div_fn
+from score_sde.schedule import ConstantBetaSchedule
 
 
 class SDE(ABC):
     # Specify if the sde returns full diffusion matrix, or just a scalar indicating diagonal variance
 
     full_diffusion_matrix = False
+    spatial_dependent_diffusion = False
 
-    def __init__(self, tf: float = 1, t0: float = 0):
+    def __init__(self, beta_schedule=ConstantBetaSchedule()):
         """Abstract definition of an SDE"""
-
-        self.t0 = t0
-        self.tf = tf
+        self.beta_schedule = beta_schedule
+        self.tf = beta_schedule.tf
+        self.t0 = beta_schedule.t0
 
     @abstractmethod
+    def drift(self, x, t):
+        """Compute the drift coefficients of the SDE at (x, t)
+
+        Parameters
+        ----------
+        x : jnp.ndarray
+            Location to evaluate the coefficients at
+        t : float
+            Time to evaluate the coefficients at
+        """
+        pass
+
+    def diffusion(self, x, t):
+        """Compute the diffusion coefficients of the SDE at (x, t)
+
+        Parameters
+        ----------
+        x : jnp.ndarray
+            Location to evaluate the coefficients at
+        t : float
+            Time to evaluate the coefficients at
+        """
+        beta_t = self.beta_schedule.beta_t(t)
+        return jnp.sqrt(beta_t)
+
     def coefficients(self, x, t):
         """Compute the drift and diffusion coefficients of the SDE at (x, t)
 
@@ -33,7 +59,7 @@ class SDE(ABC):
         t : float
             Time to evaluate the coefficients at
         """
-        pass
+        return self.drift(x, t), self.diffusion(x, t)
 
     def marginal_prob(self, x, t):
         """Parameters to determine the marginal distribution of the SDE, $p_t(x | x_0 = 0)$.
@@ -165,16 +191,32 @@ class ProbabilityFlowODE:
         return ode_drift, jnp.zeros(drift.shape[:-1])
 
 
+def get_matrix_div_fn(func):
+    def matrix_div_fn(x, t, context):
+        # define function that returns div of nth column matrix function
+        f = lambda n: get_exact_div_fn(lambda x, t, context: func(x, t, context)[..., n])(
+            x, t, context
+        )
+        matrix = func(x, t, context)
+        div_term = jax.vmap(f)(jnp.arange(matrix.shape[-1]))
+        div_term = jnp.moveaxis(div_term, 0, -1)
+        return div_term
+
+    return matrix_div_fn
+
+
 class RSDE(SDE):
-    """Reverse time SDE, assuming the drift coefficient is spatially homogenous"""
+    """Reverse time SDE, assuming the diffusion coefficient is spatially homogenous"""
 
     def __init__(self, sde: SDE, score_fn):
-        super().__init__(tf=sde.t0, t0=sde.tf)
-
+        super().__init__(sde.beta_schedule.reverse())
         self.sde = sde
         self.score_fn = score_fn
 
-    def coefficients(self, x, t):
+    def diffusion(self, x, t):
+        return self.sde.diffusion(x, t)
+
+    def drift(self, x, t):
         forward_drift, diffusion = self.sde.coefficients(x, t)
         score_fn = self.score_fn(x, t)
 
@@ -190,7 +232,25 @@ class RSDE(SDE):
                 "...,...,...i->...i", diffusion, diffusion, score_fn
             )
 
-        return reverse_drift, diffusion
+        if self.sde.spatial_dependent_diffusion:
+            # NOTE: this has not been tested
+            if self.sde.full_diffusion_matrix:
+                # ∇·(G G^t) = (∇· G_i G_i^t)_i =
+                G_G_tr = lambda x, t, _: jnp.einsum(
+                    "...ij,...kj->...ik",
+                    self.sde.diffusion(x, t),
+                    self.sde.diffusion(x, t),
+                )
+                matrix_div_fn = get_matrix_div_fn(G_G_tr)
+                div_term = matrix_div_fn(x, t, None)
+            else:
+                # ∇·(g^2 I) = (∇·g^2 1_d)_i = (||∇ g^2||_1)_i = 2 g ||∇ g||_1 1_d
+                grad = jax.vmap(jax.grad(self.sde.diffusion, argnums=0))(x, t)
+                ones = jnp.ones_like(forward_drift)
+                div_term = 2 * diffusion[..., None] * grad.sum(axis=-1)[..., None] * ones
+            reverse_drift += div_term
+
+        return reverse_drift
 
     def reverse(self):
         return self.sde
@@ -198,16 +258,14 @@ class RSDE(SDE):
 
 class VPSDE(SDE):
     def __init__(self, beta_schedule):
-        super().__init__(beta_schedule.tf, beta_schedule.t0)
-        self.beta_schedule = beta_schedule
+        from score_sde.models.distribution import NormalDistribution
+
+        super().__init__(beta_schedule)
         self.limiting = NormalDistribution()
 
-    def coefficients(self, x, t):
+    def drift(self, x, t):
         beta_t = self.beta_schedule.beta_t(t)
-        drift = -0.5 * beta_t[..., None] * x
-        diffusion = jnp.sqrt(beta_t) * jnp.ones(x.shape[:-1])
-
-        return drift, diffusion
+        return -0.5 * beta_t[..., None] * x
 
     def marginal_prob(self, x, t):
         log_mean_coeff = self.beta_schedule.log_mean_coeff(t)

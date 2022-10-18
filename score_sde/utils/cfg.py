@@ -25,6 +25,7 @@ OmegaConf.register_new_resolver(
 )
 OmegaConf.register_new_resolver("isequal", lambda x, y: x == y, replace=True)
 OmegaConf.register_new_resolver("pi", lambda x: x * math.pi, replace=True)
+OmegaConf.register_new_resolver("min", min, replace=True)
 
 
 def partialclass(cls, *args, **kwds):
