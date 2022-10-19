@@ -1,6 +1,6 @@
 # [Riemannian Score-Based Generative Modelling](https://arxiv.org/abs/2202.02763)
 
-This repo requires a modified version of [geomstats](https://github.com/geomstats/geomstats) that adds jax functionality, and a number of other modifications. This can be found [here](https://github.com/oxcsml/geomstats.git ) on the branch `jax_backend`.
+This repo requires a modified version of [geomstats](https://github.com/geomstats/geomstats) that adds jax functionality, and a number of other modifications. This can be found [here](https://github.com/oxcsml/geomstats.git).
 
 This repository contains the code for the paper `Riemannian Score-Based Generative Modelling`. This paper theoretically and practically extends score-based generative modelling (SGM) from Euclidean space to any connected and complete Riemannian manifold.
 
@@ -201,8 +201,8 @@ python main.py -m \
 ```
 
 
-### SO(3) Conditional
-To demonstrate that RSGMs can handle conditional modelling well, we train RSGMs and Moser flows on mixtures of wrapped normal distributions on $SO(3)$. We also show the number of function evaluations required to solve the likelihood ODE for each model in each case, demonstrating the difficulties Moser flows face due to the stiff vector fields they learn.
+### SO(3)
+To demonstrate that RSGMs can handle Lie groups as well, we train RSGMs and Moser flows on mixtures of wrapped normal distributions on $SO(3)$. We also show the number of function evaluations required to solve the likelihood ODE for each model in each case, demonstrating the difficulties Moser flows face due to the stiff vector fields they learn.
 
 | Method          | N=16, log-likelihood                               | N=16, NFE                                  | N=32, log-likelihood                               | N=32, NFE                                  | N=64, log-likelihood                                | N=64, NFE                                  |
 |:----------------|:-----------------------------------------------|:---------------------------------------------|:-----------------------------------------------|:---------------------------------------------|:------------------------------------------------|:---------------------------------------------|
@@ -244,5 +244,29 @@ python main.py -m \
     optim.learning_rate=5e-4,2e-4 \
     loss.K=1000,10000 \
     loss.alpha_m=1,10,100 \
+    seed=0,1,2,3,4
+```
+
+### Hyperbolic space
+So as to show that RSGMs is also suited for non-compact manifolds, we train RSGMs and an exponential map wrapped SGM baseline on mixtures of wrapped normal distributions on $H^2$.
+We observed more numerical stability working with the hyperboloid model of hyperbolic geometry, but one can similarly run this experiment on the Poincaré ball with `experiment=poincare`.
+
+`RSGMs`
+```
+python main.py -m \
+    experiment=hyperboloid \
+    model=rsgm \
+    steps=100000 \
+    seed=0,1,2,3,4
+```
+`Exp RSGMs`
+```
+python main.py -m \
+    experiment=hyperboloid \
+    model=exp_sgm \
+    loss=dsm0 \
+    generator=canonical \
+    flow=vp \
+    steps=100000 \
     seed=0,1,2,3,4
 ```

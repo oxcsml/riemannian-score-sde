@@ -1,7 +1,7 @@
 # @package _global_
 
 # to execute this experiment run:
-# python main.py experiment=hyperbolic
+# python main.py experiment=hyperboloid
 
 name: hyperboloid
 
@@ -17,7 +17,7 @@ defaults:
 
 mean:
   _target_: geomstats.geometry.hyperbolic.Hyperbolic._ball_to_extrinsic_coordinates
-  point: 
+  point:
     _target_: jax.numpy.array
     _convert_: all
     object: [[-0.4, 0.0],[0.4, 0.0],[0.0, -0.4],[0.0, 0.4]]
@@ -32,7 +32,7 @@ manifold:
 
 beta_schedule:
   beta_0: 0.01
-  beta_f: 1
+  beta_f: 2
 
 flow:
   ref_scale: 0.5
@@ -41,7 +41,7 @@ flow:
 batch_size: 512
 eval_batch_size: 512
 warmup_steps: ${min:1000,${eval:${steps}-1}}
-steps: 50000
+steps: 100000
 val_freq: 5000 # !!float inf
 ema_rate: 0.999
 eps: 1e-3

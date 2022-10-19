@@ -1,43 +1,20 @@
 # @package _global_
 
 # to execute this experiment run:
-# python main.py experiment=hyperbolic
+# python main.py experiment=poincare
 
 name: poincare
 
 defaults:
-  - /manifold: hyperbolic
-  - /model: rsgm
-  - /dataset: wrapnormmix
-  - /architecture: concat
-  - /embedding: none
+  - hyperboloid
   - override /generator: transport
-  - override /flow: langevin
-  - override /loss: ism
 
+mean: 
+  _target_: jax.numpy.array
+  _convert_: all
+  object: [[-0.4, 0.0],[0.4, 0.0],[0.0, -0.4],[0.0, 0.4]]
 dataset:
   scale: [[0.15, 0.5],[0.15, 0.5],[0.5, 0.15],[0.5, 0.15]]
-  mean: [[-0.4, 0.0],[0.4, 0.0],[0.0, -0.4],[0.0, 0.4]]
 
 manifold:
-  dim: 2
-
-beta_schedule:
-  beta_0: 0.1
-  beta_f: 1
-
-flow:
-  ref_scale: 0.5
-  N: 1000
-
-batch_size: 512
-eval_batch_size: 512
-warmup_steps: ${min:1000,${eval:${steps}-1}}
-steps: 50000
-val_freq: 5000 # !!float inf
-ema_rate: 0.999
-eps: 1e-3
-
-# train_val: false
-# test_val: false
-# test_test: false
+  default_coords_type: ball
