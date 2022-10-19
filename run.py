@@ -136,18 +136,16 @@ def run(cfg):
         # samples from model
         likelihood_fn = pushforward.get_log_prob(model_w_dicts, train=False)
         log_prob = jax.jit(lambda x: likelihood_fn(x)[0])
-        plt = plot(data_manifold, None, [x], log_prob=log_prob)
-        if plt is not None:
-            logger.log_plot(f"x0_bwd", plt, step)
+        plt = plot(data_manifold, None, x, log_prob=log_prob)
+        logger.log_plot(f"x0_bwd", plt, step)
 
         # samples from data
         if step <= 0:
             dataset.batch_dims = shape[0]
             x0 = next(dataset)[0]
             log_prob = dataset.log_prob if hasattr(dataset, "log_prob") else None
-            plt = plot(data_manifold, None, [x0], log_prob=log_prob)
-            if plt is not None:
-                logger.log_plot(f"x0", plt, step)
+            plt = plot(data_manifold, None, x0, log_prob=log_prob)
+            logger.log_plot(f"x0", plt, step)
             dataset.batch_dims = cfg.batch_size
 
         ## p_T (forward)
@@ -156,9 +154,8 @@ def run(cfg):
                 model_w_dicts, train=False, reverse=False, **sampler_kwargs
             )
             zT = sampler(rng, None, context, z=transform.inv(x0))
-            plt = plot_ref(model_manifold, [transform.inv(zT)], log_prob=base.log_prob)
-            if plt is not None:
-                logger.log_plot(f"xT_fwd", plt, step)
+            plt = plot_ref(model_manifold, transform.inv(zT), log_prob=base.log_prob)
+            logger.log_plot(f"xT_fwd", plt, step)
 
     ### Main
     log.info("Stage : Startup")

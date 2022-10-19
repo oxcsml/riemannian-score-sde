@@ -213,6 +213,8 @@ class CSVLogger(LightningLoggerBase):
 
     @rank_zero_only
     def log_plot(self, name, plt, step) -> None:
+        if plt is None:
+            return
         path = self.create_and_get_image_dir(name, step)
         if isinstance(plt, list):
             for i, plot_i in enumerate(plt):

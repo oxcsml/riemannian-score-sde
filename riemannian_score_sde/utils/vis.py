@@ -138,7 +138,7 @@ def get_spherical_grid(N, eps=0.0):
     return xs, lat, lon
 
 
-def plot_3d(x0s, xts, size, prob=None):
+def plot_3d(x0, xt, size, prob=None):
     fig = plt.figure(figsize=(size, size))
     ax = fig.add_subplot(111, projection="3d")
     ax = remove_background(ax)
@@ -150,19 +150,18 @@ def plot_3d(x0s, xts, size, prob=None):
     sphere.draw(ax, color="red", marker=".")
     # sphere_plot(ax)
     # sphere.plot_heatmap(ax, pdf, n_points=16000, alpha=0.2, cmap=cmap)
-    for k, (x0, xt) in enumerate(zip(x0s, xts)):
-        if x0 is not None:
-            cax = ax.scatter(x0[:, 0], x0[:, 1], x0[:, 2], s=50, color="green")
-        if xt is not None:
-            x, y, z = xt[:, 0], xt[:, 1], xt[:, 2]
-            c = prob(xt) if prob is not None else "blue"
-            cax = ax.scatter(x, y, z, s=50, vmin=0.0, vmax=2.0, c=c, cmap=cmap)
-        # if grad is not None:
-        #     u, v, w = grad[:, 0], grad[:, 1], grad[:, 2]
-        #     quiver = ax.quiver(
-        #         x, y, z, u, v, w, length=0.2, lw=2, normalize=False, cmap=cmap
-        #     )
-        #     quiver.set_array(c)
+    if x0 is not None:
+        cax = ax.scatter(x0[:, 0], x0[:, 1], x0[:, 2], s=50, color="green")
+    if xt is not None:
+        x, y, z = xt[:, 0], xt[:, 1], xt[:, 2]
+        c = prob(xt) if prob is not None else "blue"
+        cax = ax.scatter(x, y, z, s=50, vmin=0.0, vmax=2.0, c=c, cmap=cmap)
+    # if grad is not None:
+    #     u, v, w = grad[:, 0], grad[:, 1], grad[:, 2]
+    #     quiver = ax.quiver(
+    #         x, y, z, u, v, w, length=0.2, lw=2, normalize=False, cmap=cmap
+    #     )
+    #     quiver.set_array(c)
 
     plt.colorbar(cax)
     # plt.savefig(out, dpi=dpi, bbox_inches="tight", transparent=True)
@@ -282,8 +281,8 @@ def earth_plot(cfg, log_prob, train_ds, test_ds, N, azimuth=None, samples=None):
     return figs
 
 
-def plot_so3(x0s, xts, size, **kwargs):
-    colors = sns.color_palette("husl", len(x0s))
+def plot_so3(x0, xt, size, **kwargs):
+    colors = sns.color_palette("husl", 1)
     # colors = sns.color_palette("tab10")
     fig, axes = plt.subplots(
         2,
@@ -300,38 +299,39 @@ def plot_so3(x0s, xts, size, **kwargs):
     # bins = round(math.sqrt(len(w[:, 0])))
     bins = 100
 
-    for k, (x0, xt) in enumerate(zip(x0s, xts)):
-        # print(k, x0.shape, xt.shape)
-        for i, x in enumerate([x0, xt]):
-            w = _SpecialOrthogonal3Vectors().tait_bryan_angles_from_matrix(x)
-            # w = _SpecialOrthogonal3Vectors().rotation_vector_from_matrix(x)
-            w = np.array(w)
-            for j in range(3):
-                axes[i, j].hist(
-                    w[:, j],
-                    bins=bins,
-                    density=True,
-                    alpha=0.3,
-                    color=colors[k],
-                    label=f"Component #{k}",
-                )
-                if j == 1:
-                    axes[i, j].set(xlim=(-math.pi / 2, math.pi / 2))
-                    axes[i, j].set_xticks([-math.pi / 2, 0, math.pi / 2])
-                    axes[i, j].set_xticklabels([r"$-\pi/2$", "0", r"$\pi/2$"], color="k")
-                else:
-                    axes[i, j].set(xlim=(-math.pi, math.pi))
-                    axes[i, j].set_xticks([-math.pi, 0, math.pi])
-                    axes[i, j].set_xticklabels([r"$-\pi$", "0", r"$\pi$"], color="k")
-                if j == 0:
-                    axes[i, j].set_ylabel(y_labels[i], fontsize=30)
-                # if i == 0 and j == 0:
-                # axes[i, j].legend(loc="best", fontsize=20)
-                if i == 0:
-                    axes[i, j].get_xaxis().set_visible(False)
-                if i == 1:
-                    axes[i, j].set_xlabel(x_labels[j], fontsize=30)
-                axes[i, j].tick_params(axis="both", which="major", labelsize=20)
+    # print(k, x0.shape, xt.shape)
+    for i, x in enumerate([x0, xt]):
+        if x is None:
+            continue
+        w = _SpecialOrthogonal3Vectors().tait_bryan_angles_from_matrix(x)
+        # w = _SpecialOrthogonal3Vectors().rotation_vector_from_matrix(x)
+        w = np.array(w)
+        for j in range(3):
+            axes[i, j].hist(
+                w[:, j],
+                bins=bins,
+                density=True,
+                alpha=0.3,
+                color=colors[0],
+                # label=f"Component #{k}",
+            )
+            if j == 1:
+                axes[i, j].set(xlim=(-math.pi / 2, math.pi / 2))
+                axes[i, j].set_xticks([-math.pi / 2, 0, math.pi / 2])
+                axes[i, j].set_xticklabels([r"$-\pi/2$", "0", r"$\pi/2$"], color="k")
+            else:
+                axes[i, j].set(xlim=(-math.pi, math.pi))
+                axes[i, j].set_xticks([-math.pi, 0, math.pi])
+                axes[i, j].set_xticklabels([r"$-\pi$", "0", r"$\pi$"], color="k")
+            if j == 0:
+                axes[i, j].set_ylabel(y_labels[i], fontsize=30)
+            # if i == 0 and j == 0:
+            # axes[i, j].legend(loc="best", fontsize=20)
+            if i == 0:
+                axes[i, j].get_xaxis().set_visible(False)
+            if i == 1:
+                axes[i, j].set_xlabel(x_labels[j], fontsize=30)
+            axes[i, j].tick_params(axis="both", which="major", labelsize=20)
 
     plt.close(fig)
     return fig
@@ -347,7 +347,7 @@ def proj_t2(x):
     )
 
 
-def plot_t2(x0s, xts, size, **kwargs):
+def plot_t2(x0, xt, size, **kwargs):
     fig, axes = plt.subplots(
         1,
         2,
@@ -357,10 +357,9 @@ def plot_t2(x0s, xts, size, **kwargs):
         tight_layout=True,
     )
 
-    for k, (x0, xt) in enumerate(zip(x0s, xts)):
-        for i, x in enumerate([x0, xt]):
-            x = proj_t2(x)
-            axes[i].scatter(x[..., 0], x[..., 1], s=0.1)
+    for i, x in enumerate([x0, xt]):
+        x = proj_t2(x)
+        axes[i].scatter(x[..., 0], x[..., 1], s=0.1)
 
     for ax in axes:
         ax.set_xlim([0, 2 * jnp.pi])
@@ -374,8 +373,8 @@ def plot_t2(x0s, xts, size, **kwargs):
 import seaborn as sns
 
 
-def plot_tn(x0s, xts, size, **kwargs):
-    n = x0s[0].shape[-1]
+def plot_tn(x0, xt, size, **kwargs):
+    n = x0.shape[-1]
     n = min(5, n // 4)
 
     fig, axes = plt.subplots(
@@ -388,20 +387,18 @@ def plot_tn(x0s, xts, size, **kwargs):
         squeeze=False,
     )
     # cmap = sns.mpl_palette("viridis")
-    for k, (x0, xt) in enumerate(zip(x0s, xts)):
-        print(x0.shape)
-        for i, x in enumerate([x0, xt]):
-            for j in range(n):
-                x_ = proj_t2(x[..., (4 * j) : (4 * (j + 1))])
-                axes[j][i].scatter(x_[..., 0], x_[..., 1], s=0.1)
-                # sns.kdeplot(
-                #     x=np.asarray(x_[..., 0]),
-                #     y=np.asarray(x_[..., 1]),
-                #     ax=axes[j][i],
-                #     cmap=cmap,
-                #     fill=True,
-                #     # levels=15,
-                # )
+    for i, x in enumerate([x0, xt]):
+        for j in range(n):
+            x_ = proj_t2(x[..., (4 * j) : (4 * (j + 1))])
+            axes[j][i].scatter(x_[..., 0], x_[..., 1], s=0.1)
+            # sns.kdeplot(
+            #     x=np.asarray(x_[..., 0]),
+            #     y=np.asarray(x_[..., 1]),
+            #     ax=axes[j][i],
+            #     cmap=cmap,
+            #     fill=True,
+            #     # levels=15,
+            # )
 
     axes = [item for sublist in axes for item in sublist]
     for ax in axes:
@@ -417,7 +414,7 @@ def proj_t1(x):
     return jnp.mod(jnp.arctan2(x[..., 0], x[..., 1]), 2 * np.pi)
 
 
-def plot_t1(x0s, xts, size, **kwargs):
+def plot_t1(x0, xt, size, **kwargs):
     fig, axes = plt.subplots(
         1,
         2,
@@ -427,11 +424,10 @@ def plot_t1(x0s, xts, size, **kwargs):
         tight_layout=True,
     )
 
-    for k, (x0, xt) in enumerate(zip(x0s, xts)):
-        for i, x in enumerate([x0, xt]):
-            x = proj_t1(x)
-            sns.kdeplot(x, ax=axes[i])
-            plt.scatter(jnp.zeros_like(x), x, marker="|")
+    for i, x in enumerate([x0, xt]):
+        x = proj_t1(x)
+        sns.kdeplot(x, ax=axes[i])
+        plt.scatter(jnp.zeros_like(x), x, marker="|")
 
     for ax in axes:
         ax.set_xlim([0, 2 * jnp.pi])
@@ -576,7 +572,7 @@ def make_disk_grid(N, eps=1e-3, dim=2, radius=1.0):
 
 
 def plot_poincare(
-    x0s, xts, size, log_prob=None, coord_map=lambda x: x, grid_plot=False, **kwargs
+    x0, xt, size, log_prob=None, coord_map=lambda x: x, grid_plot=False, **kwargs
 ):
     fig, ax = plt.subplots(
         1,
@@ -627,23 +623,20 @@ def plot_poincare(
             shading="gouraud",
         )
 
-    for k, (x0, xt) in enumerate(zip(x0s, xts)):
-        if xt is not None:
-            if log_prob is not None:
-                prob = jnp.exp(log_prob(coord_map(xt)))
-                nb = len(jnp.nonzero(jnp.isnan(prob))[0])
-                tot = prob.shape[0]
-                print(f"prop nan in prob: {nb / tot * 100:.1f}%")
-                c = prob if nb == 0 else "orange"
-            else:
-                c = "blue"
-            ax.scatter(
-                xt[..., 0], xt[..., 1], alpha=0.3, s=2, c=c, label="model", cmap=cmap
-            )
-        if x0 is not None:
-            ax.scatter(
-                x0[..., 0], x0[..., 1], alpha=1.0, s=2, c="black", label="data", cmap=cmap
-            )
+    if xt is not None:
+        if log_prob is not None:
+            prob = jnp.exp(log_prob(coord_map(xt)))
+            nb = len(jnp.nonzero(jnp.isnan(prob))[0])
+            tot = prob.shape[0]
+            print(f"prop nan in prob: {nb / tot * 100:.1f}%")
+            c = prob if nb == 0 else "orange"
+        else:
+            c = "blue"
+        ax.scatter(xt[..., 0], xt[..., 1], alpha=0.3, s=2, c=c, label="model", cmap=cmap)
+    if x0 is not None:
+        ax.scatter(
+            x0[..., 0], x0[..., 1], alpha=1.0, s=2, c="black", label="data", cmap=cmap
+        )
 
     # if xt is not None or x0 is not None:
     #     ax.legend(loc="best", fontsize=20)
@@ -660,8 +653,6 @@ def plot_poincare(
 
 
 def plot(manifold, x0, xt, log_prob=None, size=10):
-    x0 = [None] if x0 is None else x0
-    xt = [None] if xt is None else xt
     prob = None if log_prob is None else lambda x: jnp.exp(log_prob(x))
     if isinstance(manifold, Euclidean) and manifold.dim == 3:
         fig = plot_3d(x0, xt, size, prob=prob)
@@ -705,13 +696,13 @@ def plot_ref(manifold, xt, size=10, log_prob=None):
     elif isinstance(manifold, _SpecialOrthogonalMatrices) and manifold.dim == 3:
         fig = plot_so3_uniform(xt, size)
     elif isinstance(manifold, PoincareBall) and manifold.dim == 2:
-        fig = plot_poincare(xt, [None], size, log_prob=log_prob)
+        fig = plot_poincare(xt, None, size, log_prob=log_prob)
     elif isinstance(manifold, Hyperboloid) and manifold.dim == 2:
         coord_map = Hyperbolic._ball_to_extrinsic_coordinates
         if xt is not None:
             xt = [Hyperbolic._extrinsic_to_ball_coordinates(x) for x in xt]
         fig = plot_poincare(
-            xt, [None], size, log_prob=log_prob, coord_map=coord_map, grid_plot=True
+            xt, None, size, log_prob=log_prob, coord_map=coord_map, grid_plot=True
         )
     else:
         print("Only plotting over R^3, S^2 and SO(3) is implemented.")

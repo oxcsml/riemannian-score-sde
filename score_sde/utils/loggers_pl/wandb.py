@@ -31,7 +31,13 @@ from weakref import ReferenceType
 # from pytorch_lightning.utilities.imports import _compare_version
 # from pytorch_lightning.utilities.warnings import rank_zero_warn
 from .base import LightningLoggerBase, rank_zero_experiment
-from .utilities import rank_zero_only, rank_zero_warn, _module_available, _compare_version, MisconfigurationException
+from .utilities import (
+    rank_zero_only,
+    rank_zero_warn,
+    _module_available,
+    _compare_version,
+    MisconfigurationException,
+)
 
 _WANDB_AVAILABLE = _module_available("wandb")
 _WANDB_GREATER_EQUAL_0_10_22 = _compare_version("wandb", operator.ge, "0.10.22")
@@ -349,12 +355,16 @@ class WandbLogger(LightningLoggerBase):
         # define default x-axis (for latest wandb versions)
         if getattr(self._experiment, "define_metric", None):
             self._experiment.define_metric("trainer/global_step")
-            self._experiment.define_metric("*", step_metric="trainer/global_step", step_sync=True)
+            self._experiment.define_metric(
+                "*", step_metric="trainer/global_step", step_sync=True
+            )
 
         return self._experiment
 
     # def watch(self, model: nn.Module, log: str = "gradients", log_freq: int = 100, log_graph: bool = True):
-    def watch(self, model, log: str = "gradients", log_freq: int = 100, log_graph: bool = True):
+    def watch(
+        self, model, log: str = "gradients", log_freq: int = 100, log_graph: bool = True
+    ):
         self.experiment.watch(model, log=log, log_freq=log_freq, log_graph=log_graph)
 
     @rank_zero_only
@@ -421,16 +431,21 @@ class WandbLogger(LightningLoggerBase):
                 raise ValueError(f"Expected {n} items but only found {len(v)} for {k}")
         step = kwargs.pop("step", None)
         kwarg_list = [{k: kwargs[k][i] for k in kwargs.keys()} for i in range(n)]
-        metrics = {key: [wandb.Image(img, **kwarg) for img, kwarg in zip(images, kwarg_list)]}
+        metrics = {
+            key: [wandb.Image(img, **kwarg) for img, kwarg in zip(images, kwarg_list)]
+        }
         self.log_metrics(metrics, step)
 
     def log_plot(self, name, plt, step):
+        if plt is None:
+            return
         if isinstance(plt, list):
             for i, plot_i in enumerate(plt):
-                self.experiment.log({f"{name}_{i}": [wandb.Image(plot_i, caption=step)]}, commit=True)
+                self.experiment.log(
+                    {f"{name}_{i}": [wandb.Image(plot_i, caption=step)]}, commit=True
+                )
         else:
             self.experiment.log({name: [wandb.Image(plt, caption=step)]}, commit=True)
-
 
     @property
     def save_dir(self) -> Optional[str]:
@@ -461,9 +476,15 @@ class WandbLogger(LightningLoggerBase):
         # don't create an experiment if we don't have one
         return self._experiment.id if self._experiment else self._id
 
-    def after_save_checkpoint(self, checkpoint_callback: "ReferenceType[ModelCheckpoint]") -> None:
+    def after_save_checkpoint(
+        self, checkpoint_callback: "ReferenceType[ModelCheckpoint]"
+    ) -> None:
         # log checkpoints as artifacts
-        if self._log_model == "all" or self._log_model is True and checkpoint_callback.save_top_k == -1:
+        if (
+            self._log_model == "all"
+            or self._log_model is True
+            and checkpoint_callback.save_top_k == -1
+        ):
             self._scan_and_log_checkpoints(checkpoint_callback)
         elif self._log_model is True:
             self._checkpoint_callback = checkpoint_callback
@@ -475,16 +496,25 @@ class WandbLogger(LightningLoggerBase):
             self._scan_and_log_checkpoints(self._checkpoint_callback)
         wandb.finish()
 
-    def _scan_and_log_checkpoints(self, checkpoint_callback: "ReferenceType[ModelCheckpoint]") -> None:
+    def _scan_and_log_checkpoints(
+        self, checkpoint_callback: "ReferenceType[ModelCheckpoint]"
+    ) -> None:
         # get checkpoints to be saved with associated score
         checkpoints = {
             checkpoint_callback.last_model_path: checkpoint_callback.current_score,
             checkpoint_callback.best_model_path: checkpoint_callback.best_model_score,
             **checkpoint_callback.best_k_models,
         }
-        checkpoints = sorted((Path(p).stat().st_mtime, p, s) for p, s in checkpoints.items() if Path(p).is_file())
+        checkpoints = sorted(
+            (Path(p).stat().st_mtime, p, s)
+            for p, s in checkpoints.items()
+            if Path(p).is_file()
+        )
         checkpoints = [
-            c for c in checkpoints if c[1] not in self._logged_model_time.keys() or self._logged_model_time[c[1]] < c[0]
+            c
+            for c in checkpoints
+            if c[1] not in self._logged_model_time.keys()
+            or self._logged_model_time[c[1]] < c[0]
         ]
 
         # log iteratively all new checkpoints
@@ -510,9 +540,15 @@ class WandbLogger(LightningLoggerBase):
                 if _WANDB_GREATER_EQUAL_0_10_22
                 else None
             )
-            artifact = wandb.Artifact(name=f"model-{self.experiment.id}", type="model", metadata=metadata)
+            artifact = wandb.Artifact(
+                name=f"model-{self.experiment.id}", type="model", metadata=metadata
+            )
             artifact.add_file(p, name="model.ckpt")
-            aliases = ["latest", "best"] if p == checkpoint_callback.best_model_path else ["latest"]
+            aliases = (
+                ["latest", "best"]
+                if p == checkpoint_callback.best_model_path
+                else ["latest"]
+            )
             self.experiment.log_artifact(artifact, aliases=aliases)
             # remember logged models - timestamp needed in case filename didn't change (lastkckpt or custom name)
             self._logged_model_time[p] = t
