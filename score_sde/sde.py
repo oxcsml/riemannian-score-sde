@@ -5,8 +5,9 @@ Modified code from https://github.com/yang-song/score_sde
 from abc import ABC, abstractmethod
 
 import jax
-import numpy as np
 import jax.numpy as jnp
+
+from score_sde.models.model import get_score_fn
 from score_sde.utils import get_exact_div_fn
 from score_sde.schedule import ConstantBetaSchedule
 
@@ -149,6 +150,9 @@ class SDE(ABC):
         f = drift * dt
         G = diffusion * jnp.sqrt(jnp.abs(dt))
         return f, G
+
+    def reparametrise_score_fn(self, score_fn, *args):
+        return get_score_fn(self, score_fn, *args, std_trick=True, residual_trick=True)
 
     def reverse(self, score_fn):
         return RSDE(self, score_fn)

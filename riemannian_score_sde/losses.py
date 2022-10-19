@@ -8,7 +8,7 @@ import jax.numpy as jnp
 import jax.random as random
 
 from score_sde.utils import batch_mul
-from score_sde.models import get_score_fn, SDEPushForward, MoserFlow
+from score_sde.models import SDEPushForward, MoserFlow
 from score_sde.utils import ParametrisedScoreFunction, TrainState
 from score_sde.models import div_noise, get_riemannian_div_fn
 
@@ -27,14 +27,7 @@ def get_dsm_loss_fn(
     def loss_fn(
         rng: jax.random.KeyArray, params: dict, states: dict, batch: dict
     ) -> Tuple[float, dict]:
-        score_fn = get_score_fn(
-            sde,
-            model,
-            params,
-            states,
-            train=train,
-            return_state=True,
-        )
+        score_fn = sde.reparametrise_score_fn(model, params, states, train, True)
         y_0, context = pushforward.transform.inv(batch["data"]), batch["context"]
 
         rng, step_rng = random.split(rng)
@@ -97,14 +90,7 @@ def get_ism_loss_fn(
     def loss_fn(
         rng: jax.random.KeyArray, params: dict, states: dict, batch: dict
     ) -> Tuple[float, dict]:
-        score_fn = get_score_fn(
-            sde,
-            model,
-            params,
-            states,
-            train=train,
-            return_state=True,
-        )
+        score_fn = sde.reparametrise_score_fn(model, params, states, train, True)
         y_0, context = pushforward.transform.inv(batch["data"]), batch["context"]
 
         rng, step_rng = random.split(rng)

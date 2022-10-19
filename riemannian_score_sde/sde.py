@@ -2,6 +2,7 @@ import jax
 import jax.numpy as jnp
 
 from score_sde.sde import SDE, RSDE as RSDEBase, get_matrix_div_fn
+from score_sde.models import get_score_fn
 from score_sde.utils import batch_mul
 from riemannian_score_sde.sampling import get_pc_sampler
 from riemannian_score_sde.models.distribution import (
@@ -57,9 +58,19 @@ class Langevin(SDE):
     def marginal_prob(self, x, t):
         # NOTE: this is only a proxy!
         log_mean_coeff = self.beta_schedule.log_mean_coeff(t)
-        mean = jnp.exp(log_mean_coeff)[..., None] * x
+        axis_to_expand = tuple(range(-1, -len(x.shape), -1))  # (-1) or (-1, -2)
+        mean_coeff = jnp.expand_dims(jnp.exp(log_mean_coeff), axis=axis_to_expand)
+        # mean = jnp.exp(log_mean_coeff)[..., None] * x
+        mean = mean_coeff * x
         std = jnp.sqrt(1 - jnp.exp(2.0 * log_mean_coeff))
         return mean, std
+
+    def varhadan_exp(self, xs, xt, s, t):
+        delta_t = self.beta_schedule.rescale_t(t) - self.beta_schedule.rescale_t(s)
+        axis_to_expand = tuple(range(-1, -len(xt.shape), -1))  # (-1) or (-1, -2)
+        delta_t = jnp.expand_dims(delta_t, axis=axis_to_expand)
+        grad = self.manifold.log(xs, xt) / delta_t
+        return delta_t, grad
 
     def reverse(self, score_fn):
         return RSDE(self, score_fn)
@@ -104,12 +115,8 @@ class Brownian(Langevin):
         logp_grad = self.manifold.grad_marginal_log_prob(x0, x, s, **kwargs)
         return None, logp_grad
 
-    def varhadan_exp(self, xs, xt, s, t):
-        delta_t = self.beta_schedule.rescale_t(t) - self.beta_schedule.rescale_t(s)
-        axis_to_expand = tuple(range(-1, -len(xt.shape), -1))  # (-1) or (-1, -2)
-        delta_t = jnp.expand_dims(delta_t, axis=axis_to_expand)
-        grad = self.manifold.log(xs, xt) / delta_t
-        return delta_t, grad
+    def reparametrise_score_fn(self, score_fn, *args):
+        return get_score_fn(self, score_fn, *args, std_trick=True, residual_trick=False)
 
 
 class Hessian(Langevin):

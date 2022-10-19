@@ -23,11 +23,9 @@ import jax.numpy as jnp
 from score_sde.utils.jax import batch_mul
 from score_sde.utils.typing import ParametrisedScoreFunction
 
-from score_sde.sde import SDE
-
 
 def get_score_fn(
-    sde: SDE,
+    sde,
     model: ParametrisedScoreFunction,
     params,
     state,

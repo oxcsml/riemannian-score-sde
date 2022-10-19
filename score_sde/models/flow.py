@@ -61,7 +61,7 @@ def div_noise(
 def get_sde_drift_from_fn(sde: SDE, model: ParametrisedScoreFunction, params, states):
     def drift_fn(y: jnp.ndarray, t: float, context: jnp.ndarray) -> jnp.ndarray:
         """The drift function of the reverse-time SDE."""
-        score_fn = get_score_fn(sde, model, params, states, train=False)
+        score_fn = sde.reparametrise_score_fn(model, params, states, False)
         pode = sde.probability_ode(score_fn)
         return pode.coefficients(y, t, context)[0]
 
@@ -139,7 +139,7 @@ class PushForward:
 
 
 class SDEPushForward(PushForward):
-    def __init__(self, flow, base, diffeq="sde", transform=Id):
+    def __init__(self, flow: SDE, base, diffeq="sde", transform=Id):
         self.sde = flow
         self.diffeq = diffeq
         flow = CNF(
@@ -159,7 +159,7 @@ class SDEPushForward(PushForward):
 
             def sample(rng, shape, context, z=None):
                 z = self.base.sample(rng, shape) if z is None else z
-                score_fn = get_score_fn(self.sde, *model_w_dicts)
+                score_fn = self.sde.reparametrise_score_fn(*model_w_dicts)
                 score_fn = partial(score_fn, context=context)
                 sde = self.sde.reverse(score_fn) if reverse else self.sde
                 sampler = get_pc_sampler(sde, **kwargs)
