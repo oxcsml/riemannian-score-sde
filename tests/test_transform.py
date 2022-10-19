@@ -8,7 +8,7 @@ import jax.numpy as jnp
 import geomstats.backend as gs
 from geomstats.geometry.special_orthogonal import SpecialOrthogonal
 from riemannian_score_sde.models.transform import *
-from riemannian_score_sde.datasets.unimodal import Wrapped
+from riemannian_score_sde.datasets import Wrapped
 
 sq_log_det = lambda jac: jnp.log(jnp.abs(jnp.linalg.det(jac)))
 rec_log_det = lambda jac: jnp.log(

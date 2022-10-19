@@ -6,7 +6,7 @@ import os
 os.environ["GEOMSTATS_BACKEND"] = "jax"
 
 import jax.numpy as jnp
-from riemannian_score_sde.datasets.unimodal import Langevin
+from riemannian_score_sde.datasets import Langevin
 from geomstats.geometry.special_orthogonal import (
     SpecialOrthogonal,
     _SpecialOrthogonal3Vectors,

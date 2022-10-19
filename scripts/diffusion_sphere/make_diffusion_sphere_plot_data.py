@@ -9,7 +9,7 @@ os.environ["GEOMSTATS_BACKEND"] = "jax"
 import jax
 import jax.numpy as jnp
 from geomstats.geometry.hypersphere import Hypersphere
-from riemannian_score_sde.datasets.unimodal import Wrapped
+from riemannian_score_sde.datasets import Wrapped
 from riemannian_score_sde.utils.vis import latlon_from_cartesian, cartesian_from_latlong
 %matplotlib inline
 import matplotlib.pyplot as plt

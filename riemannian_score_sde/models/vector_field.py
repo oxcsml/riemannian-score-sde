@@ -10,23 +10,23 @@ from geomstats.geometry.hypersphere import Hypersphere
 from geomstats.geometry.base import VectorSpace, EmbeddedManifold
 
 
-def get_exact_div_fn(fi_fn, Xi=None):
-    "flatten all but the last axis and compute the true divergence"
+# def get_exact_div_fn(fi_fn, Xi=None):
+#     "flatten all but the last axis and compute the true divergence"
 
-    def div_fn(x: jnp.ndarray, t: float):
-        x_shape = x.shape
-        dim = np.prod(x_shape[1:])
-        t = jnp.expand_dims(t.reshape(-1), axis=-1)
-        x = jnp.expand_dims(x, 1)  # NOTE: need leading batch dim after vmap
-        t = jnp.expand_dims(t, 1)
-        jac = jax.vmap(jax.jacrev(fi_fn, argnums=0))(x, t)
-        jac = jac.reshape([x_shape[0], dim, dim])
-        if Xi is not None:
-            jac = jnp.einsum("...nd,...dm->...nm", jac, Xi)
-        div = jnp.trace(jac, axis1=-1, axis2=-2)
-        return div
+#     def div_fn(x: jnp.ndarray, t: float):
+#         x_shape = x.shape
+#         dim = np.prod(x_shape[1:])
+#         t = jnp.expand_dims(t.reshape(-1), axis=-1)
+#         x = jnp.expand_dims(x, 1)  # NOTE: need leading batch dim after vmap
+#         t = jnp.expand_dims(t, 1)
+#         jac = jax.vmap(jax.jacrev(fi_fn, argnums=0))(x, t)
+#         jac = jac.reshape([x_shape[0], dim, dim])
+#         if Xi is not None:
+#             jac = jnp.einsum("...nd,...dm->...nm", jac, Xi)
+#         div = jnp.trace(jac, axis1=-1, axis2=-2)
+#         return div
 
-    return div_fn
+#     return div_fn
 
 
 class VectorFieldGenerator(hk.Module, abc.ABC):
@@ -139,12 +139,9 @@ class LieAlgebraGenerator(VectorFieldGenerator):
         x = x.reshape((x.shape[0], self.manifold.dim, self.manifold.dim))
         fi_fn, Xi_fn = self.decomposition
         x_input = x.reshape((*x.shape[:-2], -1))
-        # x_input = self.manifold.vee(self.manifold.log(x)) #NOTE: extremely unstable
         fi, Xi = fi_fn(x_input, t), Xi_fn(x)
         out = jnp.einsum("...i,ijk ->...jk", fi, Xi)
-        # is_tangent = self.manifold.lie_algebra.belongs(out, atol=1e-3).all()
         out = self.manifold.compose(x, out)
-        # is_tangent = self.manifold.is_tangent(out, x, atol=1e-3).all()
         # out = self.manifold.to_tangent(out, x)
         return out.reshape((x.shape[0], -1))
 

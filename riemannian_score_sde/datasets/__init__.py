@@ -1,3 +1,3 @@
 from .earth import *
-from .abdb import *
-from .unimodal import *
+from .simple import *
+from .mixture import *

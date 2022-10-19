@@ -2,7 +2,7 @@ import math
 from jax import numpy as jnp
 
 from riemannian_score_sde.utils.normalization import compute_normalization
-from riemannian_score_sde.datasets.unimodal import vMFDataset
+from riemannian_score_sde.datasets import vMFDataset
 from geomstats.geometry.hypersphere import Hypersphere
 
 
