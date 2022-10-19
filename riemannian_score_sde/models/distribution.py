@@ -93,11 +93,10 @@ class WrapNormDistribution:
     def grad_U(self, x):
         def U(x):
             sq_dist = self.manifold.metric.dist(x, self.mean) ** 2
-            # NOTE: scale must be isotropic!
-            res = 0.5 * sq_dist / (self.scale.mean() ** 2)
+            res = 0.5 * sq_dist / (self.scale[0] ** 2)  # scale must be isotropic
             logdetexp = self.manifold.metric.logdetexp(self.mean, x)
             return res + logdetexp
 
-        # U = lambda x: -self.log_prob(x)
+        # U = lambda x: -self.log_prob(x)  #NOTE: this does not work
 
         return self.manifold.to_tangent(self.manifold.metric.grad(U)(x), x)

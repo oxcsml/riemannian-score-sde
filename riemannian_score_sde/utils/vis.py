@@ -374,7 +374,7 @@ import seaborn as sns
 
 
 def plot_tn(x0, xt, size, **kwargs):
-    n = x0.shape[-1]
+    n = xt.shape[-1]
     n = min(5, n // 4)
 
     fig, axes = plt.subplots(
@@ -388,6 +388,8 @@ def plot_tn(x0, xt, size, **kwargs):
     )
     # cmap = sns.mpl_palette("viridis")
     for i, x in enumerate([x0, xt]):
+        if x is None:
+            continue
         for j in range(n):
             x_ = proj_t2(x[..., (4 * j) : (4 * (j + 1))])
             axes[j][i].scatter(x_[..., 0], x_[..., 1], s=0.1)

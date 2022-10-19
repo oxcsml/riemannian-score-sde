@@ -32,7 +32,11 @@ def get_riemannian_div_fn(func, hutchinson_type: str = "None", manifold=None):
     if M is submersion with euclidean ambient metric: div = div_E
     else (in a char) div f = 1/sqrt(g) \sum_i \partial_i(sqrt(g) f_i)
     """
-    sqrt_g = lambda x: 1.0 if manifold is None else manifold.metric.lambda_x(x)
+    sqrt_g = (
+        lambda x: 1.0
+        if manifold is None or not hasattr(manifold.metric, "lambda_x")
+        else manifold.metric.lambda_x(x)
+    )
     drift_fn = lambda y, t, context: sqrt_g(y) * func(y, t, context)
     div_fn = get_div_fn(drift_fn, hutchinson_type)
     return lambda y, t, context, eps: div_fn(y, t, context, eps) / sqrt_g(y)

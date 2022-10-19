@@ -3,7 +3,6 @@
 name: tn
 
 defaults:
-  # - /generator: torus
   - /dataset: wrapped
   - /manifold: tn
   - /architecture: concat
