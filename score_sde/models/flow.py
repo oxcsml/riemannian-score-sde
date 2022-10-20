@@ -4,15 +4,14 @@ from typing import Sequence
 import jax
 import numpy as np
 import jax.numpy as jnp
-from jax.nn import relu
 from score_sde.sde import SDE
-from score_sde.models.model import get_score_fn
 from score_sde.models.transform import Id
 from score_sde.utils import (
     ParametrisedScoreFunction,
     get_exact_div_fn,
     get_estimate_div_fn,
 )
+
 from score_sde.ode import odeint
 from score_sde.sampling import get_pc_sampler
 
@@ -117,10 +116,10 @@ class PushForward:
         return "PushForward: base:{} flow:{}".format(self.base, self.flow)
 
     def get_log_prob(self, model_w_dicts, train=False, transform=True, **kwargs):
-        def log_prob(x, rng=None):
+        def log_prob(x, context=None, rng=None):
             y = self.transform.inv(x) if transform else x
-            flow = self.flow.get_forward(model_w_dicts, train, augmented=True)
-            z, inv_logdets, nfe = flow(y, rng=rng, **kwargs)  # NOTE: flow is not reversed
+            flow = self.flow.get_forward(model_w_dicts, train, augmented=True, **kwargs)
+            z, inv_logdets, nfe = flow(y, context, rng=rng)  # NOTE: flow is not reversed
             log_prob = self.base.log_prob(z).reshape(-1)
             log_prob += inv_logdets
             if transform:
@@ -134,8 +133,8 @@ class PushForward:
     ):
         def sample(rng, shape, context, z=None):
             z = self.base.sample(rng, shape) if z is None else z
-            flow = self.flow.get_forward(model_w_dicts, train)
-            y, nfe = flow(z, context, reverse=reverse, **kwargs)  # NOTE: flow is reversed
+            flow = self.flow.get_forward(model_w_dicts, train, **kwargs)
+            y, nfe = flow(z, context, reverse=reverse)  # NOTE: flow is reversed
             x = self.transform(y) if transform else y
             return x
 
@@ -192,7 +191,7 @@ class MoserFlow(PushForward):
             return super().get_log_prob(model_w_dicts, train, **kwargs)
         else:
             # Proxy 'trick' likelihood /!\ does not yield normalised measure /!\
-            def log_prob(x, context):
+            def log_prob(x, context=None):
                 """Use closed-form formula since faster than solving ODE"""
                 y = self.transform.inv(x) if transform else x
                 log_prob = self.density(y, context, model_w_dicts, "None", None)

@@ -523,7 +523,6 @@ def plot_so3b(prob, lambda_x, N, size=10):
 
 
 def plot_normal(x, dim, size=10):
-    x = x[0]  # NOTE: if several context, would only plot the first one
     colors = sns.color_palette("husl", len(x))
     fig, axes = plt.subplots(
         1,
@@ -576,6 +575,7 @@ def make_disk_grid(N, eps=1e-3, dim=2, radius=1.0):
 def plot_poincare(
     x0, xt, size, log_prob=None, coord_map=lambda x: x, grid_plot=False, **kwargs
 ):
+
     fig, ax = plt.subplots(
         1,
         1,
@@ -679,10 +679,10 @@ def plot(manifold, x0, xt, log_prob=None, size=10):
         fig = plot_poincare(x0, xt, size, log_prob=log_prob)
     elif isinstance(manifold, Hyperboloid) and manifold.dim == 2:
         coord_map = Hyperbolic._ball_to_extrinsic_coordinates
-        if x0[0] is not None:
-            x0 = [Hyperbolic._extrinsic_to_ball_coordinates(x) for x in x0]
-        if xt[0] is not None:
-            xt = [Hyperbolic._extrinsic_to_ball_coordinates(x) for x in xt]
+        if x0 is not None:
+            x0 = Hyperbolic._extrinsic_to_ball_coordinates(x0)
+        if xt is not None:
+            xt = Hyperbolic._extrinsic_to_ball_coordinates(xt)
         fig = plot_poincare(x0, xt, size, coord_map=coord_map, log_prob=log_prob)
     else:
         print("Only plotting over R^3, S^2, S1/T1, T2, TN, H2 and SO(3) is implemented.")
@@ -702,7 +702,7 @@ def plot_ref(manifold, xt, size=10, log_prob=None):
     elif isinstance(manifold, Hyperboloid) and manifold.dim == 2:
         coord_map = Hyperbolic._ball_to_extrinsic_coordinates
         if xt is not None:
-            xt = [Hyperbolic._extrinsic_to_ball_coordinates(x) for x in xt]
+            xt = Hyperbolic._extrinsic_to_ball_coordinates(xt)
         fig = plot_poincare(
             xt, None, size, log_prob=log_prob, coord_map=coord_map, grid_plot=True
         )

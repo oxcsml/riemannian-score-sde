@@ -131,10 +131,11 @@ def get_logp_loss_fn(
         rng: jax.random.KeyArray, params: dict, states: dict, batch: dict
     ) -> Tuple[float, dict]:
         x_0 = batch["data"]
+        context = batch["context"]
 
         model_w_dicts = (model, params, states)
         log_prob = pushforward.get_log_prob(model_w_dicts, train=train)
-        losses = -log_prob(x_0, rng=rng)[0]
+        losses = -log_prob(x_0, context, rng=rng)[0]
         loss = jnp.mean(losses)
 
         return loss, states
