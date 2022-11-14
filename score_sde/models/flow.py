@@ -49,7 +49,8 @@ def div_noise(
         epsilon = jax.random.normal(rng, shape)
     elif hutchinson_type == "Rademacher":
         epsilon = (
-            jax.random.randint(rng, shape, minval=0, maxval=2).astype(jnp.float32) * 2 - 1
+            jax.random.randint(rng, shape, minval=0, maxval=2).astype(jnp.float32) * 2
+            - 1
         )
     elif hutchinson_type == "None":
         epsilon = None
@@ -118,8 +119,13 @@ class PushForward:
     def get_log_prob(self, model_w_dicts, train=False, transform=True, **kwargs):
         def log_prob(x, context=None, rng=None):
             y = self.transform.inv(x) if transform else x
+            tf = kwargs.pop("tf") if "tf" in kwargs else 1.0
+            t0 = kwargs.pop("t0") if "t0" in kwargs else 0.0
+
             flow = self.flow.get_forward(model_w_dicts, train, augmented=True, **kwargs)
-            z, inv_logdets, nfe = flow(y, context, rng=rng)  # NOTE: flow is not reversed
+            z, inv_logdets, nfe = flow(
+                y, context, rng=rng, tf=tf, t0=t0
+            )  # NOTE: flow is not reversed
             log_prob = self.base.log_prob(z).reshape(-1)
             log_prob += inv_logdets
             if transform:
@@ -305,7 +311,9 @@ class CNF:
                 data = data.reshape(shape[0], -1)
                 init = jnp.concatenate([data, np.zeros((shape[0], 1))], axis=1)
                 ode_func = ReverseAugWrapper(ode_func, tf) if reverse else ode_func
-                y, nfe = odeint(ode_func, init, ts, context, params, states, **ode_kwargs)
+                y, nfe = odeint(
+                    ode_func, init, ts, context, params, states, **ode_kwargs
+                )
                 z = y[-1, ..., :-1].reshape(shape)
                 delta_logp = y[-1, ..., -1]
                 return z, delta_logp, nfe
@@ -323,7 +331,9 @@ class CNF:
                 data = data.reshape(shape[0], -1)
                 init = data
                 ode_func = ReverseWrapper(ode_func, tf) if reverse else ode_func
-                y, nfe = odeint(ode_func, init, ts, context, params, states, **ode_kwargs)
+                y, nfe = odeint(
+                    ode_func, init, ts, context, params, states, **ode_kwargs
+                )
                 z = y[-1].reshape(shape)
                 return z, nfe
 

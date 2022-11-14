@@ -101,8 +101,14 @@ class VPSDE(Langevin):
 class Brownian(Langevin):
     def __init__(self, manifold, beta_schedule, N=100):
         """Construct a Brownian motion on a compact manifold"""
-        super().__init__(beta_schedule, manifold, N=N)
+        # super().__init__(beta_schedule, manifold, N=N)
+        self.manifold = manifold
         self.limiting = UniformDistribution(manifold)
+        self.N = N
+
+        self.beta_schedule = beta_schedule
+        self.tf = beta_schedule.tf
+        self.t0 = beta_schedule.t0
 
     # def coefficients(self, x, t):
     #     beta_t = self.beta_schedule.beta_t(t)

@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 
 os.environ['GEOMSTATS_BACKEND'] = 'jax'
 os.environ['XLA_PYTHON_CLIENT_PREALLOCATE'] = 'false'
-
+os.environ['CUDA_VISIBLE_DEVICES'] = '1'
 # %%
 import os
 import socket
@@ -78,7 +78,7 @@ mesh_obj = regular_square_mesh_to_obj(
     x.reshape((num_points, num_points, 3)), wrap_y=True
 )
 
-save_obj(mesh_obj, "hyperbolic/data/hyperbolic_paraboloid.obj")
+save_obj(mesh_obj, "data/sphere.obj")
 
 # %%
 sphere = Hypersphere(2)
@@ -89,7 +89,22 @@ base_point = jnp.array([0,-1,0])
 def wrap_prob(x, sigma):
     tv = sphere.log(x, base_point=base_point[None, :])
     dist = jnp.linalg.norm(tv, axis=-1) ** 2
-    return 1/jnp.sqrt(2*jnp.pi*sigma**2) * jnp.exp(- 0.5 * dist / sigma**2)
+    norm_pdf =  1/jnp.sqrt(2*jnp.pi*sigma**2) * jnp.exp(- 0.5 * dist / sigma**2)
+    logdetexp = sphere.metric.logdetexp(base_point[None, :], x)
+    return norm_pdf + logdetexp
+
+def wrap_logprob(x, sigma):
+    tv = sphere.log(x, base_point=base_point[None, :])
+    dist = jnp.linalg.norm(tv, axis=-1) ** 2
+    norm_pdf =  - 0.5 * dist / sigma**2
+    logdetexp = sphere.metric.logdetexp(base_point[None, :], x)
+    return jnp.exp(norm_pdf + logdetexp)
+
+def rnorm_logprob(x, sigma):
+    tv = sphere.log(x, base_point=base_point[None, :])
+    dist = jnp.linalg.norm(tv, axis=-1) ** 2
+    norm_pdf =  - 0.5 * dist / sigma**2
+    return jnp.exp(norm_pdf)
 
 # %%
 import geometric_kernels
@@ -130,4 +145,37 @@ for sigma in sigmas:
         f"data/brownian_{sigma:0.2f}.png",
         cmap='viridis',
     )
+# %%
+
+from riemannian_score_sde.models.distribution import WrapNormDistribution
+
+wrap_norm = WrapNormDistribution(Hypersphere(2))
+
+# wrap_norm.log_prob(
+#     x_dense
+# )
+
+make_scalar_texture(
+    partial(wrap_logprob, sigma=0.5), 
+    x_dense,
+    # m_to_e(m_dense).swapaxes(0,1),
+    f"data/wrap_norm.png",
+    cmap='viridis',
+)
+
+make_scalar_texture(
+    partial(rnorm_logprob, sigma=0.5), 
+    x_dense,
+    # m_to_e(m_dense).swapaxes(0,1),
+    f"data/rnorm.png",
+    cmap='viridis',
+)
+
+make_scalar_texture(
+    lambda x: jnp.zeros_like(x[..., 0]), 
+    x_dense,
+    # m_to_e(m_dense).swapaxes(0,1),
+    f"data/unif.png",
+    cmap='viridis',
+)
 # %%

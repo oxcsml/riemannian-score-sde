@@ -39,7 +39,8 @@ class vMFDataset:
         self.mu = jnp.array(mu)
         assert manifold.belongs(self.mu)
         self.kappa = jnp.array([kappa])
-        self.batch_dims = batch_dims
+        assert isinstance(batch_dims, int)
+        self.batch_dims = (batch_dims,)
         self.rng = rng
 
     def __iter__(self):
@@ -70,7 +71,9 @@ class vMFDataset:
 
     def entropy(self):
         output = (
-            -self.kappa * ive(self.d / 2, self.kappa) / ive((self.d / 2) - 1, self.kappa)
+            -self.kappa
+            * ive(self.d / 2, self.kappa)
+            / ive((self.d / 2) - 1, self.kappa)
         )
         return output.reshape([*output.shape[:-1]]) + self._log_normalization()
 
