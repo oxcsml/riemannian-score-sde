@@ -1,3 +1,0 @@
-git+https://github.com/emilemathieu/submitit.git#egg=submitit
-git+https://github.com/emilemathieu/hydra.git#egg=hydra-submitit-launcher&subdirectory=plugins/hydra_submitit_launcher
-hydra-joblib-launcher==1.1.5

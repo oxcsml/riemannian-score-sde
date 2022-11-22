@@ -22,8 +22,7 @@ pip install -e .
 ```
 
 - `requirements.txt` contains the core requirements for running the code in the `score_sde` and `riemmanian_score_sde` packages. NOTE: you may need to alter the jax versions here to match your setup.
-- `requirements_exps.txt` contains extra dependencies needed for running our experiments, and using the `run.py` file provided for training / testing models. 
-- `requirements_slurm.txt` contains extra dependencies for using the job scheduling functionality of hydra.
+- `requirements_exps.txt` contains extra dependencies needed for running our experiments, and using the `run.py` file provided for training / testing models. Also contains extra dependencies for using the job scheduling functionality of hydra.
 - `requirements_dev.txt` contains some handy development packages.
 
 ## Code structure
@@ -111,7 +110,7 @@ To run the full sweeps over parameters used in the paper run:
 `RSGM ISM loss`:
 ```
 python main.py -m \
-    experiment=volcano,earthquake,fire,flood \
+    experiment=volcanoe,earthquake,fire,flood \
     model=rsgm \
     generator=div_free,ambient \
     loss=ism \
@@ -124,7 +123,7 @@ python main.py -m \
 `RSGM DSM loss`:
 ```
 python main.py -m \
-    experiment=volcano,earthquake,fire,flood \
+    experiment=volcanoe,earthquake,fire,flood \
     model=rsgm \
     generator=div_free,ambient \
     loss=dsm0 \

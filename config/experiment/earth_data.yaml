@@ -9,7 +9,6 @@ defaults:
   - /architecture: concat
   - /embedding: none
 
-data_dir: /data/ziz/not-backed-up/scratch/score-sde/data
 manifold:
   dim: 2
 

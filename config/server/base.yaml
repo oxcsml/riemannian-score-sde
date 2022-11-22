@@ -4,7 +4,6 @@ num_workers: 8
 
 paths:
   experiments: results
-data_dir: /data/localhost/not-backed-up/datasets-ziz-all/
 
 hydra:
   sweep:

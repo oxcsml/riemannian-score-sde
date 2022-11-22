@@ -5,7 +5,7 @@ defaults:
   - server: local
   - experiment: s2_toy
 
-  - logger: all
+  - logger: csv
 
   - optim: adam
   - scheduler: rcosine

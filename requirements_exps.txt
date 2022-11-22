@@ -1,4 +1,9 @@
+tqdm
 seaborn
 wandb
 hydra_core==1.1.1
 hydra_colorlog==1.1
+
+git+https://github.com/emilemathieu/submitit.git#egg=submitit
+git+https://github.com/emilemathieu/hydra.git#egg=hydra-submitit-launcher&subdirectory=plugins/hydra_submitit_launcher
+hydra-joblib-launcher==1.1.5

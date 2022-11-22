@@ -39,8 +39,7 @@ class vMFDataset:
         self.mu = jnp.array(mu)
         assert manifold.belongs(self.mu)
         self.kappa = jnp.array([kappa])
-        assert isinstance(batch_dims, int)
-        self.batch_dims = (batch_dims,)
+        self.batch_dims = batch_dims
         self.rng = rng
 
     def __iter__(self):
@@ -50,7 +49,8 @@ class vMFDataset:
         samples = self.manifold.random_von_mises_fisher(
             mu=self.mu, kappa=self.kappa, n_samples=np.prod(self.batch_dims)
         )
-        samples = samples.reshape([*self.batch_dims, samples.shape[-1]])
+        batch_dims = (self.batch_dims,) if isinstance(self.batch_dims, int) else self.batch_dims
+        samples = samples.reshape([*batch_dims, samples.shape[-1]])
 
         return (samples, None)
 
