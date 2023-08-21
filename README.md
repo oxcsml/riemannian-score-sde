@@ -10,7 +10,7 @@ SGMs are a powerful class of generative models that exhibit remarkable empirical
 
 Simple install instructions are:
 ```
-git clone https://github.com/oxcsml/score-sde.git
+git clone https://github.com/oxcsml/riemannian-score-sde.git
 cd score-sde
 git clone https://github.com/oxcsml/geomstats.git 
 virtualenv -p python3.9 venv
