@@ -1,0 +1,35 @@
+name: Build and test run
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build-and-run:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Build and run devcontainer
+      run: |
+        # Pull the specified image
+        docker pull mcr.microsoft.com/devcontainers/python:0-3.10
+
+        # Create and start a container from the image, overriding the default command to keep it running
+        container_id=$(docker run -d mcr.microsoft.com/devcontainers/python:0-3.10 tail -f /dev/null)
+
+        # Copy the repository code into the container
+        docker cp . $container_id:/workspace
+
+        # Run the postCreateCommand specified in devcontainer.json
+        # to emulate the behavior of the devcontainer postCreateCommand section.
+        docker exec $container_id bash -c "cd /workspace && git clone https://github.com/oxcsml/geomstats.git && pip install -r requirements.txt && pip install -r requirements_exps.txt && GEOMSTATS_BACKEND=jax pip install -e geomstats && pip install -e ."
+
+        # Run the toy example
+        docker exec $container_id python /workspace/main.py experiment=s2_toy
+
+        # Optionally, remove the container
+        docker rm -f $container_id
