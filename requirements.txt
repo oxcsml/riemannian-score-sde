@@ -1,4 +1,5 @@
-jax==0.4.18 # Fix versions to ensure it works
+jax==0.4.19  # Fix versions to ensure it works
+jaxlib==0.4.19  # Fix versions to ensure it works
 dm-haiku
 optax==0.1.7
 distrax

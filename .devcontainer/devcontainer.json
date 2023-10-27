@@ -20,5 +20,5 @@
 	},
 
 	// Use 'postCreateCommand' to run commands after the container is created.
-	"postCreateCommand": "git clone https://github.com/oxcsml/geomstats.git && pip install -r requirements.txt && pip install -r requirements_exps.txt && GEOMSTATS_BACKEND=jax pip install -e geomstats && pip install -e ."
+	"postCreateCommand": "git clone https://github.com/oxcsml/geomstats.git || true; pip install -r requirements.txt -r requirements_dev.txt -r requirements_exps.txt; export GEOMSTATS_BACKEND=jax; pip install -e geomstats; pip install -e ."
 }
