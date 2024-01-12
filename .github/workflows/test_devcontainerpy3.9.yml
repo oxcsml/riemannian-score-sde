@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - main
+  pull_request:
+    branches:
+      - main
 
 jobs:
   build-and-run:
@@ -26,7 +29,7 @@ jobs:
 
         # Run the postCreateCommand specified in devcontainer.json
         # to emulate the behavior of the devcontainer postCreateCommand section.
-        docker exec $container_id bash -c "cd /workspace && git clone https://github.com/oxcsml/geomstats.git && pip install -r requirements.txt && pip install -r requirements_exps.txt && GEOMSTATS_BACKEND=jax pip install -e geomstats && pip install -e ."
+        docker exec $container_id bash -c "cd /workspace && git clone https://github.com/oxcsml/geomstats.git && pip install -r requirements.txt && pip install -r requirements_exps.txt && GEOMSTATS_BACKEND=jax pip install -e geomstats && pip install -e . && pip install "
 
         # Run the toy example
         docker exec $container_id python /workspace/main.py experiment=s2_toy
