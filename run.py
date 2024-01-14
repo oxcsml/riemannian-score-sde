@@ -29,7 +29,7 @@ def run(cfg):
             cfg.loss, pushforward=pushforward, model=model, eps=cfg.eps, train=True
         )
         train_step_fn = get_ema_loss_step_fn(loss, optimizer=optimiser, train=True)
-        train_step_fn = jax.jit(train_step_fn)
+        #train_step_fn = jax.jit(train_step_fn)
 
         rng = train_state.rng
         t = tqdm(
